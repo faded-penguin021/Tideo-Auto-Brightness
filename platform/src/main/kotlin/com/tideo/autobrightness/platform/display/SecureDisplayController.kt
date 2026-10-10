@@ -42,11 +42,40 @@ interface SecureDisplayController {
     fun readHdrForceSdr(): Boolean?
     fun setHdrForceSdr(on: Boolean): Result<Unit>
 
+    val nightLightRange: NightLightKelvinRange get() = NightLightKelvinRange.AOSP
+
+    fun nightLightRange(extended: Boolean): NightLightKelvinRange = nightLightRange.withExtended(extended)
+
     companion object {
-        /** AOSP Night Light Kelvin bounds/default (D-149). Shared by slider UI and D-154 circadian ramp. */
+        /** AOSP's example config (D-149), the device's fallback (DD-045); AAB's extended band is the rail (DD-046). */
         const val NIGHT_LIGHT_MIN_K = 2596
         const val NIGHT_LIGHT_MAX_K = 4082
         const val NIGHT_LIGHT_DEFAULT_K = 2850
+        const val NIGHT_LIGHT_EXTENDED_MIN_K = 686
+        const val NIGHT_LIGHT_EXTENDED_MAX_K = 7308
+        val NIGHT_LIGHT_RAIL_K = NIGHT_LIGHT_EXTENDED_MIN_K..NIGHT_LIGHT_EXTENDED_MAX_K
+    }
+}
+
+data class NightLightKelvinRange(val min: Int, val max: Int, val default: Int) {
+    fun clamp(kelvin: Int): Int = kelvin.coerceIn(min, max)
+
+    fun withExtended(extended: Boolean): NightLightKelvinRange = if (extended) {
+        NightLightKelvinRange(
+            SecureDisplayController.NIGHT_LIGHT_EXTENDED_MIN_K,
+            SecureDisplayController.NIGHT_LIGHT_EXTENDED_MAX_K,
+            default,
+        )
+    } else {
+        this
+    }
+
+    companion object {
+        val AOSP = NightLightKelvinRange(
+            SecureDisplayController.NIGHT_LIGHT_MIN_K,
+            SecureDisplayController.NIGHT_LIGHT_MAX_K,
+            SecureDisplayController.NIGHT_LIGHT_DEFAULT_K,
+        )
     }
 }
 
@@ -75,6 +104,7 @@ class AndroidSecureDisplayController(
     private val sdkInt: Int = Build.VERSION.SDK_INT,
     override val nightLightAvailable: Boolean = context.frameworkDisplayCapabilities().nightLightAvailable,
     override val alwaysOnDisplayAvailable: Boolean = context.frameworkDisplayCapabilities().alwaysOnDisplayAvailable,
+    override val nightLightRange: NightLightKelvinRange = context.frameworkDisplayCapabilities().nightLightRange,
 ) : SecureDisplayController {
     // DB-041: backing rows do not establish display-feature support or a live service update path.
     private val resolver: ContentResolver get() = context.contentResolver
@@ -100,7 +130,7 @@ class AndroidSecureDisplayController(
     }
 
     override fun setNightLightTemperature(kelvin: Int): Result<Unit> = capabilityWrite(nightLightAvailable) {
-        Settings.Secure.putInt(resolver, KEY_NIGHT_DISPLAY_TEMPERATURE, kelvin.coerceIn(1_000, 10_000))
+        Settings.Secure.putInt(resolver, KEY_NIGHT_DISPLAY_TEMPERATURE, kelvin.coerceIn(SecureDisplayController.NIGHT_LIGHT_RAIL_K))
     }
 
     override fun readNightLightAutoMode(): NightLightAutoMode = if (nightLightAvailable) {
@@ -226,6 +256,12 @@ private fun Context.frameworkString(name: String): String = frameworkString(
     read = resources::getString,
 )
 
+private fun Context.frameworkInteger(name: String): Int? = frameworkInteger(
+    name = name,
+    identifier = resources::getIdentifier,
+    read = resources::getInteger,
+)
+
 internal fun frameworkBoolean(
     name: String,
     identifier: (String, String, String) -> Int,
@@ -244,20 +280,44 @@ internal fun frameworkString(
     if (id == 0) "" else read(id)
 }.getOrDefault("")
 
+internal fun frameworkInteger(
+    name: String,
+    identifier: (String, String, String) -> Int,
+    read: (Int) -> Int,
+): Int? = runCatching {
+    val id = identifier(name, "integer", "android")
+    if (id == 0) null else read(id)
+}.getOrNull()
+
 internal data class FrameworkDisplayCapabilities(
     val nightLightAvailable: Boolean,
     val alwaysOnDisplayAvailable: Boolean,
+    val nightLightRange: NightLightKelvinRange,
 )
 
 internal fun Context.frameworkDisplayCapabilities(): FrameworkDisplayCapabilities =
-    frameworkDisplayCapabilities(::frameworkBoolean, ::frameworkString)
+    frameworkDisplayCapabilities(::frameworkBoolean, ::frameworkString, ::frameworkInteger)
 
 internal fun frameworkDisplayCapabilities(
     booleanResource: (String) -> Boolean,
     stringResource: (String) -> String,
+    integerResource: (String) -> Int?,
 ): FrameworkDisplayCapabilities = FrameworkDisplayCapabilities(
     nightLightAvailable = booleanResource("config_nightDisplayAvailable"),
     // DB-043: AOD requires both its feature flag and the ambient-display service.
     alwaysOnDisplayAvailable = booleanResource("config_dozeAlwaysOnDisplayAvailable") &&
         stringResource("config_dozeComponent").isNotEmpty(),
+    nightLightRange = nightLightKelvinRange(
+        integerResource("config_nightDisplayColorTemperatureMin"),
+        integerResource("config_nightDisplayColorTemperatureMax"),
+        integerResource("config_nightDisplayColorTemperatureDefault"),
+    ),
 )
+
+internal fun nightLightKelvinRange(min: Int?, max: Int?, default: Int?): NightLightKelvinRange {
+    val rail = SecureDisplayController.NIGHT_LIGHT_RAIL_K
+    val lo = (min ?: SecureDisplayController.NIGHT_LIGHT_MIN_K).coerceIn(rail)
+    val hi = (max ?: SecureDisplayController.NIGHT_LIGHT_MAX_K).coerceIn(rail)
+    if (lo >= hi) return NightLightKelvinRange.AOSP
+    return NightLightKelvinRange(lo, hi, (default ?: SecureDisplayController.NIGHT_LIGHT_DEFAULT_K).coerceIn(lo, hi))
+}

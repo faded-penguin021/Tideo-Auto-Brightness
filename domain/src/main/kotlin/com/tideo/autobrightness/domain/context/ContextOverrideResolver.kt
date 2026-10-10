@@ -35,9 +35,9 @@ object ContextOverrideResolver {
                 val start = ContextMatching.resolveTimeToken(range.start, signals)
                 val end = ContextMatching.resolveTimeToken(range.end, signals)
 
-                // wakeTimes collects all endpoints before match check (task43 L341-342)
+                // Wake at entry and just after the inclusive end minute, before the match check (task43 rev hunks L54-56).
                 wakeTimes.add(start)
-                wakeTimes.add(end)
+                wakeTimes.add((end + 60) % ContextMatching.SECONDS_PER_DAY)
 
                 timeDayMatch = ContextMatching.timeDayWindowMatches(start, end, activeDays, signals)
                 specificity++

@@ -25,16 +25,26 @@ These can't go to AAB (as the bug doesn't exist there), so this repository is th
 When you open one, keep it scoped to the app layer and include device model + Android version. Please don't change the brightness math or golden test fixtures in a Tideo PR
 (see below).
 
-## Translations (human-only) are welcome here
+## Translations are welcome here
 
 The app is fully localizable — every user-facing string lives in
 `app/src/main/res/values/strings.xml`. English and Simplified Chinese are available. A translation is an
 app-layer contribution, so it's welcome here via PR.
 
-> **Human translations only.** Please do **not** submit machine- or AI-generated translations
-> (Google Translate, DeepL, ChatGPT, etc.). A fluent speaker's judgement is what makes a translation
-> worth shipping — we'd rather have no translation than a machine one. By opening a translation PR you
-> confirm a fluent human did the translation.
+> **Human and AI-assisted translations are welcome; unreviewed machine translation is not.** A
+> fluent speaker's judgement is what makes a translation worth shipping, so the three kinds differ in
+> whether a fluent speaker has checked every string:
+>
+> - **Human translation**: a fluent speaker translated it. Welcome.
+> - **AI-assisted translation**: a tool (DeepL, an AI model, etc.) produced a first draft, then a
+>   fluent speaker reviewed and edited **every** string against the English original, checking
+>   meaning, omissions and placeholders, and checked it in context in the running app. Welcome; say
+>   in the PR that it is AI-assisted and which tool made the draft.
+> - **Machine translation**: tool output (Google Translate, DeepL, ChatGPT, etc.) submitted without
+>   that string-by-string review. Not accepted: we'd rather have no translation than an unchecked
+>   one.
+>
+> By opening a translation PR you confirm that a fluent speaker wrote or reviewed every string.
 
 ### How to add a language
 
@@ -53,8 +63,20 @@ app-layer contribution, so it's welcome here via PR.
 4. Keep strings roughly the same length where you can — some sit on buttons / single lines.
 5. Build to validate: `./gradlew :app:assembleDebug` and `./gradlew :app:lintDebug` (lint flags
    missing or mis-formatted translations).
-6. Open a PR with just the new `values-<lang>/strings.xml`, noting the language and that you translated
-   it yourself.
+6. Add a coverage badge for your language to the README's **Translations** section: copy the
+   简体中文 line, then change the language tag (in the alt text and in the `.json` file name) and
+   the `label=` (your language's name, URL-encoded). The number fills in by itself once your
+   translation is on `main`.
+7. Open a PR with the new `values-<lang>/strings.xml`, noting the language and whether it is a human
+   or an AI-assisted translation (if AI-assisted, which tool made the draft).
+
+A string without a translation shows in English, so a partial translation still works; lint lists
+the missing ones as warnings, not errors. When a change rewrites an English string's meaning,
+delete that string from every `values-<lang>/` file in the same change, so the app shows the new
+English rather than an outdated translation until a translator catches up. The README badges
+follow by themselves: the `Translation badges` workflow recomputes coverage on every push to
+`main` that changes a `strings.xml`, and its job summary lists the strings each language is
+missing.
 
 The in-app **Language** selector (Setup screen) lists English and Simplified Chinese. When adding
 another translated locale, also add it to the picker in `OnboardingScreen.kt` and to

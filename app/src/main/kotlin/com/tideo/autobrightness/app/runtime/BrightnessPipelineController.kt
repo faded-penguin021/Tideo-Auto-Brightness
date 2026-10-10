@@ -9,9 +9,11 @@ import com.tideo.autobrightness.platform.sensor.ProximitySensorSource
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.getAndUpdate
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.job
 import kotlinx.coroutines.launch
@@ -39,6 +41,7 @@ class BrightnessPipelineController(
     // prof759/task545 proximity. Optional: null (unit tests / no proximity sensor) is never near.
     private val proximitySource: ProximitySensorSource? = null,
     private val callbackLog: SensorCallbackLog = SensorCallbackLog(),
+    private val scaleRefreshPeriodMs: Long = 0L,
 ) : ControllerHook, PipelineRuntimeContext {
 
     private val engine = BrightnessEngine()
@@ -73,6 +76,8 @@ class BrightnessPipelineController(
         clock = clock,
     )
 
+    private val scaleRefresh = CircadianScaleRefresh(this, settingsProvider, circadianWindowsProvider, clock)
+
     private val controlGate = ControlEventGate() // DA-043 backlog bound
     private val admission = LightAdmission(this, { cachedSettings }, throttle, controlGate, clock, scope)
 
@@ -91,10 +96,12 @@ class BrightnessPipelineController(
     private var consumerJob: Job? = null
     private var sensorJob: Job? = null
     private var overrideJob: Job? = null
+    private var scaleTickJob: Job? = null
 
-    // prof759/task545 proximity damp. Orchestrator only; lifecycle lives in ProximityTracker.
+    // prof759/task545 proximity damp; A5's exit re-runs task544 on %AAB_LastRawLux (DD-024). Lifecycle: ProximityTracker.
     private val proximityTracker = ProximityTracker(proximitySource, scope) { near ->
-        _state.update { it.copy(proximityNear = near) }
+        val wasNear = _state.getAndUpdate { it.copy(proximityNear = near) }.proximityNear
+        if (wasNear && !near) admission.proximityExit()
     }
 
     // --- PipelineRuntimeContext: the single-writer accessors the cycle runner reaches state through ---
@@ -118,6 +125,11 @@ class BrightnessPipelineController(
             controlGate.consumeEach { handle(it); admission.drain() }
         }
         startOverrideDetection()
+        if (scaleRefreshPeriodMs > 0) {
+            scaleTickJob = scope.launch {
+                while (true) { delay(scaleRefreshPeriodMs); postControl(PipelineEvent.ScaleTick) }
+            }
+        }
     }
 
     /** Stop the pipeline entirely (service teardown). */
@@ -128,6 +140,7 @@ class BrightnessPipelineController(
         admission.invalidate(SampleRejection.SERVICE_DISABLED)
         stopSensor()
         overrideJob?.cancel(); overrideJob = null
+        scaleTickJob?.cancel(); scaleTickJob = null
         proximityTracker.stop()
         admission.release()
         // DA-038: independently clear pre-death Extra Dim residue and return brightness-mode ownership.
@@ -167,6 +180,7 @@ class BrightnessPipelineController(
         val consumer = consumerJob?.also { it.cancel() }
         stopSensor()
         overrideJob?.cancel(); overrideJob = null
+        scaleTickJob?.cancel(); scaleTickJob = null
         consumer?.join(); consumerJob = null
         proximityTracker.stop()
         admission.release()
@@ -215,6 +229,7 @@ class BrightnessPipelineController(
             is PipelineEvent.OverrideDetected ->
                 cycleRunner.handleOverride(event.observedBrightness, event.source)
             PipelineEvent.ContextChanged -> cycleRunner.reapplyProfile()
+            PipelineEvent.ScaleTick -> scaleRefresh.refresh()
         }
     }
 

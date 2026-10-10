@@ -7,12 +7,14 @@ import com.tideo.autobrightness.domain.circadian.DynamicScaleInput
 import com.tideo.autobrightness.platform.context.LocationReader
 import com.tideo.autobrightness.platform.context.LocationResult
 import com.tideo.autobrightness.platform.context.LocationSnapshot
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.emptyFlow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
 import org.junit.Test
@@ -185,7 +187,6 @@ class CircadianWindowProviderTest {
         assertNotNull(w, "fixed location with a live date yields windows")
         assertFalse(loc.lastKnownCalled, "fixed lat/lon must not consult Android location")
         assertEquals(CircadianWindowProvider.compute(lat, lon, midJuneEpochSec(), 1.0, transitionFactor), w)
-        assertTrue(provider.status.fixed, "status reports the location as fixed")
         scope.cancel()
     }
 
@@ -271,7 +272,7 @@ class CircadianWindowProviderTest {
             overrideFlow = MutableStateFlow(ExperimentDateLocation()),
             location = FakeLocationReader(),
             geoIpFallback = { requests++; null },
-            loadGeoIpAttemptDay = { today },
+            storedAttemptDay = flowOf(today),
             clock = { midJuneEpochSec() * 1000L },
             tzOffsetForDate = { 2.0 },
         )
@@ -289,7 +290,7 @@ class CircadianWindowProviderTest {
             overrideFlow = MutableStateFlow(ExperimentDateLocation()),
             location = FakeLocationReader(),
             geoIpFallback = { null },
-            loadCachedLocation = { CachedSunLocation(Double.NaN, 5.0, midJuneEpochSec() / 86_400L) },
+            storedLocation = flowOf(CachedSunLocation(Double.NaN, 5.0, midJuneEpochSec() / 86_400L)),
             clock = { midJuneEpochSec() * 1000L },
             tzOffsetForDate = { 2.0 },
         )
@@ -312,7 +313,7 @@ class CircadianWindowProviderTest {
             location = loc,
             geoIpFallback = { geoIpCalled = true; null },
             // a persisted fix for TODAY (Tasker %AAB_SunLat/Lon + %AAB_SunLastDate)
-            loadCachedLocation = { CachedSunLocation(lat, lon, today) },
+            storedLocation = flowOf(CachedSunLocation(lat, lon, today)),
             clock = { midJuneEpochSec() * 1000L },
             tzOffsetForDate = { 2.0 },
         )
@@ -354,12 +355,13 @@ class CircadianWindowProviderTest {
         val today = midJuneEpochSec() / 86_400L
         val yesterday = today - 1
         var refreshed = 0
+        val loc = FakeLocationReader() // no live fix
         val provider = CircadianWindowProvider(
             scope = scope,
             overrideFlow = MutableStateFlow(ExperimentDateLocation()),
-            location = FakeLocationReader(), // no live fix
+            location = loc,
             geoIpFallback = { null },        // geo-IP off
-            loadCachedLocation = { CachedSunLocation(lat, lon, yesterday) }, // cache from YESTERDAY
+            storedLocation = flowOf(CachedSunLocation(lat, lon, yesterday)), // cache from YESTERDAY
             clock = { midJuneEpochSec() * 1000L },
             tzOffsetForDate = { 2.0 },
         )
@@ -369,44 +371,113 @@ class CircadianWindowProviderTest {
         // windows instead of returning null → the default-window 0.85 (the owner's report).
         assertNotNull(w, "a day-old cached location must still produce windows (D-110), not null")
         assertEquals(CircadianWindowProvider.compute(lat, lon, midJuneEpochSec(), 2.0, transitionFactor), w)
-        // Staleness is surfaced for the UI hint.
-        assertTrue(provider.status.isStale, "a day-old cache is stale")
-        assertEquals(1L, provider.status.ageDays, "cache age is 1 day")
         assertTrue(refreshed >= 1, "seeding a cached location recomputes (onWindowsRefreshed)")
+        assertTrue(loc.lastKnownCalled, "the stale fix keeps its own day, so today's acquisition still runs")
         scope.cancel()
     }
 
     @Test
-    fun freshFixToday_isNotStale_D110() = runTest {
-        val scope = CoroutineScope(UnconfinedTestDispatcher(testScheduler))
-        val provider = CircadianWindowProvider(
-            scope = scope,
-            overrideFlow = MutableStateFlow(ExperimentDateLocation()),
-            location = FakeLocationReader(lastKnown = LocationSnapshot(lat, lon)),
-            geoIpFallback = { null },
-            clock = { midJuneEpochSec() * 1000L },
-            tzOffsetForDate = { 2.0 },
-        )
-        provider.current(transitionFactor)
-        assertFalse(provider.status.isStale, "a fix acquired today is fresh")
-        assertEquals(0L, provider.status.ageDays)
-        scope.cancel()
+    fun status_isThePinElseTheStoredDay_D110() {
+        val today = midJuneEpochSec() / 86_400L
+        val pinned = CircadianLocationStatus.of(ExperimentDateLocation(latitude = lat, longitude = lon), null, today)
+        assertTrue(pinned.fixed && !pinned.isStale, "a pinned location is fixed, never stale")
+        val dayOld = CircadianLocationStatus.of(ExperimentDateLocation(), CachedSunLocation(lat, lon, today - 1), today)
+        assertTrue(dayOld.isStale, "a day-old stored fix is stale")
+        assertEquals(1L, dayOld.ageDays)
+        val fresh = CircadianLocationStatus.of(ExperimentDateLocation(), CachedSunLocation(lat, lon, today), today)
+        assertFalse(fresh.isStale, "a fix stored today is fresh")
+        val none = CircadianLocationStatus.of(ExperimentDateLocation(), null, today)
+        assertFalse(none.hasLocation || none.isStale, "nothing stored → no location, not stale")
     }
 
+    // ----- DD-061: a running provider follows the stored location and the IP fallback switch -----
+
     @Test
-    fun noLocationEver_statusHasNoLocation_D110() = runTest {
+    fun fixStoredWhileRunning_reachesThePipeline_DD061() = runTest {
         val scope = CoroutineScope(UnconfinedTestDispatcher(testScheduler))
+        val today = midJuneEpochSec() / 86_400L
+        val stored = MutableStateFlow<CachedSunLocation?>(null)
+        var refreshed = 0
         val provider = CircadianWindowProvider(
             scope = scope,
             overrideFlow = MutableStateFlow(ExperimentDateLocation()),
             location = FakeLocationReader(),
             geoIpFallback = { null },
+            storedLocation = stored,
+            storedAttemptDay = flowOf(today), // today's automatic attempt already spent
             clock = { midJuneEpochSec() * 1000L },
             tzOffsetForDate = { 2.0 },
         )
+        provider.onWindowsRefreshed = { refreshed++ }
         assertNull(provider.current(transitionFactor))
-        assertFalse(provider.status.hasLocation, "no fix anywhere → status has no location")
-        assertFalse(provider.status.isStale)
+
+        val before = refreshed
+        stored.value = CachedSunLocation(lat, lon, today) // the Circadian screen's "Use current location"
+        assertEquals(before + 1, refreshed, "a stored fix recomputes the pipeline")
+        assertEquals(
+            CircadianWindowProvider.compute(lat, lon, midJuneEpochSec(), 2.0, transitionFactor),
+            provider.current(transitionFactor),
+        )
+        scope.cancel()
+    }
+
+    @Test
+    fun attemptDayFreed_retriesASpentDayOnce_DD061() = runTest {
+        val scope = CoroutineScope(UnconfinedTestDispatcher(testScheduler))
+        val attemptDay = MutableStateFlow<Long?>(null)
+        var geoIpOn = false
+        var requests = 0
+        var refreshed = 0
+        val provider = CircadianWindowProvider(
+            scope = scope,
+            overrideFlow = MutableStateFlow(ExperimentDateLocation()),
+            location = FakeLocationReader(),
+            geoIpFallback = { requests++; if (geoIpOn) LocationSnapshot(lat, lon) else null },
+            storedAttemptDay = attemptDay,
+            persistGeoIpAttemptDay = { attemptDay.value = it },
+            clock = { midJuneEpochSec() * 1000L },
+            tzOffsetForDate = { 2.0 },
+        )
+        provider.onWindowsRefreshed = { refreshed++ }
+        assertNull(provider.current(transitionFactor), "the day's attempt finds nothing while the fallback is off")
+
+        val before = refreshed
+        geoIpOn = true
+        attemptDay.value = null // what switching the fallback on writes
+        assertEquals(before + 1, refreshed, "a freed day recomputes, so the pipeline asks again")
+        assertNotNull(provider.current(transitionFactor), "the freed day is retried")
+        attemptDay.value = null
+        provider.current(transitionFactor)
+        assertEquals(2, requests, "a day that has its location is not retried")
+        scope.cancel()
+    }
+
+    @Test
+    fun acquisitionFinishingAfterAStoredFix_leavesTheStoredFix_DD061() = runTest {
+        val scope = CoroutineScope(UnconfinedTestDispatcher(testScheduler))
+        val today = midJuneEpochSec() / 86_400L
+        val stored = MutableStateFlow<CachedSunLocation?>(null)
+        val lookup = CompletableDeferred<LocationSnapshot?>()
+        var persisted: Triple<Double, Double, Long>? = null
+        val provider = CircadianWindowProvider(
+            scope = scope,
+            overrideFlow = MutableStateFlow(ExperimentDateLocation()),
+            location = FakeLocationReader(),
+            geoIpFallback = { lookup.await() },
+            storedLocation = stored,
+            persistLocation = { la, lo, day -> persisted = Triple(la, lo, day) },
+            clock = { midJuneEpochSec() * 1000L },
+            tzOffsetForDate = { 2.0 },
+        )
+        assertNull(provider.current(transitionFactor), "the day's acquisition is in flight")
+        stored.value = CachedSunLocation(lat, lon, today) // "Use current location" lands first
+        lookup.complete(LocationSnapshot(48.85, 2.35))
+
+        assertNull(persisted, "the late result must not overwrite the stored fix")
+        assertEquals(
+            CircadianWindowProvider.compute(lat, lon, midJuneEpochSec(), 2.0, transitionFactor),
+            provider.current(transitionFactor),
+        )
         scope.cancel()
     }
 

@@ -45,22 +45,13 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
         .distinctUntilChanged()
 
     // D-110: circadian location freshness for dashboard hint. Shown only when scaling is on.
-    // Mirrors CircadianWindowProvider.current() fallback for UI consistency.
     private val experimentPrefs = ExperimentPrefsStore(application.experimentPrefsDataStore)
     private val circadianStatusFlow = combine(
         app.settingsDataStore.data.map { it.validate().scalingEnabled }.distinctUntilChanged(),
         experimentPrefs.dateLocation,
         experimentPrefs.cachedSunLocation,
-    ) { scalingOn, ov, cache ->
-        if (!scalingOn) return@combine null
-        val today = System.currentTimeMillis() / 1000L / 86_400L
-        when {
-            ov.latitude != null && ov.longitude != null ->
-                CircadianLocationStatus(ov.latitude, ov.longitude, resolvedForDay = today, today = today, fixed = true)
-            cache != null ->
-                CircadianLocationStatus(cache.latitude, cache.longitude, resolvedForDay = cache.day, today = today, fixed = false)
-            else -> CircadianLocationStatus(today = today)
-        }
+    ) { scalingOn, ov, stored ->
+        if (scalingOn) CircadianLocationStatus.of(ov, stored, System.currentTimeMillis() / 1000L / 86_400L) else null
     }
 
     private data class Live(

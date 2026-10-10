@@ -271,4 +271,43 @@ class LegacyImportRoundTripTest {
         assertEquals(10.0f, s.deltaFactor, 0.001f, "+Infinity clamps to the deltaFactor max")
         assertEquals(0.0, s.thresholdMidpoint, "-Infinity clamps to the midpoint min")
     }
+
+    private fun task592(general: String, misc: String, reactivity: String, superdimming: String) = """
+        {
+          "meta": { "version": "3.4", "name": "x", "timestamp": 0 },
+          "general": { "form2a": 29.58, "form2b": 8.8, "form2c": 18.0, "form2d": 35.0,
+                       "form3a": 2513.0, $general },
+          "misc": { "max_bright": 255.0, "max_wait": 30, "throttle": 1510, $misc },
+          "reactivity": { "thresh_dark": 0.3, "thresh_dim": 0.25, "thresh_bright": 0.08,
+                          "thresh_steepness": 2.1, $reactivity },
+          "circadian": { "spread": 15.0, "transition": 0.1, "steepness": 6.0, "taper_mid": 190.0,
+                         "taper_steep": 0.075, "enabled": false },
+          "superdimming": { "threshold": 15.0, "strength": 25.0, "exponent": 2.5, "spread": 100.0,
+                            "pwm_exp": 0.8, "pwm_sensitive": false, $superdimming },
+          "privileged_display": { "night_light": false, "night_light_circadian": false, "daltonizer": "OFF",
+                                  "inversion": false, "always_on_display": false, "stay_awake_charging": false,
+                                  "force_sdr": false }
+        }
+    """.trimIndent()
+
+    @Test
+    fun `the owner's task592 Default and Outdoors files parse to the app's built-ins DD030`() {
+        val default = task592(
+            general = """"z1_end": 35.0, "z2_end": 10000.0, "form1a": 5.0""",
+            misc = """"min_bright": 10.0, "scale": 1.0, "offset": 0.0, "anim_steps": 50, "min_wait": 5, "delta_factor": 1.8""",
+            reactivity = """"thresh_midpoint": 4.0""",
+            superdimming = """"enabled": false""",
+        )
+        val outdoors = task592(
+            general = """"z1_end": 55.0, "form1a": 8.0, "z2_end": 18000.0""",
+            misc = """"min_bright": 25.0, "scale": 1.15, "offset": 15.0, "anim_steps": 10, "min_wait": 10, "delta_factor": 4.0""",
+            reactivity = """"thresh_midpoint": 4.255""",
+            superdimming = """"enabled": false""",
+        )
+        assertEquals(DefaultProfiles.Default, TaskerLegacyProfileSerializer.deserialize(default))
+        assertEquals(DefaultProfiles.Outdoors, TaskerLegacyProfileSerializer.deserialize(outdoors))
+        val user = AabSettings(trustUnreliableSensor = true, quickSettingsEnabled = true)
+        val loaded = DefaultProfiles.keepUserChoices("Outdoors", TaskerLegacyProfileSerializer.deserialize(outdoors), user)
+        assertTrue(loaded.trustUnreliableSensor && loaded.quickSettingsEnabled, "DD-031: the file has neither key")
+    }
 }

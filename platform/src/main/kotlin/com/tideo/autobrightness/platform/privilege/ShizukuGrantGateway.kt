@@ -68,6 +68,8 @@ object ShizukuGrantGateway {
         else -> ShizukuAvailability.NOT_INSTALLED
     }
 
+    fun isUsable(): Boolean = isAvailable() && hasPermission()
+
     private fun hasPermission(): Boolean = try {
         Shizuku.checkSelfPermission() == PackageManager.PERMISSION_GRANTED
     } catch (_: Throwable) {

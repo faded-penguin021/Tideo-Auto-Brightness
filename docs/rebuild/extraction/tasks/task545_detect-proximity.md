@@ -11,8 +11,12 @@ Owner-verified S3.5 (D-022).
 | act3 | 547 Variable Set | `%AAB_Proximity = far` |
 | act4 | 38 End If | — |
 
-Consumed in task544 act28–29: `if %AAB_Proximity = near → LuxAlpha = lux_results2 × 0.1`.
-It does **NOT** pause the pipeline, and it does not damp reactivity either: act27 has already
-stored `%SmoothedLux` from the undamped α, and act33 hands Map Lux the undamped `%lux_results2`,
-so only the readouts that display `%LuxAlpha` change (corrected 2026-09-24, DC-064; the S14 port
-had damped the EMA). The only other reader is the Debug scene.
+**Owner's version (2026-10-04, DD-024), not in this XML:** the exit branch, after setting `far`,
+adds A5: Perform Task "Evaluate Light Change (Java) V2" with par1 = `%AAB_LastRawLux`. Tideo runs it
+as a recheck through the pending slot (`LightAdmission.proximityExit`).
+
+Consumed in task535 A3b (DD-024): while near, `lux_alpha = round3(lux_alpha × 0.1)` before the
+blend, so smoothing, the target, the animation and the `%LuxAlpha` readout all move a tenth as far.
+It does **NOT** pause the pipeline. History: the XML here damped only `%LuxAlpha` in task544 act29
+(DC-064), and the owner's V2 of 2026-10-03 damped the animation but not smoothing (DD-022). The only
+other reader is the Debug scene.

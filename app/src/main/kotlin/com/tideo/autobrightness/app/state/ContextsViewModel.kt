@@ -8,11 +8,13 @@ import androidx.core.graphics.drawable.toBitmap
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.tideo.autobrightness.app.AppModule
+import com.tideo.autobrightness.app.runtime.ContextSolarTimes
 import com.tideo.autobrightness.app.settings.ContextRule
 import com.tideo.autobrightness.app.settings.ContextRuleStore
+import com.tideo.autobrightness.app.settings.ExperimentPrefsStore
 import com.tideo.autobrightness.app.settings.UserProfileStore
 import com.tideo.autobrightness.app.settings.byPriority
-import com.tideo.autobrightness.domain.circadian.SolarCalculator
+import com.tideo.autobrightness.app.storage.experimentPrefsDataStore
 import com.tideo.autobrightness.platform.context.AndroidForegroundAppMonitor
 import com.tideo.autobrightness.platform.context.AndroidLocationReader
 import com.tideo.autobrightness.platform.context.AndroidWifiInfoReader
@@ -25,7 +27,6 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.util.Calendar
 
 /** One installed, launchable app for the context-rule app picker (icon + label, G2-F14). */
 data class AppEntry(val packageName: String, val label: String, val icon: ImageBitmap? = null)
@@ -38,6 +39,7 @@ class ContextsViewModel(application: Application) : AndroidViewModel(application
     private val userProfiles: UserProfileStore = appModule.userProfileStore
     private val wifi = AndroidWifiInfoReader(application)
     private val location = AndroidLocationReader(application)
+    private val solarTimesSource = ContextSolarTimes(ExperimentPrefsStore(application.experimentPrefsDataStore), location)
     private val foregroundApp = AndroidForegroundAppMonitor(application)
 
     // G2R-F43, D-014: ordered by priority (highest first), not creation time.
@@ -77,25 +79,10 @@ class ContextsViewModel(application: Application) : AndroidViewModel(application
      */
     suspend fun currentLocation(): LocationResult = location.activeFix()
 
-    /**
-     * Today's resolved sunrise / sunset as "HH:MM" for the SUNRISE/SUNSET token labels (G2R-F68),
-     * computed for the last-known location. Null when no location is available (tokens still work;
-     * they just show without the resolved time). Mirrors AndroidContextSignalSource's solar math.
-     */
-    suspend fun solarTimes(): Pair<String, String>? = withContext(Dispatchers.Default) {
-        val loc = runCatching { location.lastKnownLocation() }.getOrNull() ?: return@withContext null
-        val cal = Calendar.getInstance()
-        val offsetHours = cal.timeZone.getOffset(cal.timeInMillis) / 3_600_000.0
-        val offsetSecs = (offsetHours * 3600.0).toLong()
-        runCatching {
-            val solar = SolarCalculator.compute(loc.latitude, loc.longitude, cal.timeInMillis / 1000L, offsetHours)
-            val rise = Math.floorMod(solar.riseEpochSec + offsetSecs, 86_400L)
-            val set = Math.floorMod(solar.setEpochSec + offsetSecs, 86_400L)
-            formatSeconds(rise) to formatSeconds(set)
-        }.getOrNull()
+    /** Token labels and offset preview (G2R-F68), resolved as the engine does (DD-038); null = no location. */
+    suspend fun solarTimes(): Pair<Long, Long>? = withContext(Dispatchers.Default) {
+        solarTimesSource.today(System.currentTimeMillis())
     }
-
-    private fun formatSeconds(s: Long): String = "%02d:%02d".format(s / 3600, (s % 3600) / 60)
 
     /** task43 reads %APP_FOREGROUND via usage stats — app rules are dead without this grant. */
     fun hasUsageAccess(): Boolean = foregroundApp.hasUsageAccessPermission()

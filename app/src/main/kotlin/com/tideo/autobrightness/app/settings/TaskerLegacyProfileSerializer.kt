@@ -151,6 +151,7 @@ object TaskerLegacyProfileSerializer {
         map["%AAB_NightLight"]?.let { settings = settings.copy(nightLightEnabled = it.asBoolean(settings.nightLightEnabled)) }
         map["%AAB_NightLightTemp"]?.asRoundedInt()?.let { settings = settings.copy(nightLightTemperature = it) }
         map["%AAB_NightLightCircadian"]?.let { settings = settings.copy(nightLightCircadianEnabled = it.asBoolean(settings.nightLightCircadianEnabled)) }
+        map["%AAB_ExtendedNightLight"]?.let { settings = settings.copy(extendedNightLightEnabled = it.asBoolean(settings.extendedNightLightEnabled)) }
         map["%AAB_Daltonizer"]?.let { settings = settings.copy(daltonizerMode = it.trim().uppercase()) }
         map["%AAB_Inversion"]?.let { settings = settings.copy(inversionEnabled = it.asBoolean(settings.inversionEnabled)) }
         map["%AAB_AlwaysOnDisplay"]?.let { settings = settings.copy(alwaysOnDisplayEnabled = it.asBoolean(settings.alwaysOnDisplayEnabled)) }

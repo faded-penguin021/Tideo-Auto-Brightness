@@ -1,0 +1,146 @@
+/* task637 Profile Manager webview -- owner revision of 2026-10-01 (solar-offset editor).
+ * Owner paste, changed regions only. Not in the extracted XML; the paste is the only source.
+ * Moved verbatim from the solar-offsets execution plan's Appendix B when that plan closed (DD-036).
+ * Tideo's port is RuleEditor (DD-035). Reference transcript, NOT buildable. */
+
+The logic is verbatim. Comments are condensed, wrapped lines are joined, and `style` attributes are
+dropped. The CSS changes are layout-only and are omitted.
+
+**B.1** The Start side of the time trigger. The End side is identical with `End` in place of `Start`.
+
+```html
+<input type="time" id="ctxTimeStart" class="modal-input" onchange="this.style.color='var(--text-pri)'; this.disabled=false; document.getElementById('ctxStartType').value='time'; document.getElementById('offsetRowStart').style.display='none'; document.getElementById('ctxOffsetStart').value='';">
+<button type="button" class="btn" onclick="setSolarTime('Start', 'SUNRISE')">Sunrise</button>
+<button type="button" class="btn" onclick="setSolarTime('Start', 'SUNSET')">Sunset</button>
+</div>
+<div class="input-row" id="offsetRowStart" style="display:none; margin-top:8px;">
+    <span>Offset (min)</span>
+    <input type="text" id="ctxOffsetStart" class="modal-input" placeholder="e.g. +30 or -15" oninput="updateSolarDisplay('Start')">
+</div>
+<input type="hidden" id="ctxStartType" value="time">
+```
+
+**B.2** The preview and token helpers:
+
+```js
+function formatSecondsToTime(secs) {
+    if (secs === null || secs === undefined || secs === "") return "--:--";
+    let s = Number(secs);
+    if (isNaN(s)) return "--:--";
+    let offsetSeconds = new Date().getTimezoneOffset() * 60;
+    s = s - offsetSeconds;                 /* UTC -> local */
+    s = ((s % 86400) + 86400) % 86400;     /* wrap */
+    s = Math.floor(s / 60) * 60;           /* floor to minute */
+    let h = Math.floor(s / 3600);
+    let m = Math.floor((s % 3600) / 60);
+    return (h < 10 ? "0" + h : h) + ":" + (m < 10 ? "0" + m : m);
+}
+
+function updateSolarDisplay(type) {
+    const typeInput = document.getElementById('ctx' + type + 'Type');
+    const timeInput = document.getElementById('ctxTime' + type);
+    const offsetInput = document.getElementById('ctxOffset' + type);
+    if (typeInput.value === 'time') return;
+    const baseSecs = (typeInput.value === 'SUNRISE') ? solarStart : solarEnd;
+    const rawVal = offsetInput ? offsetInput.value.trim() : "";
+    let offsetMin = 0;
+    if (rawVal !== "" && /^[+-]?\d+$/.test(rawVal)) {
+        offsetMin = parseInt(rawVal, 10);
+    }
+    const adjustedSecs = Number(baseSecs) + (offsetMin * 60);
+    timeInput.value = formatSecondsToTime(adjustedSecs);
+    timeInput.style.color = 'var(--yellow)';
+}
+
+function setSolarTime(type, solarEvent) {
+    const timeInput = document.getElementById('ctxTime' + type);
+    const typeInput = document.getElementById('ctx' + type + 'Type');
+    const offsetRow = document.getElementById('offsetRow' + type);
+    const offsetInput = document.getElementById('ctxOffset' + type);
+    if (typeInput.value === solarEvent) {
+        timeInput.disabled = false;
+        timeInput.value = '';
+        timeInput.style.color = 'var(--text-pri)';
+        typeInput.value = 'time';
+        if (offsetInput) offsetInput.value = '';
+        if (offsetRow) offsetRow.style.display = 'none';
+    } else {
+        const solarTimeSeconds = solarEvent === 'SUNRISE' ? solarStart : solarEnd;
+        if (hasSolar && solarTimeSeconds !== null && solarTimeSeconds !== undefined &&
+            solarTimeSeconds !== "" && !isNaN(parseFloat(solarTimeSeconds))) {
+            typeInput.value = solarEvent;
+            timeInput.disabled = true;
+            if (offsetRow) offsetRow.style.display = 'flex';
+            updateSolarDisplay(type);
+        } else {
+            showUIWarning("Solar Data Missing", "Sunrise/Sunset data is not available.");
+        }
+    }
+}
+```
+
+**B.3** In `showAddContextForm`, the reset of each side and the edit-mode seeding:
+
+```js
+['Start', 'End'].forEach(type => {
+    const el = document.getElementById('ctxTime' + type);
+    el.value = ''; el.disabled = false; el.style.color = 'var(--text-pri)';
+    document.getElementById('ctx' + type + 'Type').value = 'time';
+    const offEl = document.getElementById('ctxOffset' + type);
+    if (offEl) offEl.value = '';
+    const offRow = document.getElementById('offsetRow' + type);
+    if (offRow) offRow.style.display = 'none';
+});
+/* … edit mode, triggers.time_range present: */
+[ { type: 'Start', val: sVal }, { type: 'End', val: eVal } ].forEach(item => {
+    const type = item.type;
+    const val = String(item.val || '').trim();
+    /* timeInput / typeInput / offsetInput / offsetRow looked up as above */
+    if (val.startsWith('SUNRISE') || val.startsWith('SUNSET')) {
+        const solarEvent = val.startsWith('SUNRISE') ? 'SUNRISE' : 'SUNSET';
+        typeInput.value = solarEvent;
+        let offsetStr = '';
+        if (val.includes('+')) {
+            offsetStr = '+' + val.substring(val.indexOf('+') + 1).trim();
+        } else if (val.includes('-')) {
+            offsetStr = '-' + val.substring(val.indexOf('-') + 1).trim();
+        }
+        if (offsetInput) offsetInput.value = offsetStr;
+        if (offsetRow) offsetRow.style.display = 'flex';
+        timeInput.disabled = true;
+        updateSolarDisplay(type);
+    } else {
+        typeInput.value = 'time';
+        if (offsetInput) offsetInput.value = '';
+        if (offsetRow) offsetRow.style.display = 'none';
+        timeInput.value = val;
+        timeInput.disabled = false;
+        timeInput.style.color = 'var(--text-pri)';
+    }
+});
+```
+
+**B.4** In `commitContext`, building the saved token:
+
+```js
+function getCommittedTime(type) {
+    const typeVal = document.getElementById('ctx' + type + 'Type').value;
+    if (typeVal === 'time') {
+        return document.getElementById('ctxTime' + type).value;
+    }
+    const rawOffset = document.getElementById('ctxOffset' + type).value.trim();
+    if (rawOffset === "") {
+        return typeVal;                                  /* blank means 0 */
+    }
+    if (!/^[+-]?\d+$/.test(rawOffset)) {
+        showUIWarning("Invalid Offset",
+            "Offset for " + type + " Time must be a signed whole number of minutes (e.g. +30, -15).");
+        return null;
+    }
+    const offsetVal = parseInt(rawOffset, 10);
+    if (offsetVal > 0) return typeVal + "+" + offsetVal;
+    if (offsetVal < 0) return typeVal + offsetVal;       /* minus sign already present */
+    return typeVal;
+}
+/* sVal = getCommittedTime('Start'); if (sVal === null) return;  (same for End) */
+```

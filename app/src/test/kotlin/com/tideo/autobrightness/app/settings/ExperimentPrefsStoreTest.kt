@@ -68,4 +68,15 @@ class ExperimentPrefsStoreTest {
         store.setGeoIpEnabled(true)
         assertTrue(store.geoIpEnabled.first())
     }
+
+    @Test
+    fun geoIpSwitchedOn_freesTheSpentDay_onlyOnTheSwitch_DD061() = withStore { store ->
+        store.writeGeoIpAttemptDay(20_270L)
+        store.setGeoIpEnabled(true)
+        assertNull(store.geoIpAttemptDay.first(), "switching on frees the day, durably")
+        store.writeGeoIpAttemptDay(20_270L)
+        store.setGeoIpEnabled(true)
+        store.setGeoIpEnabled(false)
+        assertEquals(20_270L, store.geoIpAttemptDay.first(), "re-asserting on, or switching off, frees nothing")
+    }
 }

@@ -6,6 +6,8 @@ Source of truth: **task570 _Initialize AAB Defaults_** (`extraction/tasks/task57
 
 ## D-004 resolution (canonical values)
 
+> **Changed since this audit (2026-10-05, DD-030):** the owner's task570 now sets AnimSteps 50, MinWait 5 ms and MaxWait 30 ms, so the throttle is 50×30+10 = 1510 ms; ThreshMidpoint stays log10(Zone2End) = 4. The values below are the extracted XML; `AabSettings()` follows the owner's.
+
 - **`%AAB_AnimSteps` = `20`** (task570 act26). This is the animation step count. **Missing from `AabSettings.kt`** — S8 must add it. The salvaged `AnimationConfig` defaults (50/5/30) are WRONG vs Tasker; canonical animation defaults are **AnimSteps=20, MinWait=25 ms, MaxWait=65 ms** (task570 act26/27/28). The AabSettings 25/65 (min/max wait) are correct; the step count 20 is the missing piece.
 - **`%AAB_MaxSteps`** — appears in the variable census but is **never assigned a default in task570 (or 592/637)**. Treat as legacy/unused; do NOT invent a default. If S8 needs a max-step cap, derive from AnimSteps. (Logged in INDEX unresolved.)
 - **`%AAB_ThreshMidpoint` = `log10(%AAB_Zone2End)` = `log10(10000)` = `4`** (task570 act39, DoMaths). DERIVED-but-persisted. Missing from `AabSettings.kt`; S8 should persist it or recompute from zone2End.
@@ -26,7 +28,7 @@ pipeline's four bare globals (all RUNTIME, no defaults; already specced in `pipe
 | `%SmoothedLux` | 15 | EMA-smoothed lux (task544/535; cleared by task585) |
 | `%AutoBrightRunning` | 13 | 1 while the pipeline is writing brightness (echo suppression) |
 | `%LastAAB` | 10 | TIMEMS of last accepted tick (throttle gate) |
-| `%LuxAlpha` | 9 | last smoothing alpha, readouts only (prox-damped ×0.1; animation uses task661's undamped `%lux_alpha`, DC-064) |
+| `%LuxAlpha` | 9 | last smoothing alpha, prox-damped ×0.1 (round3) inside task535 while near, the same α that blended smoothed lux and that task661 animates from (DD-024) |
 
 (Scan: `grep -oE '%[A-Za-z][A-Za-z0-9_]*' | grep [A-Z]`, minus `%AAB_*` and ALL-CAPS Tasker
 built-ins; the two remaining one-off hits are HTML/Java false positives. Future audits must

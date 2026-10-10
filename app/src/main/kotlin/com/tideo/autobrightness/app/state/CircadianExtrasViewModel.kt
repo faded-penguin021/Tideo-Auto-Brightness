@@ -40,17 +40,10 @@ class CircadianExtrasViewModel @JvmOverloads constructor(
     val geoIpEnabled: StateFlow<Boolean> = store.geoIpEnabled
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
 
-    /** D-110: location staleness hint; mirrors CircadianWindowProvider's fallback chain. */
+    /** D-110: location staleness hint. */
     val circadianLocationStatus: StateFlow<CircadianLocationStatus> =
-        store.dateLocation.combine(store.cachedSunLocation) { ov, cache ->
-            val today = System.currentTimeMillis() / 1000L / 86_400L
-            when {
-                ov.latitude != null && ov.longitude != null ->
-                    CircadianLocationStatus(ov.latitude, ov.longitude, resolvedForDay = today, today = today, fixed = true)
-                cache != null ->
-                    CircadianLocationStatus(cache.latitude, cache.longitude, resolvedForDay = cache.day, today = today, fixed = false)
-                else -> CircadianLocationStatus(today = today)
-            }
+        store.dateLocation.combine(store.cachedSunLocation) { ov, stored ->
+            CircadianLocationStatus.of(ov, stored, System.currentTimeMillis() / 1000L / 86_400L)
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), CircadianLocationStatus())
 
     fun setGeoIpEnabled(enabled: Boolean) {

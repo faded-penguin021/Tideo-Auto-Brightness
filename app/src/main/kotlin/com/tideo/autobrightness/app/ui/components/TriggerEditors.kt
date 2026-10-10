@@ -20,8 +20,10 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -38,11 +40,13 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.tideo.autobrightness.R
 import com.tideo.autobrightness.app.settings.ContextTriggers
 import com.tideo.autobrightness.app.state.AppEntry
 import com.tideo.autobrightness.app.ui.theme.AabGold
+import com.tideo.autobrightness.domain.context.SolarTimeTokens
 
 /** Shared trigger-editor building blocks (D-150/D-151 extraction; ContextsScreen sole user). */
 
@@ -115,28 +119,60 @@ private fun parseHhMm(value: String): Pair<Int, Int>? {
 
 /** SUNRISE/SUNSET tokens for time fields (G2-F14). G2R-F68: show resolved time in gold (one-line layout). */
 @Composable
-fun TimeTokenRow(which: String, solarLabel: Pair<String, String>?, onPick: (String) -> Unit) {
+fun TimeTokenRow(which: String, solarTimes: Pair<Long, Long>?, onPick: (String) -> Unit) {
     Column {
         TextButton(
-            onClick = { onPick("SUNRISE") },
+            onClick = { onPick(SolarTimeTokens.SUNRISE) },
             modifier = Modifier.fillMaxWidth().testTag("${which}_sunrise"),
         ) {
             Text(
-                buildString { append("Sunrise"); solarLabel?.first?.let { append(" ($it)") } },
+                buildString { append("Sunrise"); solarTimes?.first?.let { append(" (${formatSecondsOfDay(it)})") } },
                 color = AabGold, maxLines = 1, softWrap = false, modifier = Modifier.fillMaxWidth(),
             )
         }
         TextButton(
-            onClick = { onPick("SUNSET") },
+            onClick = { onPick(SolarTimeTokens.SUNSET) },
             modifier = Modifier.fillMaxWidth().testTag("${which}_sunset"),
         ) {
             Text(
-                buildString { append("Sunset"); solarLabel?.second?.let { append(" ($it)") } },
+                buildString { append("Sunset"); solarTimes?.second?.let { append(" (${formatSecondsOfDay(it)})") } },
                 color = AabGold, maxLines = 1, softWrap = false, modifier = Modifier.fillMaxWidth(),
             )
         }
     }
 }
+
+@Composable
+fun SolarOffsetField(
+    which: String,
+    event: String,
+    offset: String,
+    solarTimes: Pair<Long, Long>?,
+    isError: Boolean,
+    onChange: (String) -> Unit,
+) {
+    OutlinedTextField(
+        value = offset,
+        onValueChange = { text -> onChange(text.filter { it in '0'..'9' || it == '+' || it == '-' }) },
+        label = { Text(stringResource(R.string.contexts_offset_label)) },
+        placeholder = { Text(stringResource(R.string.contexts_offset_placeholder)) },
+        singleLine = true,
+        isError = isError,
+        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+        modifier = Modifier.fillMaxWidth().testTag("${which}_offset"),
+    )
+    solarTimes?.let { (rise, set) ->
+        val base = if (event == SolarTimeTokens.SUNRISE) rise else set
+        val minutes = SolarTimeTokens.commit(event, offset)?.let(SolarTimeTokens::offsetMinutes) ?: 0L
+        Text(
+            formatSecondsOfDay(SolarTimeTokens.resolve(base, minutes)),
+            color = AabGold,
+            modifier = Modifier.testTag("${which}_offset_preview"),
+        )
+    }
+}
+
+internal fun formatSecondsOfDay(s: Long): String = "%02d:%02d".format(s / 3600, (s % 3600) / 60)
 
 /** Day-of-week multi-select (G2R-F67). None selected = every day. */
 @OptIn(ExperimentalLayoutApi::class)
@@ -220,7 +256,7 @@ internal fun ContextTriggers.summary(): String {
         wifi?.takeIf { it.isNotEmpty() }?.let { add("Wi-Fi ${it.joinToString()}") }
         timeRange?.takeIf { it.size == 2 }?.let { add("${it[0]}–${it[1]}") }
         days?.takeIf { it.isNotEmpty() }?.let { add(it.sorted().joinToString("") { d -> DAY_LABELS.getOrElse(d - 1) { "?" } }) }
-        battery?.let { add(if (it.onPower == true) "charging" else if (it.onPower == false) "on battery" else "battery ${it.min}-${it.max}%") }
+        battery?.let { add(if (it.onPower == true) "plugged in" else if (it.onPower == false) "on battery" else "battery ${it.min}-${it.max}%") }
         // DB-061: name the circle; "near location" read identically for every rule.
         location?.let { add("near ${formatCoord(it.lat)}, ${formatCoord(it.lon)} (${it.radius.toInt()} m)") }
     }

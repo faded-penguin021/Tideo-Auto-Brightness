@@ -150,18 +150,19 @@ class LightCycleParityTest {
     }
 
     @Test
-    fun proximityNear_smoothsAsFarAndDampsOnlyTheReportedAlpha() {
-        // act27 stores %SmoothedLux from the undamped α; act29's ×0.1 reaches only the %LuxAlpha global (gap-08).
+    fun proximityNear_dampsTheSmoothingAlphaBeforeTheBlend() {
+        // task535 A3b: α ×0.1 (3 dp) before A4 blends %SmoothedLux, so the readout and animation follow it (DD-024).
         val readings = listOf(100.0, 30.0, 100.0, 20.0, 800.0, 3.0)
-        val far = replay(readings)
         val near = replay(readings, near = true)
-        assertEquals(far.map { it.first }, near.map { it.first })
-        for ((f, n) in far.map { it.second }.zip(near.map { it.second })) {
-            assertEquals(f.smoothedLux, n.smoothedLux, tol)
-            assertEquals(f.targetBrightness, n.targetBrightness)
-            assertEquals(f.animationSteps, n.animationSteps)
-            assertEquals(f.animationWaitMs, n.animationWaitMs)
-            assertEquals(f.transitionDurationMs, n.transitionDurationMs)
-        }
+        val far = replay(readings)
+        val (lux, n) = near[1]
+        val f = far[1].second
+        assertEquals(30.0, lux)
+        assertEquals(EvaluationOutcome.SMOOTHED, n.outcome)
+        assertEquals(Math.round(f.luxAlpha * BrightnessEngine.PROXIMITY_ALPHA_DAMP * 1000.0) / 1000.0, n.luxAlpha, tol)
+        assertTrue(n.smoothedLux > f.smoothedLux, "near ${n.smoothedLux} should lag far ${f.smoothedLux} toward 30")
+        val (steps, wait, _) = engine.calculateAnimation(n.luxAlpha, input(0.0, null).animation, null)
+        assertEquals(steps, n.animationSteps)
+        assertEquals(wait, n.animationWaitMs)
     }
 }

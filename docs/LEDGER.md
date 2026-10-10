@@ -93,6 +93,7 @@ Seeded by the S0 audit (details in CLAUDE.md "Facts & corrections ledger"):
   one. The salvaged `AnimationConfig` defaults (50/5/30) are WRONG; use 20/25/65. Settings missing from
   `AabSettings.kt`: `AnimSteps`, `ContextOverride`, `SetupTitle` (+ derived `ThreshMidpoint`). Split:
   38 SETTING / 4 DERIVED (form2A/2D/3A, ThreshMidpoint) / 83 RUNTIME. (Affects S5, S8.)
+  Corrected by DD-030.
 - D-009: prof760 + prof758 multi-clause gates use Tasker `And2`/`Or2` sub-grouping; exact
   parenthesization (and polarity of `%AAB_MainLoop != On`) is UNRESOLVED — literal sequences captured
   in `extraction/profiles.md`, best-effort reading flagged. Validate against runtime in S9. `ThreshAbsLow/High`
@@ -301,6 +302,7 @@ Seeded by the S0 audit (details in CLAUDE.md "Facts & corrections ledger"):
   profile, not the settings defaults. The `AabSettings()` constructor still uses task570 values.
   (f) `thresholdMidpoint` in DefaultProfiles.Default is 3.0 (from task592), not 4.0 (task570).
   Both values are correct in their respective contexts. (Affects S9a mapper usage, S12 UI.)
+  Corrected by DD-030.
 
 - D-034 [cited]: S8.5 REVIEW FIXES (S7 surface). (a) **Suppress-echo redesigned**: the S7 token-set
   scheme (registerExpectedWrite/consume-on-match) had four defects under S9a's N-frame
@@ -547,6 +549,7 @@ Seeded by the S0 audit (details in CLAUDE.md "Facts & corrections ledger"):
   (f) **PASS1 cooldown lastEvalTime is null until the first eval** (not 0) so a freshly-started engine
   always evaluates once regardless of clock value (the 0-init would have blocked the seed eval when
   clock≈0; harmless in prod but a real edge). (Affects S12, S14.)
+  Corrected by DD-042.
 
 - D-043 [cited]: S11 UI-SHELL decisions (sanctioned by the S11 brief; flagged for S12/S13/S14).
   (a) **Shizuku grant exec closed via a bound user service, NOT reflection (D-032 closed).** The
@@ -1261,6 +1264,7 @@ Seeded by the S0 audit (details in CLAUDE.md "Facts & corrections ledger"):
   (7) **Dropped (D-069):** the Haversine de-dup — one impl exists; no domain util added (fence preserved).
   Affects S12.9c (closed); the new override string from S12.9b is still picked up by S12.9d; nested groups
   are available to S12.9e/f and S13 if they want cohesive sub-configs.
+  Corrected by DD-031.
 
 - D-074: **(post-S12.9c device finding) — app/location context rules created at runtime never fired.**
   Owner Gate-2 finding: creating a per-app context rule (e.g. "load Outdoors when Google Photos opens")
@@ -2349,6 +2353,7 @@ the permanent registry — never compress or remove them.
   folded into the same **1.6.0 / versionCode 14** release as D-130. **(Note:** the Language selector was
   subsequently moved from Misc to the top of the Onboarding screen per owner preference — same inert,
   English-only scaffold, different home.)
+  Corrected by DD-023.
 
 - D-132 [cited]: **a plug/unplug transition bypasses the PASS-1 battery cooldown (deviation from Tasker).** Owner
   report (2026-06-30): with a "Charging" rule (priority 81, on-power + time window) and a "Low Battery" rule
@@ -2750,6 +2755,7 @@ the permanent registry — never compress or remove them.
   Display toggles screen (immediate control + grant card, minus its Schedules section). D-150
   stays in this ledger as history. Folds into the unreleased **1.7.0 / versionCode 17**
   (`changelogs/17.txt` rewritten — D-150 was never released, no user-facing deprecation).
+  Corrected by DD-059.
 
 - D-152 [cited]: **D-151 completed — ALL Privileged Display toggles are profile fields; the duplicated
   manual section removed (owner finding: half the toggles existed only as device-immediate
@@ -2832,6 +2838,7 @@ the permanent registry — never compress or remove them.
   Corrected by DC-053.
   Corrected by DC-056 on the temperature clause.
   Corrected by DC-057 on the OxygenOS variance: now branched, behind observed behaviour.
+  Corrected by DD-034 on the restart clause: each service start built a new coordinator.
 
 - D-156 [cited]: **A11y (TalkBack) backlog adopted — semantics conventions + the `SemanticsAudit` gate
   (A0; plan `plans/a11y-diagnostics.md`, owner-approved 2026-07-06; opens 1.8.0/vc18).**

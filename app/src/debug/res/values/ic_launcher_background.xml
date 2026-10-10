@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Debug-build launcher background colour (DD-052): a darker shade of the debug AabTeal. -->
+<resources>
+    <color name="ic_launcher_background">#FF0D47A1</color>
+</resources>

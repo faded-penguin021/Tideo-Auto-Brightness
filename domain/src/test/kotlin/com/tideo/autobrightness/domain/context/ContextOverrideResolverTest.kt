@@ -191,8 +191,7 @@ class ContextOverrideResolverTest {
         val r = ContextOverrideResolver.resolve(rules, noon, overrideActive = true, userProfile = "MyProfile")
         assertNull(r.targetProfile)
         assertNull(r.activeContextName)
-        // Wake time still computed: next future endpoint after 12:00 is 17:00.
-        assertEquals("17.00", r.nextContextTime)
+        assertEquals("17.01", r.nextContextTime)
     }
 
     @Test
@@ -217,9 +216,69 @@ class ContextOverrideResolverTest {
 
     @Test
     fun nextWakeTime_picksNearestFutureEndpoint() {
-        // endpoints 09:00 & 17:00; now 12:00 → 09:00 is past (wraps to +21h), 17:00 is in +5h → nearest 17:00.
         val r = resolve(listOf(rule("t", timeRange = TimeRange("09:00", "17:00"))))
-        assertEquals("17.00", r.nextContextTime)
+        assertEquals("17.01", r.nextContextTime)
+    }
+
+    @Test
+    fun nextWakeTime_exitWakeAtEndOfDayWrapsToMidnight() {
+        val evening = noon.copy(nowSecondsOfDay = 23 * 3600 + 30 * 60)
+        val r = ContextOverrideResolver.resolve(listOf(rule("t", timeRange = TimeRange("22:00", "23:59"))), evening)
+        assertEquals("00.00", r.nextContextTime)
+    }
+
+    @Test
+    fun nextWakeTime_duringTheEndMinuteSchedulesTheExit() {
+        val r = ContextOverrideResolver.resolve(
+            listOf(rule("t", timeRange = TimeRange("09:00", "17:00"))),
+            noon.copy(nowSecondsOfDay = 17 * 3600 + 45),
+        )
+        assertEquals("17.01", r.nextContextTime)
+    }
+
+    @Test
+    fun timeRange_endMinuteIsInclusive() {
+        val rules = listOf(rule("t", timeRange = TimeRange("09:00", "17:00")))
+        val r1 = ContextOverrideResolver.resolve(rules, noon.copy(nowSecondsOfDay = 17 * 3600 + 45))
+        assertEquals("P_t", r1.targetProfile)
+        val r2 = ContextOverrideResolver.resolve(rules, noon.copy(nowSecondsOfDay = 17 * 3600 + 60))
+        assertNull(r2.activeContextName)
+    }
+
+    @Test
+    fun timeRange_startMinuteMatchesFromItsFirstSecond() {
+        val rules = listOf(rule("t", timeRange = TimeRange("09:00", "17:00")))
+        assertNull(ContextOverrideResolver.resolve(rules, noon.copy(nowSecondsOfDay = 9 * 3600 - 1)).activeContextName)
+        assertEquals("P_t", ContextOverrideResolver.resolve(rules, noon.copy(nowSecondsOfDay = 9 * 3600)).targetProfile)
+    }
+
+    @Test
+    fun solarOffsets_shiftTheWindow() {
+        val rules = listOf(rule("s", timeRange = TimeRange("SUNSET-30", "SUNSET+90")))
+        val at1729 = noon.copy(nowSecondsOfDay = 17 * 3600 + 29 * 60 + 59)
+        assertNull(ContextOverrideResolver.resolve(rules, at1729).activeContextName)
+        assertEquals("P_s", ContextOverrideResolver.resolve(rules, noon.copy(nowSecondsOfDay = 17 * 3600 + 30 * 60)).targetProfile)
+        assertEquals("P_s", ContextOverrideResolver.resolve(rules, noon.copy(nowSecondsOfDay = 19 * 3600 + 30 * 60 + 59)).targetProfile)
+        assertNull(ContextOverrideResolver.resolve(rules, noon.copy(nowSecondsOfDay = 19 * 3600 + 31 * 60)).activeContextName)
+        assertEquals("17.30", ContextOverrideResolver.resolve(rules, noon).nextContextTime)
+        assertEquals("19.31", ContextOverrideResolver.resolve(rules, noon.copy(nowSecondsOfDay = 18 * 3600)).nextContextTime)
+    }
+
+    @Test
+    fun solarOffsets_overnightRangeCrossingMidnight() {
+        val rules = listOf(rule("n", timeRange = TimeRange("SUNSET+300", "SUNRISE-300"), days = listOf(3)))
+        val wed0030 = noon.copy(nowSecondsOfDay = 30 * 60)
+        assertEquals("P_n", ContextOverrideResolver.resolve(rules, wed0030).targetProfile)
+        assertNull(ContextOverrideResolver.resolve(rules, noon.copy(nowSecondsOfDay = 23 * 3600 - 1)).activeContextName)
+        assertNull(ContextOverrideResolver.resolve(rules, noon.copy(dayOfWeek = 3, nowSecondsOfDay = 23 * 3600 - 1)).activeContextName)
+        assertEquals("P_n", ContextOverrideResolver.resolve(rules, noon.copy(dayOfWeek = 3, nowSecondsOfDay = 23 * 3600)).targetProfile)
+        assertNull(ContextOverrideResolver.resolve(rules, noon.copy(nowSecondsOfDay = 23 * 3600 + 1)).activeContextName)
+    }
+
+    @Test
+    fun solarToken_unparseableTailNoLongerAbortsEvaluation() {
+        val r = resolve(listOf(rule("s", timeRange = TimeRange(" SUNRISE+abc ", "SUNSET"))))
+        assertEquals("P_s", r.targetProfile)
     }
 
     @Test

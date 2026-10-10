@@ -93,7 +93,7 @@ object TaskerHelp {
     /** task510 — %AAB_DimmingEnabled. */
     @StringRes val DIMMING_ENABLED = R.string.help_dimming_enabled
 
-    /** task702 — %AAB_PWMExp ("Software exp."). */
+    /** task702 — %AAB_PWMExp ("Software exp."); text corrected away from task702's flash (DD-014). */
     @StringRes val PWM_EXPONENT = R.string.help_pwm_exponent
 
     /** task529 — %AAB_PWMSensitive. */

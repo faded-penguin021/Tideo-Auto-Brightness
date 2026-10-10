@@ -18,7 +18,12 @@ import kotlin.test.assertTrue
 @OptIn(ExperimentalCoroutinesApi::class)
 class LiveRuntimeStateTest {
 
-    @Before fun setUp() = LiveRuntimeState.reset()
+    private val owner = Any()
+
+    @Before fun setUp() {
+        LiveRuntimeState.reset()
+        LiveRuntimeState.claim(owner)
+    }
     @After fun tearDown() = LiveRuntimeState.reset()
 
     @Test
@@ -34,7 +39,7 @@ class LiveRuntimeStateTest {
     @Test
     fun publish_stampsLastPublishMs() {
         assertNull(LiveRuntimeState.pipeline.value.lastPublishMs)
-        LiveRuntimeState.publish(PipelineState(smoothedLux = 12.0), activeContext = null, nowMs = 42L)
+        LiveRuntimeState.publish(owner, PipelineState(smoothedLux = 12.0), activeContext = null, nowMs = 42L)
         assertEquals(42L, LiveRuntimeState.pipeline.value.lastPublishMs)
         assertTrue(LiveRuntimeState.serviceRunning.value)
     }
@@ -42,7 +47,7 @@ class LiveRuntimeStateTest {
     @Test
     fun staleness_freshAfterPublishThenStaleAfter11s() = runTest {
         var now = 0L
-        LiveRuntimeState.publish(PipelineState(), activeContext = null, nowMs = 0L)
+        LiveRuntimeState.publish(owner, PipelineState(), activeContext = null, nowMs = 0L)
 
         val emissions = mutableListOf<Staleness>()
         backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
@@ -59,7 +64,7 @@ class LiveRuntimeStateTest {
 
     @Test
     fun reset_clearsSnapshotAndRunning() {
-        LiveRuntimeState.publish(PipelineState(smoothedLux = 5.0), activeContext = "Cinema", nowMs = 100L)
+        LiveRuntimeState.publish(owner, PipelineState(smoothedLux = 5.0), activeContext = "Cinema", nowMs = 100L)
         LiveRuntimeState.reset()
         assertNull(LiveRuntimeState.pipeline.value.lastPublishMs)
         assertNull(LiveRuntimeState.pipeline.value.smoothedLux)
@@ -67,5 +72,47 @@ class LiveRuntimeStateTest {
         assertFalse(LiveRuntimeState.serviceRunning.value)
         // Null stamp = STALE (UI never shows dead loop as live).
         assertEquals(Staleness.STALE, classifyStaleness(LiveRuntimeState.pipeline.value.lastPublishMs, 0L))
+    }
+
+    @Test
+    fun publish_withoutAClaim_isIgnored() {
+        LiveRuntimeState.reset()
+        LiveRuntimeState.publish(owner, PipelineState(smoothedLux = 5.0), activeContext = null, nowMs = 1L)
+        assertNull(LiveRuntimeState.pipeline.value.lastPublishMs)
+        assertFalse(LiveRuntimeState.serviceRunning.value)
+    }
+
+    @Test
+    fun publish_afterRelease_keepsTheLastAcceptedSnapshot() {
+        LiveRuntimeState.publish(owner, PipelineState(smoothedLux = 5.0), activeContext = "Cinema", nowMs = 1L)
+        LiveRuntimeState.release(owner)
+        LiveRuntimeState.publish(owner, PipelineState(smoothedLux = 9.0), activeContext = "Night", nowMs = 2L)
+        assertEquals(1L, LiveRuntimeState.pipeline.value.lastPublishMs)
+        assertEquals(5.0, LiveRuntimeState.pipeline.value.smoothedLux)
+        assertEquals("Cinema", LiveRuntimeState.activeContext.value)
+        assertTrue(LiveRuntimeState.serviceRunning.value, "the grace window still shows the last snapshot")
+    }
+
+    @Test
+    fun publish_afterTheWatchdogReset_doesNotMarkTheServiceRunning() {
+        LiveRuntimeState.publish(owner, PipelineState(), activeContext = null, nowMs = 1L)
+        assertTrue(LiveRuntimeState.resetIfUnowned(LiveRuntimeState.release(owner)))
+        LiveRuntimeState.publish(owner, PipelineState(serviceOn = true), activeContext = "Night", nowMs = 2L)
+        assertFalse(LiveRuntimeState.serviceRunning.value)
+        assertNull(LiveRuntimeState.pipeline.value.lastPublishMs)
+        assertNull(LiveRuntimeState.activeContext.value)
+    }
+
+    @Test
+    fun publish_fromAPredecessor_afterASuccessorClaims_leavesTheSuccessorsSnapshot() {
+        val successor = Any()
+        LiveRuntimeState.release(owner)
+        LiveRuntimeState.claim(successor)
+        LiveRuntimeState.publish(successor, PipelineState(smoothedLux = 7.0), activeContext = "Day", nowMs = 3L)
+        LiveRuntimeState.publish(owner, PipelineState(smoothedLux = 1.0), activeContext = "Night", manualOverride = true, nowMs = 4L)
+        assertEquals(3L, LiveRuntimeState.pipeline.value.lastPublishMs)
+        assertEquals(7.0, LiveRuntimeState.pipeline.value.smoothedLux)
+        assertEquals("Day", LiveRuntimeState.activeContext.value)
+        assertFalse(LiveRuntimeState.manualOverride.value)
     }
 }

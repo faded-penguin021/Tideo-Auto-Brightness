@@ -25,12 +25,12 @@ data class AabSettings(
     val dimSpread: Int = 100,
     val pwmSensitive: Boolean = false,
     val pwmExponent: Float = 0.8f,
-    // Tasker: task570 %AAB_Throttle = AnimSteps*MaxWait+10 = 20*65+10 = 1310 (D-004/D-008)
-    val throttleDefaultMs: Long = 1_310L,
-    val minWaitMs: Int = 25,
-    val maxWaitMs: Int = 65,
-    // Tasker: task570 %AAB_AnimSteps = 20; slider range 0–100 (D-004/D-008/D-017)
-    val animSteps: Int = 20,
+    // Tasker: task570 %AAB_Throttle = AnimSteps*MaxWait+10 = 50*30+10 = 1510 (D-004/D-008, DD-030)
+    val throttleDefaultMs: Long = 1_510L,
+    val minWaitMs: Int = 5,
+    val maxWaitMs: Int = 30,
+    // Tasker: task570 %AAB_AnimSteps = 50 (DD-030); slider range 0–100 (D-004/D-008/D-017)
+    val animSteps: Int = 50,
     val deltaFactor: Float = 1.8f,
     val thresholdBright: Float = 0.08f,
     val thresholdDark: Float = 0.3f,
@@ -65,6 +65,7 @@ data class AabSettings(
     val nightLightTemperature: Int? = null,
     // D-154: temperature follows circadian modifier; manual changes don't stick while on
     val nightLightCircadianEnabled: Boolean = false,
+    val extendedNightLightEnabled: Boolean = false,
     // D-150: color-correction mode (STRING enum for schema forward-compatibility)
     val daltonizerMode: String = DALTONIZER_OFF,
     val inversionEnabled: Boolean = false,
@@ -127,10 +128,10 @@ object AabSettingsContract {
         AabSettingRule("%AAB_DimSpread", "dimSpread", AabValueType.Int, "100", "range -100..100"),
         AabSettingRule("%AAB_PWMSensitive", "pwmSensitive", AabValueType.Boolean, "false", "must be true|false"),
         AabSettingRule("%AAB_PWMExp", "pwmExponent", AabValueType.Float, "0.8", "range 0.1..3.0"),
-        AabSettingRule("%AAB_Throttle", "throttleDefaultMs", AabValueType.Long, "1310", "range 100..60000"),
-        AabSettingRule("%AAB_MinWait", "minWaitMs", AabValueType.Int, "25", "range 1..5000"),
-        AabSettingRule("%AAB_MaxWait", "maxWaitMs", AabValueType.Int, "65", "range 1..5000 and >= minWaitMs"),
-        AabSettingRule("%AAB_AnimSteps", "animSteps", AabValueType.Int, "20", "range 0..100"),
+        AabSettingRule("%AAB_Throttle", "throttleDefaultMs", AabValueType.Long, "1510", "range 100..60000"),
+        AabSettingRule("%AAB_MinWait", "minWaitMs", AabValueType.Int, "5", "range 1..5000"),
+        AabSettingRule("%AAB_MaxWait", "maxWaitMs", AabValueType.Int, "30", "range 1..5000 and >= minWaitMs"),
+        AabSettingRule("%AAB_AnimSteps", "animSteps", AabValueType.Int, "50", "range 0..100"),
         AabSettingRule("%AAB_DeltaFactor", "deltaFactor", AabValueType.Float, "1.8", "range 0.1..10.0"),
         AabSettingRule("%AAB_ThreshBright", "thresholdBright", AabValueType.Float, "0.08", "range 0.0..1.0"),
         AabSettingRule("%AAB_ThreshDark", "thresholdDark", AabValueType.Float, "0.3", "range 0.0..1.0"),
@@ -153,8 +154,9 @@ object AabSettingsContract {
         AabSettingRule("%AAB_PanicPlugged", "panicRequiresPlugged", AabValueType.Boolean, "false", "must be true|false"),
         // D-151/D-152: rebuild-only display-toggle fields (invented %AAB_ names, D-116 precedent)
         AabSettingRule("%AAB_NightLight", "nightLightEnabled", AabValueType.Boolean, "false", "must be true|false"),
-        AabSettingRule("%AAB_NightLightTemp", "nightLightTemperature", AabValueType.Int, "device default", "range 1000..10000, or unset = device default"),
+        AabSettingRule("%AAB_NightLightTemp", "nightLightTemperature", AabValueType.Int, "device default", "range 686..7308, or unset = device default"),
         AabSettingRule("%AAB_NightLightCircadian", "nightLightCircadianEnabled", AabValueType.Boolean, "false", "must be true|false"),
+        AabSettingRule("%AAB_ExtendedNightLight", "extendedNightLightEnabled", AabValueType.Boolean, "false", "must be true|false"),
         AabSettingRule("%AAB_Daltonizer", "daltonizerMode", AabValueType.String, DALTONIZER_OFF, "one of OFF|GRAYSCALE|PROTANOMALY|DEUTERANOMALY|TRITANOMALY"),
         AabSettingRule("%AAB_Inversion", "inversionEnabled", AabValueType.Boolean, "false", "must be true|false"),
         AabSettingRule("%AAB_AlwaysOnDisplay", "alwaysOnDisplayEnabled", AabValueType.Boolean, "false", "must be true|false"),

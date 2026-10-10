@@ -64,6 +64,7 @@ import com.tideo.autobrightness.app.ui.components.SwitchSettingRow
 import com.tideo.autobrightness.app.ui.components.SettingsScaffold
 import com.tideo.autobrightness.app.ui.components.rememberToaster
 import com.tideo.autobrightness.app.ui.graph.PowerDrawChart
+import com.tideo.autobrightness.app.ui.theme.AabTeal
 import com.tideo.autobrightness.domain.power.PowerDrawSample
 import com.tideo.autobrightness.domain.wizard.CurveSuggestionEngine
 import com.tideo.autobrightness.domain.wizard.CurveSuggestionInput
@@ -257,7 +258,7 @@ private fun PowerCalibrationOverlay(
                         val total = progress?.total ?: 0
                         if (total > 0) (progress!!.step.toFloat() / total).coerceIn(0f, 1f) else 0f
                     },
-                    color = Color(0xFF007C63), // task524 progress-bar teal
+                    color = AabTeal, // task524 progress-bar teal
                     trackColor = Color(0xFFEEEEEE),
                     modifier = Modifier.fillMaxWidth(),
                 )

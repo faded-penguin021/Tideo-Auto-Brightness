@@ -280,9 +280,8 @@ class AmbientMonitoringService : Service() {
             .distinctUntilChanged()
         notificationJob = scope.launch {
             combine(controller.state, contextEngine.activeContext, manualOverrideFlow) { state, ctx, manualOverride ->
-                contextEngine.onPipelineTick()
                 // Republish for Dashboard/Menu; separate override lock from active context rule (F46).
-                LiveRuntimeState.publish(state, ctx, manualOverride)
+                LiveRuntimeState.publish(this@AmbientMonitoringService, state, ctx, manualOverride)
                 notificationModel(state, ctx)
             }
                 .distinctUntilChanged()

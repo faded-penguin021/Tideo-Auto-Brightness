@@ -4,6 +4,7 @@ import com.tideo.autobrightness.app.settings.AabSettings
 import com.tideo.autobrightness.app.settings.ContextBaselineStore
 import com.tideo.autobrightness.app.settings.ContextRule
 import com.tideo.autobrightness.app.settings.ContextSignalTokens
+import com.tideo.autobrightness.app.settings.DefaultProfiles
 import com.tideo.autobrightness.app.settings.toSpec
 import com.tideo.autobrightness.domain.context.ContextOverrideResolver
 import com.tideo.autobrightness.domain.context.ContextResolution
@@ -22,6 +23,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import java.util.Calendar
+import java.util.concurrent.ConcurrentHashMap
 import kotlin.math.abs
 
 /**
@@ -105,6 +107,7 @@ class ContextEngine(
     private var locationJob: Job? = null
     private var rulesJob: Job? = null
     private var timeJob: Job? = null
+    private val deferred = ConcurrentHashMap<ContextCaller, Job>()
     // The lone surviving @Volatile (S12.9e audit): written from the lifecycle callbacks onScreenOn/Off
     // and read from the listener-start helpers on the engine scope — a single boolean, single-writer
     // per transition, so a plain volatile read is sufficient (no compound invariant to protect).
@@ -115,9 +118,9 @@ class ContextEngine(
 
     /**
      * Non-suspend snapshot of the last resolved effective settings, or null before the first context
-     * evaluation. Used by the panic source to read the GLOBAL `%AAB_PanicSensitivity` per arming from a
-     * sensor callback (no coroutine, must not block) — the value is identical in baseline and effective
-     * because mergeProfile preserves it (D-116).
+     * evaluation. Used by the panic source to read the GLOBAL `%AAB_PanicSensitivity` and
+     * `%AAB_PanicPlugged` from a sensor callback (no coroutine, must not block) — both are identical in
+     * baseline and effective because mergeProfile preserves them (D-116, DD-025).
      */
     val effectiveSnapshot: AabSettings? get() = _effective.value
 
@@ -184,21 +187,21 @@ class ContextEngine(
                 evaluate(ContextCaller.RESUME)
             }
         }
-        // prof764 self-scheduling Time context (contexts_spec): wake EXACTLY at the next time boundary
-        // and re-evaluate, instead of waiting for the next light sample. TYPE_LIGHT is an on-change
-        // sensor, so in constant light (phone on a desk, screen off) no sample arrives and a 20:00 /
-        // Sunset rule would otherwise fire late — only when the user next disturbs the sensor or wakes
-        // the screen. `collectLatest` re-arms whenever the nearest boundary changes; the inner loop
-        // re-arms a same-time daily recurrence. NB: a coroutine delay() can be deferred during deep Doze,
-        // so onScreenOn()'s TIME eval and the 15-min MaintenanceWorker remain backstops for that case.
+        // prof764 self-scheduling Time context (contexts_spec): wake at the next time boundary rather than
+        // wait for a light sample — TYPE_LIGHT is on-change, so in constant light none arrives and a 20:00 /
+        // Sunset rule would fire late. `collectLatest` re-arms when the boundary changes; Doze can defer
+        // delay(), so onScreenOn()'s TIME eval and the 15-min MaintenanceWorker remain backstops. DD-056: it
+        // also wakes at local midnight; each evaluation is a child of timeJob, which a re-arm cannot cancel.
         timeJob = scope.launch {
+            val evaluations = this
             nextContextTime.collectLatest {
                 while (true) {
                     val token = nextContextTime.value ?: break
-                    val waitMs = millisUntilNextContextWake(token, clock())
+                    val now = clock()
+                    val waitMs = millisUntilNextContextWake(token, now)
                     if (waitMs < 0) break
-                    delay(waitMs)
-                    evaluate(ContextCaller.TIME)
+                    delay(minOf(waitMs, millisUntilNextContextWake("00.00", now)))
+                    evaluations.launch { evaluate(ContextCaller.TIME) }.join()
                 }
             }
         }
@@ -211,6 +214,7 @@ class ContextEngine(
         locationJob?.cancel(); locationJob = null
         rulesJob?.cancel(); rulesJob = null
         timeJob?.cancel(); timeJob = null
+        deferred.values.forEach { it.cancel() }; deferred.clear()
         scope = null
     }
 
@@ -270,11 +274,6 @@ class ContextEngine(
     fun onScreenOff() {
         screenOn = false
         appJob?.cancel(); appJob = null
-    }
-
-    /** Called from the pipeline cycle: re-evaluate time-window rules (contexts_spec — prof764). */
-    fun onPipelineTick() {
-        scope?.launch { evaluate(ContextCaller.TIME) }
     }
 
     private suspend fun startAppPollIfNeeded() {
@@ -368,7 +367,10 @@ class ContextEngine(
         val cooldown = caller.cooldownMs
         val now = clock()
         val last = lastEvalTime
-        if (!plugChanged && cooldown > 0 && last != null && now - last < cooldown) return@withLock
+        if (!plugChanged && cooldown > 0 && last != null && now - last < cooldown) {
+            if (caller != ContextCaller.BATTERY) deferPastCooldown(caller)
+            return@withLock
+        }
 
         val signals = signalSource.assemble(snap.app, snap.batteryPercent, snap.plugged, snap.wifi, snap.lat, snap.lon)
         // %AAB_ProfileUser (DA-018): the last manually-loaded profile = the no-match revert target and
@@ -398,6 +400,20 @@ class ContextEngine(
             profileExists = { knownProfiles.contains(it) },
         )
         apply(resolution, current, rules, caller)
+    }
+
+    // DD-042: a PASS-1 refusal is retried as the same caller once the shared cooldown has passed.
+    private fun deferPastCooldown(caller: ContextCaller) {
+        if (deferred[caller]?.isActive == true) return
+        deferred[caller] = scope?.launch {
+            while (true) {
+                val waitMs = evalMutex.withLock { lastEvalTime }?.let { it + caller.cooldownMs - clock() } ?: 0L
+                if (waitMs <= 0) break
+                delay(waitMs)
+            }
+            deferred.remove(caller)
+            evaluate(caller)
+        } ?: return
     }
 
     private fun shouldProceed(
@@ -468,7 +484,7 @@ class ContextEngine(
                 val profile = profileCatalog.profile(target)
                 if (profile != null) {
                     if (baselineStore.snapshot() == null) baselineStore.save(current)
-                    settingsWriter { mergeProfile(it, profile) }
+                    settingsWriter { mergeProfile(it, DefaultProfiles.keepUserChoices(target, profile, it)) }
                 } else {
                     current
                 }
@@ -641,7 +657,7 @@ interface ProfileCatalog {
  * preserved from the baseline.
  *
  * `%AAB_DetectOverrides` is a GLOBAL preference, not a task626 snapshot key, so a swap must never
- * silently disable manual-override detection (G2-F8) — likewise panicSensitivity (D-116). A blanket
+ * silently disable manual-override detection (G2-F8) — likewise both panic prefs (D-116, DD-025). A blanket
  * `copy(global = baseline.global)` is therefore wrong: GlobalPrefs also holds
  * `quickSettingsEnabled`/`notificationsEnabled`, which ARE per-profile (S12.9c #1).
  */
@@ -651,6 +667,7 @@ internal fun mergeProfile(baseline: AabSettings, profile: AabSettings): AabSetti
     detectOverrides = baseline.detectOverrides,
     debugLevel = baseline.debugLevel,
     panicSensitivity = baseline.panicSensitivity,
+    panicRequiresPlugged = baseline.panicRequiresPlugged,
     setupTitle = baseline.setupTitle,
     schemaVersion = baseline.schemaVersion,
 )

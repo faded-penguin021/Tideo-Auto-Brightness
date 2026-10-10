@@ -637,9 +637,13 @@
     <string name="contexts_use_current_wifi">Use current Wi-Fi</string>
     <string name="contexts_time_window">Time window:</string>
     <string name="contexts_clear_time">Clear time</string>
+    <string name="contexts_offset_label">Offset (min)</string>
+    <string name="contexts_offset_placeholder">e.g. +30 or -15</string>
+    <string name="contexts_offset_invalid_start">Offset for Start must be a signed whole number of minutes (e.g. +30, -15)</string>
+    <string name="contexts_offset_invalid_end">Offset for End must be a signed whole number of minutes (e.g. +30, -15)</string>
     <string name="contexts_days">Days (none = every day):</string>
     <string name="contexts_radius">Radius (metres)</string>
-    <string name="contexts_only_charging">Only while charging</string>
+    <string name="contexts_only_plugged_in">Only while plugged in</string>
     <string name="contexts_battery_pct">Battery percentage:</string>
     <string name="contexts_from_pct" formatted="false">From %</string>
     <string name="contexts_to_pct" formatted="false">To %</string>
@@ -675,7 +679,7 @@
     <string name="help_dimming_threshold">This is the screen brightness below which super dimming kicks in.</string>
     <string name="help_pwm_threshold">This is the lowest hardware screen brightness. Software dimming is applied below this point.</string>
     <string name="help_dimming_enabled">Enables or disables super dimming. When on, the screen is darkened below its hardware minimum (using Android\'s Extra Dim layer) once brightness drops below the SD threshold. Requires elevated (secure settings) privilege.</string>
-    <string name="help_pwm_exponent">Gamma-like exponent. Controls the shape of the dimming curve. Higher values keep the screen brighter for longer and fade more steeply near the threshold; lower values dim more quickly. Adjusts how brightness transitions, not how much(!)</string>
+    <string name="help_pwm_exponent">Shapes the software dimming below the PWM threshold. Higher values dim more at every brightness below the threshold, and the dimming sets in faster just under it; lower values dim more gently. It changes how dark the screen gets, not only the transition.</string>
     <string name="help_pwm_sensitive">Enables or disables the software dimming feature. When enabled the max hardware brightness is fixated to the PWM threshold.</string>
     <!-- Inline Circadian field help (was inline literals on CircadianScreen). -->
     <string name="help_circadian_scaling">Shift the whole curve across the day using sun position.</string>
@@ -718,6 +722,7 @@
     <string name="settings_dimming_exponent">Dimming curve</string>
     <string name="settings_dimming_strength">Dimming strength</string>
     <string name="settings_night_light_circadian">Night Light circadian tracking</string>
+    <string name="settings_night_light_extended">Night Light extended range</string>
     <string name="settings_pwm_exponent">PWM curve</string>
     <string name="settings_night_light_temperature">Night Light temperature</string>
     <string name="settings_form1a">Zone 1 scaling</string>
@@ -754,11 +759,14 @@
     <string name="pd_night_light_switch">Night Light</string>
     <string name="pd_night_light_temp_label">Temperature: %1$d K</string>
     <string name="pd_night_light_temp_default">Temperature: device default</string>
-    <string name="pd_night_light_temp_hint">Lower = warmer (stronger filter). Standard Android range 2596–4082 K.</string>
+    <string name="pd_night_light_temp_hint">Lower = warmer (stronger filter). This device\'s range is %1$d–%2$d K.</string>
+    <string name="pd_night_light_temp_hint_extended">Lower = warmer (stronger filter). Extended range %1$d–%2$d K.</string>
     <string name="pd_night_light_circadian">Follow circadian scaling</string>
-    <string name="pd_night_light_circadian_help">While the service runs, the temperature follows your circadian curve — warmest at night, relaxing to the weakest filter (4082 K) in daylight. The slider above sets the night-time temperature (device default 2850 K when unset). Manual temperature changes are overridden while this is on. Uses the same sun schedule and steepness as circadian scaling (Circadian screen).</string>
+    <string name="pd_night_light_circadian_help">While the service runs, the temperature follows your circadian curve — warmest at night, relaxing to the weakest filter (%1$d K) in daylight. The slider above sets the night-time temperature (device default %2$d K when unset). Manual temperature changes are overridden while this is on. Uses the same sun schedule and steepness as circadian scaling (Circadian screen).</string>
     <string name="pd_night_light_schedule_caveat">A Night Light schedule is set in system settings — the system may flip this switch back on its own.</string>
     <string name="pd_night_light_needs_shizuku">This device ignores the temperature setting unless it is applied through its display service. Start Shizuku (or grant root) for the temperature and circadian ramp to take effect.</string>
+    <string name="pd_night_light_extended">Go beyond temperature limits</string>
+    <string name="pd_night_light_extended_help">Unlocks lower and higher temperatures (down to %1$d K and up to %2$d K) through the display service, using Shizuku or root. While it is on, circadian tracking starts from %2$d K, so Night Light fades in more gently.</string>
     <string name="pd_section_color">Color</string>
     <string name="pd_daltonizer_label">Color correction</string>
     <string name="pd_daltonizer_off">Off</string>

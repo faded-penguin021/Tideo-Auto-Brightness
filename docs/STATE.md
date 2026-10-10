@@ -12,25 +12,25 @@ adds super dimming and Privileged Display.
 
 ## Current state
 
-Harness AMH 14.1.0 with its one hand step applied (DC-029…DC-036, DC-051); upstream manifest
-scripts are immutable; the live ledger is `LEDGER_D.md`. **Release standing is NOT recorded
-here:** the session banner computes it (`scripts/session-facts.sh`, DC-030), settled by hand with
+Harness AMH 14.1.0 with its one hand step applied (DC-029…DC-036, DC-051); the live ledger is
+`LEDGER_D.md`. **Release standing is NOT recorded here:** the session banner computes it
+(`scripts/session-facts.sh`, DC-030), settled by hand with
 `git ls-remote --tags --refs origin 'refs/tags/v*'`.
 
-The tree declares 1.13.0 / vc27 and includes Simplified Chinese and app-language selection,
-#134's notification Discard (DD-011), and #133's unclamped curve inputs (DD-012). The light-stall
-findings H1 and H2 remain recorded in DD-003 and DD-002. Device rounds on 1.10.0-debug vc24 are closed, with the 0–4095 conversion path frozen as
-built, and a later build owes its own run (DC-011…DC-013, DC-025…DC-028, DB-083;
-`DEVICE_TEST_SCRIPT.md` §2); no round script is alive (RUNBOOK §6, DB-010), the force-stop
-investigation stays closed (DB-051…DB-060), and Scorecard.dev is a run-once local input.
+The tree declares 1.14.0 / vc28 (the train paragraph under the Owner queue); its device round
+passed on 1.14.0-debug vc28 (DD-036), and a later build owes its own run. The 0–4095 conversion
+path stays frozen as built (DC-011…DC-013, DC-025…DC-028, DB-083), the light-stall findings H1/H2
+are DD-003/DD-002, no round script is alive (RUNBOOK §6, DB-010), the force-stop investigation
+stays closed (DB-051…DB-060), and Scorecard.dev is a run-once local input.
 
 ## Active work
 
-- **Real-device E2E suite** — `docs/plans/DEVICE_E2E_PLAN.md` (owner-approved 2026-09-13): S0
-  done, S1–S9 open; no device mutation before S4's recovery contract is Sol-reviewed.
-- **Night Light fix** — `docs/plans/NIGHT_LIGHT_CIRCADIAN_FIX.md`, for
-  `faded-penguin021/AdvancedAutoBrightness#15` (not a Tideo issue): [x] N1 · [ ] N2 Kelvin bounds
-  · [ ] N3 daytime activation, BLOCKED on device evidence · [ ] N4 close-out.
+- **Bright-light hand-off (#136)** — `docs/plans/BRIGHT_LIGHT_HANDOFF.md`, spec only (owner,
+  2026-10-01); it goes in the train after 1.14.0 (owner, 2026-10-07), each unit on the owner's
+  go-ahead.
+- **Low-lux settling jitter** — `docs/plans/LOW_LUX_SETTLING_JITTER.md`, spec only; its
+  **Proposed fix** is approved as written and goes in the train after 1.14.0 (owner, 2026-10-08),
+  each step on the owner's go-ahead.
 
 ## Owner queue
 
@@ -46,94 +46,64 @@ investigation stays closed (DB-051…DB-060), and Scorecard.dev is a run-once lo
 > fork, options, recommendation (D-167), dated (DA-006); credential leaks and external-content
 > escalations land here too.
 
-1. **[2026-09-23] On the next false "manual override" pause, read brightness before pressing
-   Resume:** `adb shell settings get system screen_brightness` while Live Debug still shows the
-   pause. About 193 means the 12 stuck, so something outside Tideo changed brightness; 241 means a
-   dip that reverted by itself, which Tideo paused on because its "settled" value is a re-read
-   3 ms later, and fixing that is a settle-window change for you to rule on. Extra Dim is ruled
-   out (DC-059…DC-062).
+1. **[2026-10-04] Get eleven Chinese strings translated; they show in English until then.**
+   `help_pwm_exponent` (DD-014), `contexts_only_plugged_in` (DD-025) and
+   `pd_night_light_temp_hint` (DD-045) changed meaning, so their old Chinese was removed (DD-026),
+   the rule editor's four `contexts_offset_*` strings are new (DD-035), and so are the extended
+   Night Light range's four: `settings_night_light_extended` (DD-047),
+   `pd_night_light_temp_hint_extended` and the two `pd_night_light_extended*` (DD-050). Asked in
+   #143 (2026-10-08); it does not block the release, since missing keys fall back to English
+   (owner, 2026-10-08). Paste translations replied there into the file. Settles it:
+   `grep -c -e 'name="help_pwm_exponent"' -e 'name="contexts_only_plugged_in"' -e
+   'name="pd_night_light_temp_hint' -e 'name="contexts_offset_' -e
+   'name="settings_night_light_extended"' -e 'name="pd_night_light_extended'
+   app/src/main/res/values-b+zh+Hans/strings.xml` prints 11.
 
-2. **[2026-09-24] Check the proximity change on the phone next time you test a build.** Tideo no
-   longer slows brightness while the top of the phone is covered, which is what Tasker does: its
-   ×0.1 only ever changed the displayed α (DC-064). If you would rather keep the old slowing as a
-   deliberate difference from Tasker, say so; it is one engine change back. Settles it: run
-   `DEVICE_TEST_SCRIPT.md` step 13 — brightness tracks as fast covered as uncovered, and only
-   Live Debug's "Smoothing α" drops to a tenth.
+2. **[2026-10-04] Once this train is on `main`, check the translation badge.** The `Translation
+   badges` workflow first runs there. Worked if its Actions run is green and the README's 简体中文
+   badge shows a percentage. If its push was refused, let Actions create the `badges` branch
+   (Settings → Actions → Workflow permissions, or the blocking ruleset) and rerun it. Settles it:
+   `git ls-remote --heads origin badges` prints one line (DD-028).
 
-Open questions: none.
+**This train is `1.14.0` on vc28, its ONE bump** (the owner's minor bump of 2026-10-04, moved off
+1.13.0 / vc27 when `main` shipped #141). Land further user-facing fixes in `changelogs/28.txt`
+(500-character cap), never by bumping or creating `29.txt`; re-open only for something major, and
+say so.
 
 ## Decided non-items
 
-- **No migration resets an already-snowballed `nightLightTemperature` (owner, 2026-09-21;
-  DC-055).** A stored Kelvin cannot be told apart from a setpoint the user genuinely chose, so a
-  blanket reset to null would discard real choices while missing contaminated profiles that
-  currently have circadian off. DC-055 stops the capture; an affected user clears it with the
-  screen's existing "device default" button. Do not propose a one-shot reset.
-- **Both backup-fix questions are closed (owner, 2026-09-18; DC-052)** — the pre-fix blast radius
-  will not be measured, needing `bmgr` work the owner declines, and no regression test guards
-  `android:backupAgent`, one having been dropped as YAGNI; propose neither. The owner later ran
-  one package-scoped restore check (2026-09-27): it found and fixed the missing
-  `fullBackupOnly` and verified the restore path end to end (DD-008).
-- **The `stop()`/`emergencyStop()` join asymmetry stays** (owner, 2026-09-07; DC-047).
-- **Issues #123, #126 and #127 get no reply, and no issue gets one unasked** (owner, 2026-08-24,
-  re-confirmed 2026-09-07; DB-082) — a standing rule, and nothing was posted.
-- **Three device checks will never be executed (owner, 2026-09-07)** — the Android 12/12L Wi-Fi fix
-  (DB-074), the unrecognised-colour-mode button (DB-071, DB-078) and Night Light / always-on failing
-  safely (DB-041…DB-043) all need hardware the owner lacks.
-- **Graph Metrics is owner-tested; its automated wiring tests are declined** (owner, 2026-09-07;
-  DC-001).
-- **The x86_64-JDK-on-ARM rule is a local host concern** (owner, 2026-09-07; DC-033,
-  `.orch/LOCAL_LADDER.md`).
-- Still declined: root changelog, speculative dependency bumps, standalone drift audit, Gradle
-  dependency verification, wider session-branch CI, the D-162/DA-021 triage sets (DB-038), the
-  superseded Privileged Display schedule and a persisted seed without real reports (D-150–152), a
-  grayscale quick action, refresh-rate/OEM keys, manual Extra Dim, panic re-firing after teardown,
-  §11.39a C1/C2 as wontfix, a scripted `bmgr restore` step (DB-013; the owner ran it once by
-  hand, DD-008), and migrating
-  the test-only `ContextsContent` wrapper; the rest is in `docs/plans/REVIEW_TRIAGE_1.9.0.md`.
-- **Never synthesise unsupported display values on a device** (DB-071) — use a real settings UI;
-  DB-077 is exempt, mask 7 having been written by Tideo v1.9.0.
-- Rejected by the #126/#127 plan and not to be reintroduced: keying wake behaviour on
-  `ACTION_USER_PRESENT`/unlock (owner, 2026-08-30), a larger fixed or blanket settle window, wake
-  baseline adoption, a recent-write token set (D-034/D-051(d)), and auto-learning the device
-  maximum.
+Binding owner declines live in `docs/rebuild/DECIDED_NON_ITEMS.md` (moved there by the owner's
+grant, DD-037), including the `docs/plans/REVIEW_TRIAGE_1.9.0.md` declines. Read it before
+proposing work; changing it is legislation under RUNBOOK's rule-review protocol.
 
 ## Changelog
 
 Newest first; ledger rows are the durable detail.
 
-- 2026-10-04 — User Guide HTML and its WebView background follow the app theme, including changes
-  while the page is open; dark-mode accents and tinted callouts retain the original palette, with
-  corresponding readable gold/green/coral colors in light mode. Robolectric covers both palettes,
-  light-mode contrast and both switch directions; actual device rendering remains unverified.
-- 2026-10-03..04 — Added Simplified Chinese and persistent app-language selection (1.13.0 / vc27),
-  including System default; UI, grant feedback, diagnostics (DC-040), profile lists, notifications
-  and widgets follow the language. Review fixes use one language lookup per notification,
-  profile labels matching all 40 original English entries, with independent Chinese labels where
-  screen wording differs, and refreshed channel names with Android 12/12L storage-race
-  coverage; changelog 26 is unchanged. Translation/picker guidance is documented;
-  compiled launch resources retain AppCompat, with device appearance unverified.
-- 2026-09-28 — **#133: curve inputs persist unclamped wherever Apply accepts them (DD-012); owner
-  confirmed on 1.12.0-debug vc26 that a Form1A-40 curve and #133's exact curve (Form1A 28.7353),
-  loaded as profiles, survive, the latter after a force-stop.**
-- 2026-09-28 — **1.12.0/vc26 opened from `main` (v1.11.0 tagged, Owner-queue item closed); #134:
-  the override notification can Discard the adjustment it just recorded (DD-011); owner passed
-  `DEVICE_TEST_SCRIPT.md` step 57 on 1.12.0-debug vc26.**
-
-- 2026-09-27 — **Backup actually saves data now (DD-008):** `android:fullBackupOnly="true"` moves
-  the helper-less agent off the empty key/value path; the backup and a Tideo-only restore,
-  including the sanitizer, were verified on the OnePlus 13.
-- 2026-09-25 — **Light-stall train closed (R8):** its plan is deleted and its record is DC-063…DC-071
-  and DD-001…DD-007, with H1 and H2 open. The ledger rolled over to `LEDGER_D.md` (DC-071 ended
-  past the cap), and `AGENTS.md` names the new live volume. R7's settling passed on the OnePlus 13
-  (DD-006) and became `DEVICE_TEST_SCRIPT.md` step 56. Live Debug and the diagnostic cards show lux
-  at its stored precision and the dynamic threshold as a percentage (owner request).
-- 2026-09-23..25 — **Light stalls R0–R7 and F-G (DC-059…DC-071):** notification, diagnostics,
-  startup race, watchdog, Tasker's dead band, proximity damp, pending slot, settling; a false
-  override pause on unlock diagnosed, not fixed.
-- 2026-09-18..22 — **Night Light: snowball closed, anchor on the device's own Kelvin (DC-055,
-  DC-056), Kelvin via `color_display` where the key is ignored, making vc25 `1.11.0` (DC-057,
-  DC-058); backup-agent fix (DC-052).**
-- 2026-09-02..13 — **AMH 9.1.0 → 14.1.0 (DC-029…DC-036, DC-050, DC-051), the runtime rot audit
-  (DC-037…DC-049), E2E suite planned.**
-- 2026-06-23..08-31 — **v1.0.0 → v1.9.2, then the #126/#127 train (D-096…DC-028).**
+- 2026-10-10 — **Owner-confirmed on device: Circadian follows a new location without a restart,
+  the live card shows the applied scale, and the dusk scale refresh steps (DD-061…DD-063).**
+- 2026-10-09 — **Open question answered (a): AAB's 2-minute prof758 re-run refreshes the scale
+  readout during the dawn/dusk ramps and moves no brightness; the owner declined (b) as jitter in
+  steady light. One shared helper now serves the pipeline, that tick and Night Light (DD-063).**
+- 2026-10-09 — **Night Light goes back as found on disable and on again on enable, both
+  owner-confirmed (DD-059, DD-060). A running service follows the stored circadian location and
+  the IP fallback switch (DD-061); a reapply now publishes the scale it applied (DD-062).**
+- 2026-10-08 — **Release preflight treats debug sources and `e2e/` as non-shipping (DD-058); Astra
+  review fixes for TIME wakes and the badge workflow (DD-056, DD-057); only the owning service
+  publishes live state (DD-055); debug builds are dark blue (DD-052, DD-054); step 38a passed on
+  device (DD-053); the low-lux jitter rule approved for after 1.14.0.**
+- 2026-10-06..08 — **Night Light: the device's Kelvin range (N2, DD-045) and the opt-in extended
+  686–7308 K range per profile, Shizuku or root only (N2b, DD-046…DD-051); the plan is archived as
+  `docs/history/NIGHT_LIGHT_CIRCADIAN_FIX.md`.**
+- 2026-10-04..07 — **E2E suite S5–S9 done on the owner's phone, S8 dropped (DD-029,
+  DD-032…DD-034, DD-039…DD-044); RUNBOOK playbook 9 runs it.**
+- 2026-10-06 — **Device round on 1.14.0-debug vc28 passed nine checks (DD-036); Decided non-items
+  moved to `docs/rebuild/DECIDED_NON_ITEMS.md` (DD-037); SUNRISE/SUNSET rules follow the pinned
+  location (DD-038); TIME rules wake only at the next context time (DD-042).**
+- 2026-10-01..06 — **This train (1.14.0 / vc28 after `main` shipped #141 as v1.13.0): E2E S1–S4
+  (DD-015…DD-021), the PWM help (DD-014), the proximity damp (DD-022,
+  DD-024), #139 (DD-025), translation policy and coverage badges (DD-023, DD-026…DD-028), the
+  owner's first-launch defaults (DD-030, DD-031), AAB's solar offsets (DD-035), #138's actions
+  bump.**
+- 2026-06-23..09-28 — **v1.0.0 → v1.12.0 (D-096…DD-012); #133 and #134 owner-passed on
+  1.12.0-debug vc26.**

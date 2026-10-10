@@ -146,6 +146,7 @@ jobs:
               */proguard-rules.pro|*/consumer-rules.pro) echo ships ;;
               docs/*|.github/*|.claude/*|.codex/*|scripts/*|fastlane/*) echo nonships ;;
               */src/test/*|*/src/testFixtures/*|*/src/androidTest/*|*/src/sharedTest/*) echo nonships ;;
+              */src/debug/*|e2e/*) echo nonships ;;                                 # debug variant only; owner-run device harness (DD-058)
               *.md|amh.conf|.gitignore|.gitattributes|LICENSE|LICENSE.*|*/lint.xml) echo nonships ;;
               *) echo unknown ;;
             esac
@@ -157,6 +158,8 @@ jobs:
           [ "$(classify_path amh.conf)" = nonships ]
           [ "$(classify_path scripts/ladder.sh)" = nonships ]
           [ "$(classify_path domain/src/test/kotlin/ExampleTest.kt)" = nonships ]
+          [ "$(classify_path app/src/debug/res/drawable/ic_launcher_background.xml)" = nonships ]
+          [ "$(classify_path e2e/tideo_e2e/cli.py)" = nonships ]
           [ "$(classify_path future-artifact-input.conf)" = unknown ]
 
           ships=false

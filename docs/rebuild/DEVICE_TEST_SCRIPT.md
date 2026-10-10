@@ -19,6 +19,8 @@ optional.
 
 ## 0. Install & onboarding (task563)
 
+E2E auto: `s00_tier`; the other rows, with reasons, are in `e2e/scenarios.toml`.
+
 1. Install the APK; launch. **Expected:** onboarding starts (tier == NONE) → notifications prompt →
    "Modify system settings" → optional Location → optional Elevated step → optional usage-access.
 2. Grant POST_NOTIFICATIONS and WRITE_SETTINGS. Return to the app. **Expected:** tier badge shows
@@ -27,6 +29,8 @@ optional.
    between Tideo and the OS.
 
 ## 1. Core loop — sensor → brightness (prof760/task554/544/535/661/543/696)
+
+E2E auto: `s01_4`; the other rows, with reasons, are in `e2e/scenarios.toml`.
 
 4. From the Dashboard, flip the **master switch** on. **Expected:** a persistent foreground
    notification appears (live lux/target); the QS-tile/widget (if added) shows Active.
@@ -37,6 +41,9 @@ optional.
    shows the throttle climbing to its ceiling in stable light.
 
 ## 2. Manual override detect / resume (prof755/task567)
+
+E2E auto: `s02_8` `s02_9` `s02_10a` `s02_10b` `s02_10c` `s02_10e`; the other rows, with reasons,
+are in `e2e/scenarios.toml`.
 
 8. With Override Detection on (Reactivity screen), drag the **system** brightness slider mid-run.
    **Expected:** Tideo **pauses**, posts a vibrating high-priority "manual override" notification +
@@ -208,6 +215,8 @@ optional.
 
 ## 3. Screen off/on — hibernate & reinit (prof753/585, prof761/618)
 
+E2E auto: none; every row, with its reason, is in `e2e/scenarios.toml`.
+
 11. Turn the screen off, wait ~10 s, turn it on. **Expected:** sensing resumes; an initial brightness is
     set for the ambient level; context automation resumes (manual lock cleared on wake).
 12. Reboot the device. **Expected:** the service self-starts (foreground notification returns) if it was
@@ -215,13 +224,20 @@ optional.
 
 ## 4. Proximity damp (prof759/task545)
 
+E2E auto: none; every row, with its reason, is in `e2e/scenarios.toml`.
+
 13. With the service running in changing light, cover the **top** of the phone (proximity "near", e.g.
-    hold it to your ear). **Expected (DC-064, Tasker parity):** brightness follows the light exactly as
-    it does uncovered — same speed, no damping — and the loop does **not** pause. Only the Live Debug
-    "Smoothing α (LuxAlpha)" readout drops to a tenth while near. Builds before DC-064 slowed reactivity
-    ~10× here instead.
+    hold it to your ear). **Expected (DD-024, the owner's task535/task545 parity):** the loop does
+    **not** pause, but while near each light change moves brightness only about a tenth of the way per
+    cycle: Live Debug's "Smoothing α (LuxAlpha)" drops to a tenth, "Last animation" shows few steps,
+    and the "settling" count climbs as Tideo creeps toward the reading. Uncover the sensor:
+    brightness catches up within a cycle or two without any change in light, because uncovering
+    re-evaluates the last reading. History: DC-064 builds up to DD-022 changed only the α readout;
+    DD-022 builds sped the animation up and left smoothing undamped.
 
 ## 5. Panic reset (prof769/task528)
+
+E2E auto: `s05_14a`; the other rows, with reasons, are in `e2e/scenarios.toml`.
 
 14. Hold the phone **upside down** (charging port up) and **shake** vertically. **Expected:** an **S.O.S.
     vibration**, brightness forced to **maximum**, the service stops (full reset).
@@ -242,6 +258,10 @@ optional.
     re-enabling the service while unplugged. The second shape is the one that broke (DB-011) — the
     gesture started before the settings snapshot resolved and an unresolved snapshot read as "no
     restriction".
+    - **The toggle is global, not per-profile (DD-025).** Turn it **off** and save profile P; turn it
+      **on** and save profile Q; turn it **off** again and add a rule that loads Q. While the rule is
+      active, **Expected:** Live Debug's switch still reads **off** and the gesture fires on battery.
+      Flip the switch while the rule is active. **Expected:** the new value survives the rule dropping.
 15b. **The accelerometer is released while the screen is off** and re-registered on screen-on
     (DB-009 — it was held at ~50 Hz for the life of the service, including screen-off, where the
     gesture cannot fire). With the toggle off: lock, wait ~10 s, unlock and **immediately** gesture.
@@ -250,6 +270,8 @@ optional.
     service still running.
 
 ## 6. Super dimming [ELEVATED] (task646/650/645/700/698)
+
+E2E auto: `s06_16` `s06_19a`; the other rows, with reasons, are in `e2e/scenarios.toml`.
 
 16. Grant elevated access:
     `adb shell pm grant com.tideo.autobrightness android.permission.WRITE_SECURE_SETTINGS`
@@ -272,8 +294,10 @@ optional.
     spread 0, dark room. **Fail:** dimming got *weaker*; the clamp was only ever meant to correct the
     display.
 19b. **A grant made while the app is running is picked up without a restart** (DB-012). With the
-    service running and the screen on, grant `WRITE_SECURE_SETTINGS` over adb. **Expected:** the tier
-    badge reaches **ELEVATED** within ~10 s and super dimming starts working, with no app restart.
+    service running, the screen on and the room dark enough to dim, grant `WRITE_SECURE_SETTINGS`
+    over adb. **Expected:** super dimming starts working within ~10 s, with no app restart. An open
+    Dashboard's tier badge does not change; it reads **ELEVATED** once the app is reopened (step
+    16), and that is intended (owner, 2026-10-06).
     **Known residual:** `PrivilegeManager` is per-`AppModule` and `AppModule` is built at ~10 call
     sites, so the tier cache is shared only within one instance; DB-012 self-heals the visible symptom
     rather than making it process-wide.
@@ -284,6 +308,8 @@ optional.
     actually landed.
 
 ## 7. Circadian scaling (task90)
+
+E2E auto: none; every row, with its reason, is in `e2e/scenarios.toml`.
 
 20. On the Circadian screen, enable dynamic scaling; check the chart's **"Now"** line and the live curve.
     **Expected:** the scale multiplier tracks the real local sunrise/sunset (not a fixed UTC window).
@@ -299,9 +325,18 @@ optional.
 
 ## 8. Contexts (task43 + prof762–768)
 
+E2E auto: none; every row, with its reason, is in `e2e/scenarios.toml`.
+
 22. Add a **per-app** rule (grant usage access when prompted) targeting a saved profile; switch to that
     app. **Expected:** the profile loads (a teal context flash); the Dashboard shows the active context.
-23. Add a **charging** rule; plug/unplug. **Expected:** the rule applies on the charging change.
+23. Add an **Only while plugged in** rule; plug/unplug. **Expected:** the rule applies on the plug change.
+    - **Charge limit (#139, DD-025).** With the charger in and the rule active, run
+      `adb shell dumpsys battery set status 4` (not charging), then `adb shell dumpsys battery reset`.
+      **Expected:** the rule stays active and Live Debug shows no context change. On a phone with a real
+      charge limit, at the limit, `adb shell dumpsys battery` shows `status: 4` (or 3) with `AC powered`
+      or `USB powered` `true`, and the rule stays active. If both read `false` at the limit, that
+      device's limit reports the charger as disconnected and no fix here can help: record it, don't
+      work around it.
     - **Prompt switch on plug-in (D-132).** With a higher-priority charging rule and a lower-priority
       battery rule both matching (e.g. "Charging" P81 on-power vs "Low battery" P80 ≤30%), at low battery
       plug the charger in (screen can be off). **Expected:** it switches to the charging rule **immediately**,
@@ -337,6 +372,19 @@ optional.
     **comma decimal separator** (e.g. Deutsch). **Expected:** identical — the parse/format pair is
     shared by both screens now. Before the fix, Set silently refused and the rule reopened with the
     toggle off.
+24c. **Time rules exit on time; solar offsets (DD-035).** Use a profile different from your baseline
+    as the rule's target, with no other rule matching.
+    - **Exit at end + 1 min.** Keep the **screen on** for the whole check (Stay awake, or a long
+      screen timeout), on the Dashboard, in steady light, and don't touch the phone: turning the screen
+      on runs its own evaluation, which would hide a late exit. Add a time rule from now to **2 min
+      from now** (e.g. 14:00–14:02 at 14:00). **Expected:** it switches on, stays on through the whole
+      14:02 minute, and the active profile flips back to your baseline at **14:03:00** (a teal context
+      flash). The old build left it on until some later evaluation (a light change, or a screen-on).
+    - **Sunset offset.** With location available, add a rule whose From is **Sunset** and whose
+      **Offset (min)** puts it about 3 min from now (e.g. sunset 18:30, now 17:57 → `-30`), To a
+      clock time an hour later. **Expected:** the gold preview under the offset shows that time
+      (18:00 here), the rule switches on at exactly that minute, and reopening the rule shows the
+      offset as `-30`. An offset like `5-` refuses to save with "Offset for Start must be…".
 25. Manually load a profile (Profiles). **Expected:** context automation **pauses** (Resume banner);
     screen off→on or Resume re-enables it.
     - **Resume re-evaluates, it does not reset (DA-018).** With a rule currently MATCHING, load a
@@ -352,6 +400,8 @@ optional.
 
 ## 9. Charts, wizard, calibration, profiles
 
+E2E auto: none; every row, with its reason, is in `e2e/scenarios.toml`.
+
 26. Collect ≥ 9 manual overrides (step 8 repeatedly across lighting), then **Tools → Run wizard**.
     **Expected:** a fitted curve + a verbose diagnostics report; **Apply** updates the curve; the Curve &
     Brightness chart shows the recorded points + suggested line + the live "Now" marker.
@@ -365,6 +415,8 @@ optional.
 
 ## 10. Surfaces & soak
 
+E2E auto: none; every row, with its reason, is in `e2e/scenarios.toml`.
+
 30. Add the **QS tile** and the **home-screen widget** (Dashboard quick actions). **Expected:** both
     reflect Off/Active/Paused and toggle the service; the widget repaints on state changes.
 31. **24 h soak:** leave the service running a full day across doze/charging/locations. **Expected:**
@@ -372,6 +424,9 @@ optional.
     acceptable battery drain, **no ANRs/crashes**, brightness stays sensible.
 
 ## 11. Privileged Display toggles [ELEVATED] (D-149–D-152)
+
+E2E auto: `s11_32a` `s11_32c` `s11_34` `s11_36` `s11_39` `s11_39b`; the other rows, with reasons,
+are in `e2e/scenarios.toml`.
 
 The toggles are `AabSettings` **profile fields** applied on profile change by
 `DisplayTogglesCoordinator` (super-dimming model, idempotent only-on-change); with the service OFF,
@@ -423,11 +478,13 @@ Apply writes the device directly (`applyNow`). Debug builds need their own grant
     toggle ON, Apply → **Expected: `15`** (`AC|USB|WIRELESS|DOCK`), not 7. OFF + Apply → `0`.
     Then set a mask this app does not write (`… put global stay_on_while_plugged_in 7` — what
     Tideo itself wrote up to v1.9.0, so this is the state every upgrading device is in; `1` also
-    works) and reopen the screen. **Expected:** the switch reads ON *and* a notice appears under it
-    saying Android is set to a charger set this app did not write. Now Apply with some *other*
+    works) and reopen the screen. **Expected:** the switch keeps Tideo's stored setting (OFF after
+    the step above) *and* a notice appears under it saying Android is set to a charger set this
+    app did not write (owner, 2026-10-05: not ON). Now Apply with some *other*
     field changed. **Expected:** the mask stays as you set it — an unrelated Apply must not broaden
     a charger set Tideo did not choose. Finally tap **Use Tideo's setting instead** on that notice.
-    **Expected:** the mask becomes `15` and the notice disappears, with no Apply needed. A notice
+    **Expected:** the mask becomes Tideo's setting (`0` while OFF, `15` while ON) and the notice
+    disappears, with no Apply needed. A notice
     that never appears at `7` is the DB-077 regression; a button that needs Apply is DB-078's.
 32b. **HDR: an absent row is a default, a partial row is a preference (DB-045/DB-049).** With both
     rows cleared (`adb shell settings delete global user_disabled_hdr_formats` and
@@ -489,12 +546,33 @@ Apply writes the device directly (`applyNow`). Debug builds need their own grant
     circadian scaling**, Apply (baseline), service ON, ideally within ~1 h of local sunset/sunrise.
     **Expected:** within a minute the temperature starts moving with the sun —
     `adb shell settings get secure night_display_color_temperature` drifts toward your slider value
-    (warmer) as the evening ramp progresses, and toward 4082 in daylight; in stable indoor light too
+    (warmer) as the evening ramp progresses, and toward the device's maximum (4082 on stock) in
+    daylight; in stable indoor light too
     (the ticker is independent of brightness cycles). Change the temperature by hand in system
     settings. **Expected:** it is re-overridden within ~1 min — documented behavior while tracking is
     on (every other display field keeps manual changes). Turn the switch off + Apply. **Expected:**
     the ticker stops and the temperature returns to the profile's static value (the slider; with the
     slider unset it simply stays where the ramp left it); manual changes stick again.
+38a. **Extended Night Light range (DD-047…DD-050).** With neither Shizuku running for Tideo nor
+    root, open Privileged Display. **Expected:** no "Go beyond temperature limits" row. Start
+    Shizuku (or have root), reopen the screen. **Expected:** the row shows under "Follow circadian
+    scaling". Turn it on. **Expected:** at once, before Apply, the slider hint reads "Extended range
+    686–7308 K". Set about 1000 K (below the device's minimum), Night Light on, Apply.
+    **Expected:** the panel is visibly redder
+    than at the device's own minimum, and `adb shell settings get secure
+    night_display_color_temperature` prints 1000 (`dumpsys color_display` may report a clamped
+    value, as #142 saw — not a failure). Turn the row off and Apply. **Expected:** the panel returns
+    to the device's minimum (2596 on stock) rather than staying at 1000, and the slider label still
+    reads 1000 K (a stored setpoint is kept, clamped only when applied). Turn it back on with
+    **Follow circadian scaling**, service ON, in daylight. **Expected:** the key sits near 7308 and
+    Night Light switching on is barely visible. Stop Shizuku (skip this check on a rooted phone,
+    where root still carries the bridge), reopen the screen. **Expected:** the
+    row stays visible with the "needs Shizuku" note, and with no Apply (there is nothing to apply)
+    the next tick drops the key to the top of the device's range (4082 on stock). Turn **Follow
+    circadian scaling** off and Apply. **Expected:** the key lands the device's minimum (2596 on
+    stock) and the slider still reads the stored setpoint. On a build that ignores the key (DC-057;
+    the owner's OnePlus 13) the panel keeps what the display service last held — 4082 in
+    `dumpsys color_display` — until Shizuku returns, as the note says (owner run, 2026-10-08).
 39. **Panic resets the privileged keys (D-155).** With a profile holding grayscale + inversion +
     Night Light engaged (via context rule or Apply), fire the panic gesture (step 14).
     **Expected:** besides the SOS + max brightness + service stop, ALL display toggles return to
@@ -548,6 +626,8 @@ Apply writes the device directly (`applyNow`). Debug builds need their own grant
 
 ## 12. Accessibility — TalkBack & touch targets (D-156)
 
+E2E auto: none; every row, with its reason, is in `e2e/scenarios.toml`.
+
 The a11y backlog (D-156, units A0–A7) is verified in CI by the `SemanticsAudit`
 gate + the `TouchTargetsA11yTest` floor, but semantics tests only *approximate* TalkBack, and Compose's
 runtime `minimumInteractiveComponentSize()` expansion is **not observable in Robolectric** — so the two
@@ -573,6 +653,8 @@ double-tap to activate.
     instead (they are excluded from the automated floor by design — `TouchTargetsA11yTest`).
 
 ## 13. Automation control — intent surface (D-157)
+
+E2E auto: `s13_42` `s13_43` `s13_45`; the other rows, with reasons, are in `e2e/scenarios.toml`.
 
 Opt-in external control (Tasker / MacroDroid). CI covers the gate + verb routing + the outbound event
 contract (`ControlReceiverTest`, `AmbientMonitoringServiceTest`), but end-to-end delivery from a real
@@ -614,6 +696,8 @@ reference: [`docs/AUTOMATION.md`](../AUTOMATION.md). Use `adb` (no automation ap
 
 ## 14. Edge-to-edge + keyboard insets (D-159)
 
+E2E auto: none; every row, with its reason, is in `e2e/scenarios.toml`.
+
 `MainActivity` now calls `enableEdgeToEdge()` **app-wide** (plus manifest `adjustResize` and the
 Scaffold-level `imePadding()`), which changed how EVERY screen receives system-bar and keyboard
 insets on API 31–36. CI cannot see insets — this sweep is the only real gate. Test with **gesture
@@ -636,6 +720,8 @@ navigation** first, then repeat the marked items with **3-button navigation** (t
     whole window (adjustResize + inset dispatch, not legacy ADJUST_PAN).
 
 ## 15. Force dark via Shizuku/root (D-172)
+
+E2E auto: none; every row, with its reason, is in `e2e/scenarios.toml`.
 
 Global `debug.hwui.force_dark` toggle in Tools. Live paths try Shizuku (**running and
 authorized**) first, then a root shell; the switch itself always persists.
@@ -661,6 +747,8 @@ authorized**) first, then a root shell; the switch itself always persists.
 
 ## 16. Settling after a light change (DC-070)
 
+E2E auto: none; every row, with its reason, is in `e2e/scenarios.toml`.
+
 56. **A transition finishes after the light stops changing.** In a dark room, service running and
     Live Debug on the Light Sensor card, sample `adb shell settings get system screen_brightness`
     first for a dark baseline, then every ~250 ms while flickering a flashlight at the sensor for
@@ -671,6 +759,8 @@ authorized**) first, then a root shell; the switch itself always persists.
     its own readings (DD-006).
 
 ## 17. Discarding an override (DD-011)
+
+E2E auto: none; every row, with its reason, is in `e2e/scenarios.toml`.
 
 57. **Discard forgets only that adjustment.** Move the brightness slider with the service running.
     **Expected:** the heads-up reads Discard · Resume · Disable, and Curve & Brightness already

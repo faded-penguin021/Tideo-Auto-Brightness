@@ -2,6 +2,7 @@ package com.tideo.autobrightness.domain.brightness
 
 import com.tideo.autobrightness.domain.circadian.DynamicScaleEngine
 import com.tideo.autobrightness.domain.circadian.DynamicScaleInput
+import com.tideo.autobrightness.domain.circadian.DynamicScaleResult
 import java.math.BigDecimal
 import java.math.RoundingMode
 import kotlin.math.abs
@@ -26,7 +27,7 @@ data class CompressedScaleResult(val calculatedBrightness: Double, val effective
 
 class BrightnessEngine {
     companion object {
-        // Tasker task544 act28/29 / prof759 / task545: %LuxAlpha readout factor while proximity reads "near".
+        // Tasker task535 A3b (was task544 act28/29) / prof759 / task545: lux_alpha factor while %AAB_Proximity is "near" (DD-024).
         const val PROXIMITY_ALPHA_DAMP = 0.1
 
         const val MAX_SETTLING_STEPS = 20
@@ -85,6 +86,7 @@ class BrightnessEngine {
                     thresholdDynamicPercent = prev.threshDynamicPercent,
                     deltaFactor = input.thresholds.deltaFactor,
                     zone1End = input.thresholds.zone1End,
+                    proximityNear = input.proximityNear,
                 )
             }
             val par1 = if (stop) input.lux else smoothed.first
@@ -131,16 +133,13 @@ class BrightnessEngine {
         )
 
         val dimmingAlpha = dimmingAlpha(targetBrightness, input.curve.minBrightness)
-        // Tasker task544 act28–31: the ×0.1 sets only the %LuxAlpha global; act27 and act33 use %lux_results2 (gap-08).
-        val smoothing = outcome == EvaluationOutcome.SMOOTHED || outcome == EvaluationOutcome.SETTLED
-        val reportedLuxAlpha = if (smoothing && input.proximityNear) luxAlpha * PROXIMITY_ALPHA_DAMP else luxAlpha
 
         return BrightnessPolicyOutput(
             targetBrightness = targetBrightness,
             transitionDurationMs = throttle,
             animationSteps = steps,
             animationWaitMs = wait,
-            luxAlpha = reportedLuxAlpha,
+            luxAlpha = luxAlpha,
             dimmingAlpha = dimmingAlpha,
             smoothedLux = smoothedLux,
             dynamicThreshold = dynamicThreshold,
@@ -177,11 +176,13 @@ class BrightnessEngine {
         thresholdDynamicPercent: Double,
         deltaFactor: Double,
         zone1End: Double,
+        proximityNear: Boolean = false,
     ): Pair<Double, Double> {
         val luxDelta = round3(abs((rawLux - previousSmoothedLux) / (previousSmoothedLux + 1.0)))
         val effectiveDelta = round3(luxDelta - (thresholdDynamicPercent / 100.0))
-        // Tasker task535: lux_alpha NOT clamped to [0,1] (D-010(a)).
-        val luxAlpha = round3(1.0 - exp(-deltaFactor * effectiveDelta))
+        // Tasker task535: lux_alpha NOT clamped to [0,1] (D-010(a)); A3b damps it before the blend while near (DD-024).
+        val undamped = round3(1.0 - exp(-deltaFactor * effectiveDelta))
+        val luxAlpha = if (proximityNear) round3(undamped * PROXIMITY_ALPHA_DAMP) else undamped
         val smoothed = rawLux * luxAlpha + previousSmoothedLux * (1.0 - luxAlpha)
         // Tasker task535: BigDecimal(raw).setScale(2|0, HALF_UP) — exact-binary constructor.
         val rounded = if (smoothed < zone1End) bigScale(smoothed, 2) else bigScale(smoothed, 0)
@@ -250,6 +251,9 @@ class BrightnessEngine {
     }
 
     fun computeDynamicScale(time: TimeContext, scaling: DynamicScalingConfig, context: BrightnessContext): Double =
+        dynamicScale(time, scaling, context).scaleDynamic
+
+    fun dynamicScale(time: TimeContext, scaling: DynamicScalingConfig, context: BrightnessContext): DynamicScaleResult =
         DynamicScaleEngine.compute(
             DynamicScaleInput(
                 nowSecOfDay = time.secondsOfDay,
@@ -262,7 +266,7 @@ class BrightnessEngine {
                 steepness = scaling.steepness,
                 scaleSpreadPercent = scaling.spreadPercent,
             )
-        ).scaleDynamic
+        )
 
     fun calculateAnimation(alpha: Double, animation: AnimationConfig, cycleTimeMs: Double?): Triple<Int, Long, Long> {
         val clamped = alpha.coerceIn(0.0, 1.0)

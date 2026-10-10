@@ -195,13 +195,17 @@ class SettingsValidatorTest {
 
     @Test
     fun `night light temperature outside the sanity band triggers an advisory D151`() {
-        val errors = SettingsValidator.validate(AabSettings(nightLightTemperature = 500))
-        assertTrue(
-            errors.any { it.field == "nightLightTemperature" && it.severity == Severity.ADVISORY },
-            "out-of-band temperature must warn (it is clamped on save); got: $errors",
-        )
-        // In-band and unset ("device default") are both clean.
-        assertTrue(SettingsValidator.validate(AabSettings(nightLightTemperature = 2700)).none { it.field == "nightLightTemperature" })
+        for (outside in listOf(685, 7_309)) {
+            val errors = SettingsValidator.validate(AabSettings(nightLightTemperature = outside))
+            assertTrue(
+                errors.any { it.field == "nightLightTemperature" && it.severity == Severity.ADVISORY },
+                "out-of-band temperature must warn (it is clamped on save); got: $errors",
+            )
+        }
+        // In-band (both rail ends included) and unset ("device default") are clean.
+        for (inside in listOf(686, 2_700, 7_308)) {
+            assertTrue(SettingsValidator.validate(AabSettings(nightLightTemperature = inside)).none { it.field == "nightLightTemperature" })
+        }
         assertTrue(SettingsValidator.validate(AabSettings()).none { it.field == "nightLightTemperature" })
     }
 }

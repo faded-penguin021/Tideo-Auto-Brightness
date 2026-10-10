@@ -7,7 +7,7 @@ schema-drifted file in one never takes down the others. They are declared in
 
 | # | Store (extension) | File | Type | Payload | Schema ver | Serializer | Why independent |
 |---|---|---|---|---|---|---|---|
-| 1 | `settingsDataStore` | `aab_settings.json` | typed JSON | `AabSettings` (flat, 48 fields) | **3** (`CURRENT_SCHEMA_VERSION`) | `AabSettingsSerializer` | The core tuned curve/threshold/dimming parameters; versioned + migrated (v1→v2→v3; the 7 D-151/D-152 display-toggle fields joined additively at v3). High read frequency (every pipeline reapply). |
+| 1 | `settingsDataStore` | `aab_settings.json` | typed JSON | `AabSettings` (flat, 51 fields) | **3** (`CURRENT_SCHEMA_VERSION`) | `AabSettingsSerializer` | The core tuned curve/threshold/dimming parameters; versioned + migrated (v1→v2→v3; the 7 D-151/D-152 display-toggle fields joined additively at v3; DD-030 changed the animation defaults without a bump and writes every key). High read frequency (every pipeline reapply). |
 | 2 | `serviceHealthDataStore` | `service_health.preferences_pb` | Preferences | heartbeat timestamps, degraded flag/reason | n/a (schema-less) | — (Preferences) | Volatile runtime diagnostics written by `MaintenanceWorker`; losing it is harmless. |
 | 3 | `experimentPrefsDataStore` | `experiment_prefs.preferences_pb` | Preferences | fixed date + lat/lon override, geo-IP opt-in, daily cached lat/lon/day | n/a (schema-less) | — (Preferences) | Circadian experiment and acquisition state. It contains precise coordinates and a privacy consent choice. |
 | 4 | `contextRulesDataStore` | `aab_context_rules.json` | typed JSON | `ContextOverrideConfig` (rule list) | **1** (`ContextOverrideConfig.SCHEMA_VERSION`) | `ContextRulesSerializer` | The context-override rule set; edited from the Contexts UI, read by `ContextEngine`. Tasker-JSON interop lives here, separate from settings. |
@@ -27,6 +27,16 @@ schema-drifted file in one never takes down the others. They are declared in
   stay at **v1**, and `contextBaseline` is at **v2** (DA-018 added `userProfileName` additively — the
   constant was bumped for honesty, not a migration). Bump the `SCHEMA_VERSION` constant and add a real
   migration only on a *breaking* shape change.
+- **Changing an `AabSettings` default is a breaking change (DD-030).** Before DD-030 the settings,
+  baseline and export writers omitted every key equal to its default, `schemaVersion` included, so
+  an absent key meant the default of the writing build. Those three writers now encode every key, so
+  an absent key can only come from an older writer, and `AabSettingsSerializer.upgradeJson` pins an
+  object's absent animation keys to their v3 values unless all four are absent; it is also applied
+  to a baseline snapshot and an imported export. The version stays 3 on purpose: a bump makes an
+  older build reject the file and reset to defaults on a downgrade or an equal-versionCode
+  reinstall. `userProfiles` always wrote every key; its `factoryRevision` moves an untouched
+  built-in to new factory values once. A future default change must extend that pin to its key
+  (layer: `AabSettingsMigrationTest`'s frozen-defaults test fails until it is looked at).
 - The four **Preferences** stores (`service_health`, `experiment_prefs`, `power_draw`, `control_prefs`)
   are intentionally schema-less key/value bags (no serializer, no version); they hold disposable/optional
   data.

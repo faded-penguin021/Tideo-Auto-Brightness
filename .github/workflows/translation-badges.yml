@@ -1,0 +1,64 @@
+name: Translation badges
+
+# Publishes each translated language's coverage as shields.io endpoint JSON on the `badges`
+# branch, which the README's Translations badges read (DD-028). Main only, so a badge shows what
+# users get. No workflow listens to `badges`, so this push triggers nothing else.
+#
+# The first run creates `badges` as an orphan branch. If the push is rejected (a ruleset limiting
+# branch creation, or Actions tokens set to read-only), the job fails and the badges show an
+# error until it is allowed. The coverage table, with missing keys, is in the job summary.
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'app/src/main/res/values/strings.xml'
+      - 'app/src/main/res/values-*/strings.xml'
+      - '.github/scripts/translation_coverage.py'
+      - '.github/workflows/translation-badges.yml'
+  workflow_dispatch:
+
+# Read-only by default; the single job below re-grants `contents: write` at job scope.
+permissions:
+  contents: read
+
+concurrency:
+  group: translation-badges
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    # A manual run from another branch would publish that branch's coverage over main's.
+    if: github.ref == 'refs/heads/main'
+    permissions:
+      contents: write  # needed to push the JSON to the badges branch
+    runs-on: ubuntu-latest
+    timeout-minutes: 10  # quick git op; cap a hang
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1 - node24 runtime (see build.yml node24 policy)
+
+      - name: Compute coverage
+        run: python3 .github/scripts/translation_coverage.py app/src/main/res "$RUNNER_TEMP/badges" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Publish to the badges branch
+        run: |
+          set -euo pipefail
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          wt="$RUNNER_TEMP/badges-branch"
+          if git ls-remote --exit-code --heads origin badges >/dev/null; then
+            git fetch --depth=1 origin badges
+            git worktree add --detach "$wt" FETCH_HEAD
+          else
+            git worktree add --detach "$wt"
+            git -C "$wt" switch --orphan badges
+          fi
+          rm -f "$wt"/*.json
+          cp "$RUNNER_TEMP"/badges/*.json "$wt"/
+          git -C "$wt" add -A
+          if git -C "$wt" diff --cached --quiet; then
+            echo "Coverage unchanged; nothing to publish."
+            exit 0
+          fi
+          git -C "$wt" commit -q -m "Translation coverage for ${GITHUB_SHA::7}"
+          git -C "$wt" push origin HEAD:refs/heads/badges

@@ -136,6 +136,26 @@ class DraftSettingsViewModelTest {
     }
 
     @Test
+    fun apply_isRefusedBeforeTheSeed_soDefaultsNeverReplaceTheProfile() {
+        setBaseline(AabSettings(minBrightness = 42, dimmingStrength = 30))
+        val main = StandardTestDispatcher()
+        Dispatchers.setMain(main)
+        try {
+            val vm = DraftSettingsViewModel(app)
+            assertEquals(0, vm.epoch.value, "the seed must still be pending; nothing else pins that")
+            assertFalse(vm.dirty.value, "no Apply bar over pre-seed defaults")
+            vm.edit { it.copy(dimmingStrength = 65) }
+            vm.apply()
+            awaitVmOn(main, vm) { it.epoch.value >= 1 }
+            assertEquals(42, awaitCommitted { true }.minBrightness, "the profile must survive")
+            assertEquals(30, committed().dimmingStrength, "the pre-seed edit is not committed")
+            assertFalse(vm.dirty.value, "the seed replaced the pre-seed edit")
+        } finally {
+            Dispatchers.resetMain()
+        }
+    }
+
+    @Test
     fun readBack_tracksRepeatedDeviceChanges() {
         setBaseline(AabSettings(nightLightEnabled = false))
         val vm = seededVm()
@@ -206,6 +226,32 @@ class DraftSettingsViewModelTest {
 
         val result = awaitCommitted { it.maxBrightness == 222 }
         assertEquals(222, result.maxBrightness, "Apply commits the draft to the DataStore")
+    }
+
+    @Test
+    fun liveDebugPanicPluggedChange_reachesTheDraft_withoutDirtying_DD025() {
+        setBaseline(AabSettings(panicRequiresPlugged = false))
+        val vm = seededVm()
+
+        setBaseline(committed().copy(panicRequiresPlugged = true)) // Live Debug, a GLOBAL field
+        awaitVm(vm) { it.draft.value.panicRequiresPlugged && !it.dirty.value }
+
+        assertTrue(vm.draft.value.panicRequiresPlugged, "the open draft follows the store")
+        assertFalse(vm.dirty.value, "a global field moved elsewhere is not a user edit")
+    }
+
+    @Test
+    fun apply_doesNotWriteAStalePanicPluggedValueBack_DD025() {
+        setBaseline(AabSettings(maxBrightness = 200, panicRequiresPlugged = false))
+        val vm = seededVm()
+        vm.edit { it.copy(maxBrightness = 222) }
+        idle()
+        runBlocking { app.settingsDataStore.updateData { it.copy(panicRequiresPlugged = true) } }
+
+        vm.apply()
+
+        val result = awaitCommitted { it.maxBrightness == 222 }
+        assertTrue(result.panicRequiresPlugged, "Apply keeps the store's global panic toggle")
     }
 
     @Test

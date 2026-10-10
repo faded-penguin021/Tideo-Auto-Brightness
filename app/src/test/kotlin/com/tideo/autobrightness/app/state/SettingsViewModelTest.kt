@@ -4,6 +4,7 @@ import android.app.Application
 import android.os.Looper
 import androidx.test.core.app.ApplicationProvider
 import com.tideo.autobrightness.app.settings.AabSettings
+import com.tideo.autobrightness.app.settings.DefaultProfiles
 import com.tideo.autobrightness.app.storage.settingsDataStore
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
@@ -155,5 +156,62 @@ class SettingsViewModelTest {
 
         val result = awaitCommitted { it.minBrightness != 42 }
         assertEquals(7, result.debugLevel, "a per-screen reset must not reset the global debug category")
+    }
+
+    @Test
+    fun resetDefaults_keepsTheGlobalPanicPluggedToggle_DD025() {
+        runBlocking {
+            app.settingsDataStore.updateData {
+                AabSettings(serviceEnabled = false, panicRequiresPlugged = true, minBrightness = 42)
+            }
+        }
+        idle()
+
+        SettingsViewModel(app).resetDefaults()
+
+        val result = awaitCommitted { it.minBrightness != 42 }
+        assertEquals(true, result.panicRequiresPlugged, "Reset keeps the global panic toggle (DB-009)")
+    }
+
+    @Test
+    fun replaceAll_keepsTheGlobalPanicPluggedToggle_DD025() {
+        runBlocking {
+            app.settingsDataStore.updateData { AabSettings(serviceEnabled = false, panicRequiresPlugged = false) }
+        }
+        idle()
+
+        SettingsViewModel(app).replaceAll(AabSettings(panicRequiresPlugged = true, zone1End = 50))
+
+        val result = awaitCommitted { it.zone1End == 50 }
+        assertEquals(false, result.panicRequiresPlugged, "an import keeps the global panic toggle (DB-009)")
+    }
+
+    @Test
+    fun replaceAll_ofATask592BuiltInByName_keepsTrustAndQuickSettings_DD031() {
+        val user = AabSettings(serviceEnabled = false, trustUnreliableSensor = true, quickSettingsEnabled = true)
+        runBlocking { app.settingsDataStore.updateData { user.copy(minBrightness = 42) } }
+        idle()
+
+        SettingsViewModel(app).replaceAll(DefaultProfiles.Outdoors, "Outdoors")
+
+        val result = awaitCommitted { it.minBrightness == DefaultProfiles.Outdoors.minBrightness }
+        assertEquals(true, result.trustUnreliableSensor, "task592 writes no trust_unreliable")
+        assertEquals(true, result.quickSettingsEnabled, "task592 writes no qs_use")
+    }
+
+    @Test
+    fun replaceAll_ofAnUnnamedImport_appliesItsOwnTrustAndQuickSettings_DD031() {
+        runBlocking {
+            app.settingsDataStore.updateData {
+                AabSettings(serviceEnabled = false, trustUnreliableSensor = true, quickSettingsEnabled = true, minBrightness = 42)
+            }
+        }
+        idle()
+
+        SettingsViewModel(app).replaceAll(DefaultProfiles.Outdoors)
+
+        val result = awaitCommitted { it.minBrightness == DefaultProfiles.Outdoors.minBrightness }
+        assertEquals(false, result.trustUnreliableSensor, "without a profile name an import applies its own values")
+        assertEquals(false, result.quickSettingsEnabled)
     }
 }

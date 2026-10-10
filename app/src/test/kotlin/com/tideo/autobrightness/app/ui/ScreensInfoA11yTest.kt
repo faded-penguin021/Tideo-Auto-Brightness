@@ -114,7 +114,7 @@ class ScreensInfoA11yTest {
                     rule = rule,
                     profileNames = listOf("Default", "Movies"),
                     apps = listOf(AppEntry("com.example", "Example App")),
-                    solarLabel = "06:42" to "20:15",
+                    solarTimes = 24_120L to 72_900L,
                     onCancel = {}, onSave = {},
                     onUseCurrentSsid = {}, onUseCurrentLocation = {},
                     hasUsageAccess = { false }, onRequestUsageAccess = {},
@@ -137,7 +137,7 @@ class ScreensInfoA11yTest {
         // D-156: the battery section's "only while charging" Switch label is a sibling Text — the fix
         // gives the switch node its own contentDescription so TalkBack reads more than "switch".
         renderEditorAllSectionsOpen()
-        compose.onNodeWithTag("rule_charging").assertContentDescriptionEquals("Only while charging")
+        compose.onNodeWithTag("rule_charging").assertContentDescriptionEquals("Only while plugged in")
     }
 
     @Test

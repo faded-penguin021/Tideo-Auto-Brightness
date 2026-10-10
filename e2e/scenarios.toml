@@ -1,0 +1,498 @@
+# One row per DEVICE_TEST_SCRIPT step (id = s<section>_<step>), plus `extra` rows for checks that
+# are not a script step. test_manifest.py keeps this in lockstep with the script.
+#
+# status:  auto | partial | manual
+# effects: what the scenario may write, directly or through Tideo (vocabulary in
+#          tideo_e2e/scenarios.py; refined into the S3 effect inventory). Required unless manual.
+# test:    pytest node id. Required for auto rows unless `pending = true` (scenario not written yet).
+# reason:  why a row is partial or manual. Required for both.
+
+# §0 Install & onboarding
+[[scenario]]
+id = "s00_1"
+status = "manual"
+reason = "fresh-install onboarding needs tier NONE; the suite never uninstalls or clears data"
+
+[[scenario]]
+id = "s00_2"
+status = "manual"
+reason = "runtime permission grant dialogs (onboarding); the tier readout is s00_tier"
+
+[[scenario]]
+id = "s00_3"
+status = "manual"
+reason = "system Settings UI outside Tideo's UI allowlist"
+
+[[scenario]]
+id = "s00_tier"
+extra = true
+status = "auto"
+effects = ["ui_nav"]
+test = "tests/test_s00_smoke.py::test_s00_tier_badge_matches_the_grant"
+note = "tier badge readout against the grant state"
+
+# §1 Core loop
+[[scenario]]
+id = "s01_4"
+status = "auto"
+effects = ["service_toggle", "ui_nav"]
+test = "tests/test_s00_smoke.py::test_s01_4_master_switch_starts_the_service"
+
+[[scenario]]
+id = "s01_5"
+status = "partial"
+effects = ["service_toggle"]
+reason = "light control is physical; animation smoothness is judged by eye"
+
+[[scenario]]
+id = "s01_6"
+status = "partial"
+effects = ["service_toggle"]
+reason = "light control is physical; animation smoothness is judged by eye"
+
+[[scenario]]
+id = "s01_7"
+status = "partial"
+effects = ["service_toggle", "ui_nav"]
+reason = "steady light is physical; the Live Debug throttle readout is automatable"
+
+# §2 Manual override
+[[scenario]]
+id = "s02_8"
+status = "auto"
+effects = ["service_toggle", "settings_write", "override_record", "notification_action", "ui_nav", "prefs_ui"]
+test = "tests/test_s02_override.py::test_s02_8_brightness_change_pauses"
+note = "pause oracle: Resume on the ongoing notification, manual_override channel and override_card; the pause is discarded so no curve point stays"
+
+[[scenario]]
+id = "s02_9"
+status = "auto"
+effects = ["service_toggle", "prefs_ui", "broadcast", "automation_events", "notification_action", "ui_nav"]
+test = "tests/test_s02_override.py::test_s02_9_resume_from_the_notification"
+note = "paused by PAUSE, not an override, whose Resume would keep its curve point"
+
+[[scenario]]
+id = "s02_10"
+status = "partial"
+effects = ["service_toggle", "ui_nav"]
+reason = "swinging light during an animation is physical; absence of a pause is automatable"
+
+[[scenario]]
+id = "s02_10a"
+status = "auto"
+effects = ["service_toggle", "settings_write", "screen_wake", "override_record", "notification_action", "ui_nav", "prefs_ui"]
+test = "tests/test_s02_override.py::test_s02_10a_no_false_pause_on_wake"
+note = "quiet/control pair in one test (DB-083); DC-012 unpaused gate before each half"
+
+[[scenario]]
+id = "s02_10b"
+status = "auto"
+effects = ["service_toggle", "settings_write", "override_record", "notification_action", "ui_nav", "prefs_ui"]
+test = "tests/test_s02_override.py::test_s02_10b_deadband_boundary"
+note = "stored scale S from the device profile, never calibrated via PANIC"
+
+[[scenario]]
+id = "s02_10c"
+status = "auto"
+effects = ["service_toggle", "settings_write", "override_record", "notification_action", "ui_nav", "prefs_ui"]
+test = "tests/test_s02_override.py::test_s02_10c_mode_conflict_dismisses"
+
+[[scenario]]
+id = "s02_10d"
+status = "manual"
+reason = "diagnostic readout, not pass/fail, already answered on the owner's phone"
+
+[[scenario]]
+id = "s02_10e"
+status = "auto"
+effects = ["service_toggle", "settings_write", "screen_wake", "override_record", "notification_action", "ui_nav", "prefs_ui"]
+test = "tests/test_s02_override.py::test_s02_10e_no_pause_from_a_write_while_off"
+note = "control: step 8's pause once awake, since the pre-fix build is not installed"
+
+# §3 Screen off/on
+[[scenario]]
+id = "s03_11"
+status = "partial"
+effects = ["service_toggle", "screen_wake"]
+reason = "off/on readouts are automated; the initial brightness's fit to ambient light is not"
+
+[[scenario]]
+id = "s03_12"
+status = "manual"
+reason = "reboot is forbidden"
+
+# §4 Proximity
+[[scenario]]
+id = "s04_13"
+status = "manual"
+reason = "covering the proximity sensor is physical"
+
+# §5 Panic
+[[scenario]]
+id = "s05_14"
+status = "partial"
+effects = ["panic"]
+reason = "invert+shake gesture and vibration are physical"
+
+[[scenario]]
+id = "s05_14a"
+status = "auto"
+effects = ["panic", "broadcast", "notification_action", "automation_events", "prefs_ui", "service_toggle", "ui_nav"]
+test = "tests/test_s05_panic.py::test_s05_14a_every_panic_entry_point_resets"
+note = "late PANIC stage; distinct non-S pre-value, transition to S after; the S.O.S. vibration is not observed"
+
+[[scenario]]
+id = "s05_15"
+status = "partial"
+effects = ["service_toggle"]
+reason = "pocket grab is physical; absence of a panic is automatable"
+
+[[scenario]]
+id = "s05_15a"
+status = "partial"
+effects = ["prefs_ui", "panic"]
+reason = "the gesture is physical; the plugged-in preference round trip is automatable"
+
+[[scenario]]
+id = "s05_15b"
+status = "partial"
+effects = ["service_toggle", "screen_wake"]
+reason = "accelerometer release is observable in dumpsys; the gesture half is physical"
+
+# §6 Super dimming
+[[scenario]]
+id = "s06_16"
+status = "auto"
+effects = ["grant", "ui_nav"]
+test = "tests/test_s06_elevated.py::test_s06_16_grant_raises_the_tier_on_resume"
+
+[[scenario]]
+id = "s06_17"
+status = "partial"
+effects = ["prefs_ui", "service_toggle"]
+reason = "needs a dark room below the dimming threshold"
+
+[[scenario]]
+id = "s06_18"
+status = "partial"
+effects = ["prefs_ui", "service_toggle"]
+reason = "needs a dark room; optional step"
+
+[[scenario]]
+id = "s06_19"
+status = "partial"
+effects = ["prefs_ui", "service_toggle"]
+reason = "needs daylight hours and a dark room"
+
+[[scenario]]
+id = "s06_19a"
+status = "auto"
+effects = ["prefs_ui", "ui_nav"]
+test = "tests/test_s06_elevated.py::test_s06_19a_strength_is_clamped_where_stored"
+
+[[scenario]]
+id = "s06_19b"
+status = "manual"
+reason = "super dimming needs a room dark enough to dim; the badge on reopening is s06_16"
+
+[[scenario]]
+id = "s06_19c"
+status = "manual"
+reason = "needs a failed Extra Dim write, which cannot be staged without forbidden settings surgery"
+
+# §7 Circadian
+[[scenario]]
+id = "s07_20"
+status = "manual"
+reason = "chart judgement"
+
+[[scenario]]
+id = "s07_21"
+status = "manual"
+reason = "chart judgement"
+
+[[scenario]]
+id = "s07_21a"
+status = "manual"
+reason = "chart judgement"
+
+# §8 Contexts
+[[scenario]]
+id = "s08_22"
+status = "manual"
+reason = "context-rule editors and profile loads are outside the UI allowlist (unrestorable tuple)"
+
+[[scenario]]
+id = "s08_23"
+status = "manual"
+reason = "context-rule editors are outside the UI allowlist; plugging in is physical"
+
+[[scenario]]
+id = "s08_24"
+status = "manual"
+reason = "context-rule editors are outside the UI allowlist"
+
+[[scenario]]
+id = "s08_24a"
+status = "manual"
+reason = "context-rule editors are outside the UI allowlist"
+
+[[scenario]]
+id = "s08_24b"
+status = "manual"
+reason = "context-rule editors are outside the UI allowlist"
+
+[[scenario]]
+id = "s08_24c"
+status = "manual"
+reason = "context-rule editors are outside the UI allowlist; the waits are wall-clock minutes"
+
+[[scenario]]
+id = "s08_25"
+status = "manual"
+reason = "profile load: the (settings, baseline, profile-name) tuple is not restorable"
+
+# §9 Charts, wizard, calibration, profiles
+[[scenario]]
+id = "s09_26"
+status = "manual"
+reason = "the wizard rewrites the curve; needs nine real overrides"
+
+[[scenario]]
+id = "s09_27"
+status = "manual"
+reason = "Calibrate is outside the UI allowlist; needs airplane mode"
+
+[[scenario]]
+id = "s09_28"
+status = "manual"
+reason = "profile save/overwrite/restore/import are outside the UI allowlist"
+
+[[scenario]]
+id = "s09_29"
+status = "partial"
+effects = ["prefs_ui", "ui_nav"]
+reason = "automatable once a concrete field and bound are pinned from code"
+
+# §10 Surfaces & soak
+[[scenario]]
+id = "s10_30"
+status = "manual"
+reason = "adding a QS tile and a widget is launcher UI"
+
+[[scenario]]
+id = "s10_31"
+status = "manual"
+reason = "24 h soak"
+
+# §11 Privileged Display
+[[scenario]]
+id = "s11_32"
+status = "partial"
+effects = ["privileged_apply", "settings_write"]
+reason = "the device reacting is automatable; visible agreement with system Settings is not"
+
+[[scenario]]
+id = "s11_32a"
+status = "auto"
+effects = ["privileged_apply", "settings_write", "service_toggle", "ui_nav"]
+test = "tests/test_s11_privileged.py::test_s11_32a_stay_awake_writes_the_whole_mask"
+
+[[scenario]]
+id = "s11_32b"
+status = "manual"
+reason = "needs an absent settings row, which only settings delete can restore"
+
+[[scenario]]
+id = "s11_32c"
+status = "auto"
+effects = ["ui_nav"]
+test = "tests/test_s11_privileged.py::test_s11_32c_unrecognised_colour_mode_is_read_only"
+note = "reads only; values -1, 0, 11, 12, 13 or unset SKIP; otherwise checks the notice, never writes"
+
+[[scenario]]
+id = "s11_32d"
+status = "manual"
+reason = "needs hardware the owner lacks (decided non-item)"
+
+[[scenario]]
+id = "s11_33"
+status = "manual"
+reason = "context-carried profile: unrestorable tuple"
+
+[[scenario]]
+id = "s11_34"
+status = "auto"
+effects = ["privileged_apply", "service_toggle", "ui_nav"]
+test = "tests/test_s11_privileged.py::test_s11_34_apply_with_the_service_off_hits_the_device"
+
+[[scenario]]
+id = "s11_35"
+status = "manual"
+reason = "needs context swaps and the system QS"
+
+[[scenario]]
+id = "s11_36"
+status = "auto"
+effects = ["revoke", "grant", "ui_nav"]
+test = "tests/test_s11_privileged.py::test_s11_36_privileged_row_follows_the_grant"
+note = "revoke kills the process; the scenario expects the death and relaunches"
+
+[[scenario]]
+id = "s11_37"
+status = "manual"
+reason = "context-loaded profile and process death mid-override"
+
+[[scenario]]
+id = "s11_38"
+status = "manual"
+reason = "circadian Night Light tracking needs hours"
+
+[[scenario]]
+id = "s11_38a"
+status = "manual"
+reason = "needs Shizuku or root for Tideo and a visual panel check; the extended range writes through the display service"
+
+[[scenario]]
+id = "s11_39"
+status = "auto"
+effects = ["panic", "privileged_apply", "notification_action", "service_toggle", "ui_nav"]
+test = "tests/test_s11_privileged.py::test_s11_39_panic_resets_the_privileged_keys"
+note = "late PANIC stage; stay-awake and inversion stand in for grayscale and Night Light"
+
+[[scenario]]
+id = "s11_39a"
+status = "manual"
+reason = "needs a stored profile that differs from the device"
+
+[[scenario]]
+id = "s11_39b"
+status = "auto"
+effects = ["privileged_apply", "service_toggle", "ui_nav"]
+test = "tests/test_s11_privileged.py::test_s11_39b_apply_does_not_undo_itself"
+
+[[scenario]]
+id = "s11_39c"
+status = "manual"
+reason = "system Night Light UI is outside the allowlist"
+
+[[scenario]]
+id = "s11_39d"
+status = "manual"
+reason = "needs a profile swap"
+
+# §12 Accessibility
+[[scenario]]
+id = "s12_40"
+status = "partial"
+effects = ["ui_nav"]
+reason = "hierarchy label audit only; TalkBack speech is manual"
+
+[[scenario]]
+id = "s12_41"
+status = "partial"
+effects = ["ui_nav"]
+reason = "uiautomator bounds are not Compose touch bounds"
+
+# §13 Automation control
+[[scenario]]
+id = "s13_42"
+status = "auto"
+effects = ["prefs_ui", "broadcast", "service_toggle", "automation_events", "ui_nav"]
+test = "tests/test_s13_automation.py::test_s13_42_commands_ignored_until_opted_in"
+note = "quiet/control pair in one test"
+
+[[scenario]]
+id = "s13_43"
+status = "auto"
+effects = ["prefs_ui", "broadcast", "service_toggle", "automation_events", "panic", "ui_nav"]
+test = "tests/test_s13_automation.py::test_s13_43_core_verbs_route"
+note = "one oracle per verb; REAPPLY partial (no attributable fresh write); PANIC in the late stage"
+
+[[scenario]]
+id = "s13_44"
+status = "manual"
+reason = "LOAD_PROFILE / CONTEXTS_RESUME: unrestorable tuple"
+
+[[scenario]]
+id = "s13_44a"
+status = "partial"
+effects = ["prefs_ui", "broadcast", "automation_events"]
+reason = "flash text is transient; the LOAD_PROFILE cases are excluded"
+
+[[scenario]]
+id = "s13_45"
+status = "auto"
+effects = ["prefs_ui", "broadcast", "service_toggle", "automation_events", "ui_nav"]
+test = "tests/test_s13_automation.py::test_s13_45_service_on_while_stopped"
+
+[[scenario]]
+id = "s13_46"
+status = "partial"
+effects = ["prefs_ui", "service_toggle", "automation_events"]
+reason = "needs a receiver for STATE_CHANGED; the profile-load case is excluded"
+
+# §14 Edge-to-edge + keyboard insets
+[[scenario]]
+id = "s14_47"
+status = "partial"
+effects = ["ui_nav"]
+reason = "IME/bar overlap geometry only; typing would need an IME, which is denied"
+
+[[scenario]]
+id = "s14_48"
+status = "partial"
+effects = ["ui_nav"]
+reason = "geometry only; context-rule editor is opened, never saved"
+
+[[scenario]]
+id = "s14_49"
+status = "partial"
+effects = ["ui_nav"]
+reason = "geometry only"
+
+[[scenario]]
+id = "s14_50"
+status = "partial"
+effects = ["ui_nav"]
+reason = "geometry only; the profile name field is never submitted"
+
+# §15 Force dark
+[[scenario]]
+id = "s15_51"
+status = "manual"
+reason = "needs Shizuku and other apps' rendering"
+
+[[scenario]]
+id = "s15_52"
+status = "manual"
+reason = "needs Shizuku and another app's rendering"
+
+[[scenario]]
+id = "s15_53"
+status = "manual"
+reason = "needs Shizuku stopped"
+
+[[scenario]]
+id = "s15_54"
+status = "manual"
+reason = "reboot is forbidden"
+
+[[scenario]]
+id = "s15_55"
+status = "manual"
+reason = "setting the prop by hand is denied (setprop)"
+
+# §16 Settling (added after the plan)
+[[scenario]]
+id = "s16_56"
+status = "partial"
+effects = ["service_toggle", "ui_nav"]
+reason = "flashlight flicker is physical; the brightness sampling is automatable"
+
+# §17 Discard (added after the plan)
+[[scenario]]
+id = "s17_57"
+status = "partial"
+effects = ["service_toggle", "settings_write", "override_record", "notification_action", "ui_nav"]
+reason = "Discard is allowlisted (owner, 2026-10-02) and every §2 control pause uses it; the Resume half keeps its curve point, which the suite cannot remove"

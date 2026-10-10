@@ -11,14 +11,20 @@ import com.tideo.autobrightness.domain.context.ContextSignals
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
+import java.util.Calendar
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertNotEquals
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import org.junit.Test
@@ -57,6 +63,8 @@ class ContextEngineTest {
         var wifi: String = "",
         var dayOfWeek: Int = 4,
         var nowSecondsOfDay: Int = 12 * 3600,
+        var timeOfDay: (() -> Int)? = null,
+        var sunrise: (() -> Long)? = null,
     ) : ContextSignalSource {
         val battery = MutableSharedFlow<BatterySignal>(extraBufferCapacity = 16)
         val wifi_ = MutableSharedFlow<String?>(extraBufferCapacity = 16)
@@ -76,7 +84,8 @@ class ContextEngineTest {
             return ContextSignals(
                 app = this.app, lat = lat, lon = lon,
                 batteryPercent = this.batteryPercent, plugged = this.plugged,
-                wifi = this.wifi, dayOfWeek = dayOfWeek, nowSecondsOfDay = nowSecondsOfDay,
+                wifi = this.wifi, dayOfWeek = dayOfWeek, nowSecondsOfDay = timeOfDay?.invoke() ?: nowSecondsOfDay,
+                sunriseLocalSecs = sunrise?.invoke() ?: 21_600L,
             )
         }
     }
@@ -116,6 +125,7 @@ class ContextEngineTest {
         clock: () -> Long = { 0L },
         onChanged: () -> Unit = {},
         baselineStore: FakeBaselineStore = FakeBaselineStore(),
+        profiles: ProfileCatalog = catalog,
     ): EngineHarness {
         val scope = CoroutineScope(UnconfinedTestDispatcher(testScheduler))
         val settings = FakeSettingsStore(baseline)
@@ -124,12 +134,137 @@ class ContextEngineTest {
             settingsProvider = settings.provider,
             settingsWriter = settings.writer,
             baselineStore = baselineStore,
-            profileCatalog = catalog,
+            profileCatalog = profiles,
             signalSource = signalSource,
             onProfileChanged = onChanged,
             clock = clock,
         )
         return EngineHarness(engine, scope, settings, baselineStore)
+    }
+
+    @Test
+    fun timeWake_insidePass1Cooldown_retriesInsteadOfSkippingADay() = runTest {
+        val noon = Calendar.getInstance().apply {
+            set(Calendar.HOUR_OF_DAY, 12); set(Calendar.MINUTE, 0)
+            set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0)
+        }.timeInMillis
+        val rule = ContextRule(
+            id = "lunch", name = "Lunch", profile = "Video Streaming", priority = 10,
+            triggers = ContextTriggers(timeRange = listOf("12:01", "13:00")),
+        )
+        val src = FakeSignalSource(timeOfDay = { 12 * 3600 + (testScheduler.currentTime / 1000).toInt() })
+        val (engine, scope) = engine(listOf(rule), src, clock = { noon + testScheduler.currentTime })
+        engine.start(scope)
+        runCurrent()
+        assertEquals("12.01", engine.nextContextTime.value)
+
+        advanceTimeBy(59_500)
+        engine.resumeContextAutomation()
+        advanceTimeBy(600)
+        runCurrent()
+        assertNull(engine.activeContext.value, "the 12:01:00 wake fell inside RESUME's cooldown")
+
+        advanceTimeBy(1_000)
+        runCurrent()
+        assertEquals("Lunch", engine.activeContext.value)
+        scope.cancel()
+    }
+
+    @Test
+    fun timeWake_withASuspendingWriter_finishesTheProfileSwap() = runTest {
+        val noon = Calendar.getInstance().apply {
+            set(Calendar.HOUR_OF_DAY, 12); set(Calendar.MINUTE, 0)
+            set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0)
+        }.timeInMillis
+        val rule = ContextRule(
+            id = "lunch", name = "Lunch", profile = "Video Streaming", priority = 10,
+            triggers = ContextTriggers(timeRange = listOf("12:01", "13:00")),
+        )
+        val src = FakeSignalSource(timeOfDay = { 12 * 3600 + (testScheduler.currentTime / 1000).toInt() })
+        var stored = baseline
+        val scope = CoroutineScope(UnconfinedTestDispatcher(testScheduler))
+        val engine = ContextEngine(
+            rulesProvider = { listOf(rule) },
+            settingsProvider = { stored },
+            // A real DataStore write suspends; the in-memory fakes never do.
+            settingsWriter = { transform -> delay(1); stored = transform(stored); stored },
+            baselineStore = FakeBaselineStore(),
+            profileCatalog = catalog,
+            signalSource = src,
+            onProfileChanged = {},
+            clock = { noon + testScheduler.currentTime },
+        )
+        try {
+            engine.start(scope)
+            runCurrent()
+            assertEquals("12.01", engine.nextContextTime.value)
+
+            advanceTimeBy(60_500)
+            runCurrent()
+            assertEquals("Lunch", engine.activeContext.value)
+            assertNotEquals(baseline, stored, "the 12:01 wake's profile write was cancelled mid-apply")
+        } finally {
+            scope.cancel()
+        }
+    }
+
+    @Test
+    fun solarWake_armedBeforeMidnight_reArmsFromTheNewDaysSunrise() = runTest {
+        val evening = Calendar.getInstance().apply {
+            set(Calendar.HOUR_OF_DAY, 20); set(Calendar.MINUTE, 0)
+            set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0)
+        }.timeInMillis
+        val untilMidnightMs = 4 * 3_600_000L
+        val rule = ContextRule(
+            id = "dawn", name = "Dawn", profile = "Video Streaming", priority = 10,
+            triggers = ContextTriggers(timeRange = listOf("SUNRISE", "SUNRISE+1")),
+        )
+        val src = FakeSignalSource(
+            timeOfDay = { ((20 * 3600 + testScheduler.currentTime / 1000) % 86_400).toInt() },
+            // 06:44 today, 06:41 tomorrow: the window moves earlier than the wake armed tonight.
+            sunrise = { if (testScheduler.currentTime < untilMidnightMs) 24_240L else 24_060L },
+        )
+        val (engine, scope) = engine(listOf(rule), src, clock = { evening + testScheduler.currentTime })
+        try {
+            engine.start(scope)
+            runCurrent()
+            assertEquals("06.44", engine.nextContextTime.value)
+
+            advanceTimeBy(untilMidnightMs + 1_000)
+            runCurrent()
+            assertEquals("06.41", engine.nextContextTime.value)
+
+            advanceTimeBy((6 * 3600 + 41 * 60 + 29) * 1_000L)
+            runCurrent()
+            assertEquals("Dawn", engine.activeContext.value)
+        } finally {
+            scope.cancel()
+        }
+    }
+
+    @Test
+    fun wifiChange_insideSharedCooldown_appliesWhenTheCooldownEnds() = runTest {
+        val rule = ContextRule(
+            id = "home", name = "Home", profile = "Video Streaming", priority = 10,
+            triggers = ContextTriggers(wifi = listOf("HomeNet")),
+        )
+        val src = FakeSignalSource()
+        val (engine, scope) = engine(listOf(rule), src, clock = { testScheduler.currentTime })
+        engine.start(scope)
+        runCurrent()
+        assertNull(engine.activeContext.value)
+
+        advanceTimeBy(3_000)
+        src.wifi = "HomeNet"
+        src.wifi_.emit("HomeNet")
+        advanceTimeBy(4_900)
+        runCurrent()
+        assertNull(engine.activeContext.value, "refused inside WIFI's 8 s cooldown from the t=0 evaluation")
+
+        advanceTimeBy(200)
+        runCurrent()
+        assertEquals("Home", engine.activeContext.value)
+        scope.cancel()
     }
 
     @Test
@@ -755,6 +890,37 @@ class ContextEngineTest {
     }
 
     @Test
+    fun contextLoadOfABuiltIn_keepsTrustUnreliableAndQuickSettings_DD031() = runTest {
+        val user = baseline.copy(trustUnreliableSensor = true, quickSettingsEnabled = true)
+        val h = engine(listOf(batterySaverRule), FakeSignalSource(batteryPercent = 10), baseline = user)
+        h.engine.start(h.scope)
+        advanceUntilIdle()
+        assertEquals("Low Battery", h.engine.activeContext.value)
+        assertEquals(DefaultProfiles.BatterySaver.minBrightness, h.settings.value.minBrightness)
+        assertTrue(h.settings.value.trustUnreliableSensor, "task592 writes no trust_unreliable")
+        assertTrue(h.settings.value.quickSettingsEnabled, "task592 writes no qs_use")
+        h.scope.cancel()
+    }
+
+    @Test
+    fun contextLoadOfAnEditedBuiltIn_appliesItsOwnTrustAndQuickSettings_DD031() = runTest {
+        val edited = DefaultProfiles.BatterySaver.copy(minBrightness = 7)
+        val profiles = object : ProfileCatalog {
+            override suspend fun profile(name: String): AabSettings? = if (name == "Battery Saver") edited else null
+            override suspend fun names(): Set<String> = setOf("Battery Saver")
+        }
+        val user = baseline.copy(trustUnreliableSensor = true, quickSettingsEnabled = true)
+        val h = engine(listOf(batterySaverRule), FakeSignalSource(batteryPercent = 10), baseline = user, profiles = profiles)
+        h.engine.start(h.scope)
+        advanceUntilIdle()
+        assertEquals("Low Battery", h.engine.activeContext.value)
+        assertEquals(7, h.settings.value.minBrightness)
+        assertFalse(h.settings.value.trustUnreliableSensor, "a saved profile carries its own value")
+        assertFalse(h.settings.value.quickSettingsEnabled)
+        h.scope.cancel()
+    }
+
+    @Test
     fun midOverrideEdits_sameProfileEvalKeepsThem_revertDiscardsProfileKeysKeepsGlobals_D170() = runTest {
         var now = 0L
         val src = FakeSignalSource(batteryPercent = 10)
@@ -910,6 +1076,72 @@ class ContextEngineTest {
     }
 
     @Test
+    fun mergeProfile_preservesPanicRequiresPlugged_bothWays_DD025() {
+        val on = mergeProfile(AabSettings(panicRequiresPlugged = true), AabSettings(panicRequiresPlugged = false))
+        assertEquals(true, on.panicRequiresPlugged, "on in the baseline survives a profile saved off")
+        val off = mergeProfile(AabSettings(panicRequiresPlugged = false), AabSettings(panicRequiresPlugged = true))
+        assertEquals(false, off.panicRequiresPlugged, "off in the baseline survives a profile saved on")
+    }
+
+    private val pluggedRule = ContextRule(
+        id = "plug", name = "Plugged", profile = "Q", priority = 10,
+        triggers = ContextTriggers(battery = BatteryTrigger(onPower = true)),
+    )
+
+    private fun TestScope.panicEngine(live: FakeSettingsStore, src: FakeSignalSource): Pair<ContextEngine, CoroutineScope> {
+        val profileQ = AabSettings(panicRequiresPlugged = true, minBrightness = 99)
+        val scope = CoroutineScope(UnconfinedTestDispatcher(testScheduler))
+        val engine = ContextEngine(
+            rulesProvider = { listOf(pluggedRule) },
+            settingsProvider = live.provider,
+            settingsWriter = live.writer,
+            baselineStore = FakeBaselineStore(),
+            profileCatalog = object : ProfileCatalog {
+                override suspend fun profile(name: String): AabSettings? = if (name == "Q") profileQ else null
+                override suspend fun names(): Set<String> = setOf("Q")
+            },
+            signalSource = src,
+            onProfileChanged = {},
+            clock = { 0L },
+        )
+        return engine to scope
+    }
+
+    @Test
+    fun ruleLoadingAProfileSavedWithPanicPluggedOn_keepsTheGlobalOff_DD025() = runTest {
+        val live = FakeSettingsStore(baseline.copy(panicRequiresPlugged = false))
+        val (engine, scope) = panicEngine(live, FakeSignalSource(plugged = true))
+        engine.start(scope)
+        advanceUntilIdle()
+
+        assertEquals("Plugged", engine.activeContext.value)
+        assertEquals(99, engine.effectiveSettings().minBrightness, "the profile's curve applies")
+        assertEquals(false, engine.effectiveSettings().panicRequiresPlugged, "the global toggle stays off")
+        scope.cancel()
+    }
+
+    @Test
+    fun panicPluggedChangedWhileARuleIsActive_survivesTheRevert_DD025() = runTest {
+        val live = FakeSettingsStore(baseline.copy(panicRequiresPlugged = false))
+        val src = FakeSignalSource(plugged = true)
+        val (engine, scope) = panicEngine(live, src)
+        engine.start(scope)
+        advanceUntilIdle()
+        assertEquals("Plugged", engine.activeContext.value)
+
+        live.value = live.value.copy(panicRequiresPlugged = true) // Live Debug, while the rule runs
+
+        src.plugged = false
+        src.battery.emit(BatterySignal(50, plugged = false))
+        advanceUntilIdle()
+
+        assertNull(engine.activeContext.value, "unplugging drops the rule")
+        assertEquals(baseline.minBrightness, engine.effectiveSettings().minBrightness, "the baseline is restored")
+        assertEquals(true, engine.effectiveSettings().panicRequiresPlugged, "the Live Debug change survives")
+        scope.cancel()
+    }
+
+    @Test
     fun mergeProfile_preservesDebugLevel_G2RF9() {
         // G2R-F9: debugLevel is global, not task626 snapshot key.
         val base = AabSettings(debugLevel = 4, minBrightness = 7)
@@ -927,6 +1159,7 @@ class ContextEngineTest {
             nightLightEnabled = true,
             nightLightTemperature = 2_700,
             nightLightCircadianEnabled = true,
+            extendedNightLightEnabled = true,
             daltonizerMode = "GRAYSCALE",
             inversionEnabled = true,
             alwaysOnDisplayEnabled = true,
@@ -937,6 +1170,7 @@ class ContextEngineTest {
         assertEquals(true, merged.nightLightEnabled, "nightLightEnabled comes from the profile")
         assertEquals(2_700, merged.nightLightTemperature, "nightLightTemperature comes from the profile")
         assertEquals(true, merged.nightLightCircadianEnabled, "nightLightCircadianEnabled comes from the profile (D-154)")
+        assertEquals(true, merged.extendedNightLightEnabled, "extendedNightLightEnabled comes from the profile")
         assertEquals("GRAYSCALE", merged.daltonizerMode, "daltonizerMode comes from the profile")
         assertEquals(true, merged.inversionEnabled, "inversionEnabled comes from the profile")
         assertEquals(true, merged.alwaysOnDisplayEnabled, "alwaysOnDisplayEnabled comes from the profile")

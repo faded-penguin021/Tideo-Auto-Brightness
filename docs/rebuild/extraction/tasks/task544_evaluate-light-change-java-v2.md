@@ -50,6 +50,15 @@
 | 39 | L16339 | 548 Flash | **Flash** `Relative change %relative_change > Dynamic threshold %dynamic_threshold. Updating.` | `%AAB_Debug = 3` |
 | 40 | L16375 | 547 Variable Set | **Set** `%AAB_CycleTotal` = `%TIMEMS-%AAB_CycleStart` [DoMaths] | `%AAB_Debug != 1` |
 
+> **Owner's V2 (2026-10-03, DD-022), not in this XML:** the near branch first sets `%lux_results2`
+> = `%lux_results2*0.1` [DoMaths, 3 dp], then `%LuxAlpha` = `%lux_results2`, so act33's par2 is the
+> damped α. The owner pasted the task, numbered from A1 (A1 = act0); with the inserted action,
+> act29 here became A30–A31 and act33 became A35.
+>
+> **Superseded 2026-10-04 (DD-024):** the near branch is gone. The owner's task544 copies
+> `%lux_results1` into `%SmoothedLux` and `%lux_results2` into `%LuxAlpha` (A28–A29), and act33's
+> par2 is `%lux_results2`, which task535 A3b has already damped while near.
+
 **Variables written:** `%AAB_CycleStart`, `%AAB_CycleTotal`, `%AAB_MainLoop`, `%AutoBrightRunning`, `%LastAAB`, `%LuxAlpha`, `%SmoothedLux`, `%elapsed_time`, `%lux_results`
 
 **Variables read:** `%AAB_CycleStart`, `%LastAAB`, `%SmoothedLux`, `%TIMEMS`, `%lux_results2`, `%new_smoothed_lux`, `%now`, `%par1`

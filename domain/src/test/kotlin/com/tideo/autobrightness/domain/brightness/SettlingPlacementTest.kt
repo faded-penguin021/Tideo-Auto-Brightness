@@ -38,13 +38,13 @@ class SettlingPlacementTest {
             if (step > BrightnessEngine.MAX_SETTLING_STEPS) fail("still outside the band after $step steps: $steps")
             val before = out
             out = engine.evaluate(input(to, carried(before), step, near))
-            if (out.outcome != EvaluationOutcome.SETTLED) assertMatchesOracle(to, before, out)
+            if (out.outcome != EvaluationOutcome.SETTLED) assertMatchesOracle(to, before, out, near)
             steps += out
         }
         return steps
     }
 
-    private fun assertMatchesOracle(lux: Double, before: BrightnessPolicyOutput, out: BrightnessPolicyOutput) {
+    private fun assertMatchesOracle(lux: Double, before: BrightnessPolicyOutput, out: BrightnessPolicyOutput, near: Boolean) {
         val ref = TaskerReference.lightCycle(
             par1 = lux,
             state = TaskerReference.LightCycleState(before.smoothedLux, before.threshDynamicPercent),
@@ -55,7 +55,7 @@ class SettlingPlacementTest {
             threshDark = cfg.threshDark,
             zone1End = cfg.zone1End,
             deltaFactor = cfg.deltaFactor,
-            proximityNear = false,
+            proximityNear = near,
         )
         assertEquals(ref.smoothedLux, out.smoothedLux, tol, "a progressing settling step is Tasker's step")
         assertEquals(ref.thresholds.threshAbsLow.toDouble(), out.thresholdLow, tol)
@@ -171,12 +171,14 @@ class SettlingPlacementTest {
     }
 
     @Test
-    fun proximityNear_settlesTheSameAndDampsOnlyTheReportedAlpha() {
+    fun proximityNear_settlesSlowerOntoTheSameBand() {
+        // task535 A3b damps each step's α, so settling takes Tasker's smaller steps and still lands in the band (DD-024).
         val far = settle(160.0, 0.0)
         val near = settle(160.0, 0.0, near = true)
-        assertEquals(far.map { it.smoothedLux }, near.map { it.smoothedLux })
-        assertEquals(far.map { it.targetBrightness }, near.map { it.targetBrightness })
-        assertEquals(far.last().luxAlpha * BrightnessEngine.PROXIMITY_ALPHA_DAMP, near.last().luxAlpha, tol)
-        assertEquals(far.last().animationSteps, near.last().animationSteps)
+        assertTrue(near.size >= far.size, "near ${near.size} steps vs far ${far.size}")
+        assertTrue(near.first().smoothedLux > far.first().smoothedLux, "the first near step moves less")
+        assertTrue(near.last().inBand())
+        assertEquals(far.last().thresholdLow, near.last().thresholdLow, tol)
+        assertEquals(far.last().thresholdHigh, near.last().thresholdHigh, tol)
     }
 }

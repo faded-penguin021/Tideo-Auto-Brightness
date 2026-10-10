@@ -5,6 +5,7 @@ import com.tideo.autobrightness.platform.display.DaltonizerMode
 import com.tideo.autobrightness.platform.display.NightDisplayServiceBridge
 import com.tideo.autobrightness.platform.display.NightLightAutoMode
 import com.tideo.autobrightness.platform.display.SecureDisplayController
+import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.coroutines.test.runTest
 import org.junit.Test
 import kotlin.test.assertEquals
@@ -14,6 +15,7 @@ class NightLightTemperatureRouteTest {
 
     private class KeyDisplay : SecureDisplayController {
         var key: Int? = null
+        val history = mutableListOf<Int>()
         var failWrites = false
         var competing: Int? = null
         override val nightLightAvailable = true
@@ -23,6 +25,7 @@ class NightLightTemperatureRouteTest {
         override fun setNightLightTemperature(kelvin: Int): Result<Unit> {
             if (failWrites) return Result.failure(SecurityException("refused"))
             key = kelvin
+            history += kelvin
             return Result.success(Unit)
         }
         override fun readNightLightAutoMode() = NightLightAutoMode.MANUAL
@@ -73,6 +76,7 @@ class NightLightTemperatureRouteTest {
             isNotHonoured = { stored },
             markNotHonoured = { stored = true },
             nowMs = { now },
+            bridgeOutOfRange = AtomicBoolean(false),
         )
     }
 
@@ -171,9 +175,83 @@ class NightLightTemperatureRouteTest {
     }
 
     @Test
+    fun `an extended write goes to the service unprobed, so a clamping getter never latches a verdict`() = runTest {
+        val h = Harness().apply { service.observesKey = false }
+        repeat(3) { assertEquals(700 + it, h.route.writeClamped(700 + it, extended = true).getOrThrow()) }
+        assertEquals(listOf(700, 701, 702), h.service.sets)
+        assertEquals(702, h.display.key, "the settings row follows the service")
+        assertEquals(0, h.service.reads)
+        assertEquals(Verdict.UNKNOWN, h.route.verdict)
+        assertEquals(false, h.stored)
+    }
+
+    @Test
+    fun `the extended band is 686 to 7308 and the normal one the device's`() = runTest {
+        val h = Harness()
+        assertEquals(686, h.route.writeClamped(500, extended = true).getOrThrow())
+        assertEquals(7_308, h.route.writeClamped(9_000, extended = true).getOrThrow())
+        assertEquals(4_082, h.route.writeClamped(5_000, extended = false).getOrThrow())
+        assertEquals(2_596, h.route.writeClamped(700, extended = false).getOrThrow())
+        assertEquals(
+            listOf(686, 7_308, 4_082), h.service.sets,
+            "extended writes reach the service, and so does the one write that leaves an out-of-range Kelvin",
+        )
+    }
+
+    @Test
+    fun `leaving an out-of-range binder Kelvin goes through the service once, unprobed`() = runTest {
+        val h = Harness()
+        h.route.writeClamped(700, extended = true)
+        assertEquals(2_596, h.route.writeClamped(1_000, extended = false).getOrThrow())
+        assertEquals(listOf(700, 2_596), h.service.sets, "a key write of 2596 is a no-op on a service holding raw 700")
+        assertEquals(0, h.service.reads, "no probe: its clamped getter would read 2596 and latch HONOURED")
+        h.route.writeClamped(3_000, extended = false)
+        assertEquals(listOf(700, 2_596), h.service.sets, "back to the key path once the service is in range")
+    }
+
+    @Test
+    fun `leaving an out-of-range binder Kelvin with the service gone writes the key but never probes`() = runTest {
+        val h = Harness()
+        h.route.writeClamped(700, extended = true)
+        h.service.reachable = false
+        assertEquals(2_596, h.route.writeClamped(1_000, extended = false).getOrThrow())
+        assertEquals(0, h.service.reads, "a clamped getter would read 2596 and latch HONOURED")
+        assertEquals(Verdict.UNKNOWN, h.route.verdict)
+    }
+
+    @Test
+    fun `an in-range extended Kelvin leaves the key path alone afterwards`() = runTest {
+        val h = Harness()
+        h.route.writeClamped(3_000, extended = true)
+        h.route.writeClamped(2_596, extended = false)
+        assertEquals(listOf(3_000), h.service.sets)
+    }
+
+    @Test
+    fun `extended with no route lands the device clamp on the key, never the extended value`() = runTest {
+        val h = Harness().apply { service.reachable = false }
+        assertEquals(2_596, h.route.writeClamped(700, extended = true).getOrThrow())
+        assertEquals(listOf(2_596), h.display.history)
+        assertEquals(2_596, h.route.writeClamped(700, extended = true, probe = false, current = 2_596).getOrThrow())
+        assertEquals(listOf(2_596), h.display.history, "a tick that cannot reach the service does not churn the key")
+    }
+
+    @Test
+    fun `the anchor read after an extended write is the key, not a clamped service getter`() = runTest {
+        val h = Harness().apply { service.observesKey = false }
+        h.route.writeClamped(700, extended = true)
+        h.service.service = 2_596
+        assertEquals(700, h.route.readDeviceKelvin().getOrThrow())
+    }
+
+    @Test
     fun `a refused settings write stops before the service`() = runTest {
         val h = Harness(persisted = true).apply { display.failWrites = true }
         assertTrue(h.route.write(3_000).isFailure)
         assertTrue(h.service.sets.isEmpty())
+        assertTrue(
+            h.route.writeClamped(3_000, extended = true).isFailure,
+            "extended reaches the service first, but a refused key is still a failed write",
+        )
     }
 }

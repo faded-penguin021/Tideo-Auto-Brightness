@@ -11,6 +11,8 @@ import com.tideo.autobrightness.platform.context.SsidResult
 import com.tideo.autobrightness.platform.context.WifiInfoReader
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emptyFlow
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -27,8 +29,8 @@ import kotlin.test.assertTrue
 @RunWith(RobolectricTestRunner::class)
 class AndroidContextSignalSourceTest {
 
-    private class FakeBattery : BatteryStateReader {
-        override fun batteryState(): Flow<BatteryState> = emptyFlow()
+    private class FakeBattery(private val states: Flow<BatteryState> = emptyFlow()) : BatteryStateReader {
+        override fun batteryState(): Flow<BatteryState> = states
     }
     private class FakeWifi : WifiInfoReader {
         override fun ssidFlow(): Flow<String?> = emptyFlow()
@@ -53,6 +55,18 @@ class AndroidContextSignalSourceTest {
         location = FakeLocation(last),
         clock = { clockMs },
     )
+
+    @Test
+    fun batteryFlow_mapsPluggedAndPercent_DD025() = runTest {
+        val src = AndroidContextSignalSource(
+            context = RuntimeEnvironment.getApplication(),
+            battery = FakeBattery(flowOf(BatteryState(isPlugged = true, levelPercent = 80, temperatureTenths = 250))),
+            wifi = FakeWifi(),
+            foregroundApp = FakeForeground(),
+            location = FakeLocation(null),
+        )
+        assertEquals(BatterySignal(percent = 80, plugged = true), src.batteryFlow().first())
+    }
 
     // Fixed instant; derived fields vs Calendar are timezone-independent.
     private val fixedClock = 1_750_000_000_000L

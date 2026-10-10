@@ -47,16 +47,16 @@ class DraftSettingsViewModel(application: Application) : AndroidViewModel(applic
     private val _epoch = MutableStateFlow(0)
     val epoch: StateFlow<Int> = _epoch.asStateFlow()
 
-    private var seeded = false
+    private val seeded = MutableStateFlow(false)
 
     init {
         viewModelScope.launch {
             app.settingsDataStore.data.collect { c ->
-                if (!seeded) {
+                if (!seeded.value) {
                     // D-125: curve-suggestion preview applies to seed so values ride epoch 0→1.
                     val preview = CurveSuggestionPreview.consume()
                     _draft.value = preview?.invoke(c) ?: c
-                    seeded = true
+                    seeded.value = true
                     _epoch.update { it + 1 }
                 } else {
                     _draft.update {
@@ -65,9 +65,10 @@ class DraftSettingsViewModel(application: Application) : AndroidViewModel(applic
                             contextOverride = c.contextOverride,
                             schemaVersion = c.schemaVersion,
                             setupTitle = c.setupTitle,
-                            // GLOBAL fields: debugLevel (Live Debug scene, G2R-F9), panicSensitivity (D-116).
+                            // GLOBAL fields: debugLevel (Live Debug scene, G2R-F9), panic prefs (D-116, DD-025).
                             debugLevel = c.debugLevel,
                             panicSensitivity = c.panicSensitivity,
+                            panicRequiresPlugged = c.panicRequiresPlugged,
                         )
                     }
                 }
@@ -75,7 +76,7 @@ class DraftSettingsViewModel(application: Application) : AndroidViewModel(applic
         }
     }
 
-    val dirty: StateFlow<Boolean> = combine(_draft, committed) { d, c -> d != c }
+    val dirty: StateFlow<Boolean> = combine(_draft, committed, seeded) { d, c, s -> s && d != c }
         .stateIn(viewModelScope, SharingStarted.Eagerly, false)
 
     val errors: StateFlow<List<FieldError>> = _draft
@@ -114,7 +115,7 @@ class DraftSettingsViewModel(application: Application) : AndroidViewModel(applic
      * `update` so a concurrent user edit cannot be read-then-clobbered.
      */
     fun mergeDeviceReadBack(snapshot: DeviceDisplaySnapshot) {
-        if (!seeded) return
+        if (!seeded.value) return
         val committedNow = committed.value
         _draft.update { current ->
             readBackDraft(current, committedNow, lastReadBack, snapshot)
@@ -129,6 +130,7 @@ class DraftSettingsViewModel(application: Application) : AndroidViewModel(applic
 
     // Commit draft → DataStore; service/identity fields preserved.
     fun apply(raiseMaxBrightForCurve: Boolean = false) {
+        if (!seeded.value) return // DD-021: committing pre-seed defaults replaces the profile.
         // D-085: clamp fields on commit (same as SettingsStore/import/export).
         // D-169: raise MaxBright if curve needs it (D-052 blocks on form errors).
         // Tasker force-fixes and flashes "adjusted to N" rather than blocking the save.
@@ -150,6 +152,7 @@ class DraftSettingsViewModel(application: Application) : AndroidViewModel(applic
                     contextOverride = current.contextOverride,
                     debugLevel = current.debugLevel,
                     panicSensitivity = current.panicSensitivity,
+                    panicRequiresPlugged = current.panicRequiresPlugged,
                 )
             }
             if (committedNow.serviceEnabled) AutoBrightnessRuntime.reapply(app)

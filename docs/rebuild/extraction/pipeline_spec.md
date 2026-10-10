@@ -62,6 +62,10 @@ Order is by `actN` (Tasker execution order), NOT document order. Key sequence:
 8. → Perform **task661 Map Lux to Brightness** (act33) with `par1=%new_smoothed_lux`,
    `par2=%lux_results2`: the undamped α sizes the animation (task661 act2 → act24). So proximity
    changes no brightness (parity_gaps gap-08).
+   > **Superseded (DD-024, 2026-10-04):** the owner's task535 now damps α itself — `round3(α × 0.1)`
+   > while `%AAB_Proximity = near`, before the blend — and task544's near branch is gone, so smoothed
+   > lux, the band, the target and the animation all follow the damped α; uncovering re-runs Evaluate
+   > (task545). Steps 6–8 above describe the earlier export.
 
 ### 1c. task535 Lux Smoothing (`java/task535_1`)
 Exponential smoothing with hysteresis:

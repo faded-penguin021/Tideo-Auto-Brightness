@@ -42,6 +42,7 @@ vectors are ground truth**; where any doc disagrees with the code, trust the cod
 | Threat model — assets, attackers, invariants | `SECURITY_AUDIT_MODEL.md` |
 | The standing on-device acceptance pass (permanent, cited by §number) | `DEVICE_TEST_SCRIPT.md` |
 | What the *unreleased* train changed, for the owner to check (ephemeral) | `DEVICE_TEST_SCRIPT_<version>.md` |
+| The executable twin of that pass: one row per step, auto / partial / manual | `e2e/scenarios.toml` |
 | Which control enforces an invariant, and what proves it | `SECURITY_REVIEW.md` |
 | Numbered deviations — solved mistakes + ongoing (⭐, append in the live file, D-153 rollover; `[cited]` = code-anchored, D-174) | `docs/LEDGER.md` (later `_A.md`/DA-…, `_B.md`/DB-…) |
 
@@ -112,7 +113,8 @@ Each: *when · read first · code to touch · parity obligations · acceptance �
   owner-approved execution plan in the directory named by `PLAN_DIR` in `amh.conf` (today
   `docs/plans/`), which also holds retained triage docs such as `REVIEW_TRIAGE_1.9.0.md`. The two are
   not governed alike: an execution plan is deleted at its final segment (below), while a triage doc
-  that `STATE.md` **Decided non-items** or a ledger row still points at is retained until nothing
+  that the Decided non-items (`docs/rebuild/DECIDED_NON_ITEMS.md`, DD-037) or a ledger row still
+  points at is retained until nothing
   points at it. Mirror a segment checklist in `STATE.md` `## Active work`, creating that section if it
   is absent. Segments run **sequentially** (D-133) and each ends SHIPPABLE:
   ladder green → STATE Changelog line → commit → push. A follow-up session bases its branch on
@@ -123,6 +125,13 @@ Each: *when · read first · code to touch · parity obligations · acceptance �
   Changelog lines + ledger rows — that precondition is the rule, so a tree carrying no plan file means
   every plan landed, not that one went missing. Code comments cite `D-NN`, never the plan file (it
   dies; the ledger doesn't).
+- **Device steps change in two places.** `DEVICE_TEST_SCRIPT.md` is the human-readable spec and
+  `e2e/scenarios.toml` its machine/agent-executable twin. Any change that adds, removes or rewrites
+  a numbered step updates both in the same commit, whatever playbook it falls under: the step in
+  the script, and its row (status, effects, reason, and the test once one exists) in the manifest.
+  A plan that will add device steps names both files in the segment that adds them. **Layer:** the
+  `e2e` manifest test fails on a step without a row, but only when `e2e/run.sh tests/unit` runs;
+  neither `scripts/ladder.sh` nor CI runs it, so at the ladder this is prose-only.
 - **Record:** note the deviation-from-Tasker explicitly in `STATE.md`.
 
 ### 6. Cutting a release / version bump
@@ -222,8 +231,9 @@ so check it explicitly.
   `DEVICE_TEST_SCRIPT_<version>.md` — what *this* unreleased train changed, so the owner isn't
   re-running the whole app to check one fix. It is **ephemeral**: when the version ships, fold
   anything with standing value into the numbered sections of `DEVICE_TEST_SCRIPT.md` (append or
-  extend an existing step — sections are cited by number, so never renumber) and **delete** the
-  round file. Git history is its archive; `docs/history/` is not (that is the frozen migration
+  extend an existing step — sections are cited by number, so never renumber), add or update the
+  matching `e2e/scenarios.toml` rows (playbook 5, "Device steps change in two places"), and
+  **delete** the round file. Git history is its archive; `docs/history/` is not (that is the frozen migration
   record and takes no maintenance-era files). Two round scripts alive at once means the previous
   one should already have been retired.
 - **Record:** a `STATE.md` Changelog line; if the version drifted or you changed the release
@@ -235,8 +245,9 @@ so check it explicitly.
 - **CI guardrail (`release-preflight.yml`, D-124).** A secret-free PR check enforces this checklist so a
   miss is caught before merge, not after a bad tag. It runs the version/changelog checks **only when the
   PR ships app code**: shipped `src/main`/`src/release` trees, Gradle build graph/toolchain files,
-  wrapper files, or ProGuard/consumer rules. Harness/config/docs/workflow/test/metadata changes do
-  not manufacture a release bump. Any path in neither explicit class fails closed and must be
+  wrapper files, or ProGuard/consumer rules. Harness/config/docs/workflow/test/metadata changes,
+  debug-variant `src/debug` trees and the owner-run `e2e/` device harness do not manufacture a
+  release bump (DD-058). Any path in neither explicit class fails closed and must be
   classified in the same PR. **Prose-only invariant:** if the build begins consuming a file under
   a non-shipping tree, that input is reclassified as shipping in the introducing PR; CI cannot infer
   a future Gradle input graph. When the release gate fires it requires:
@@ -337,6 +348,46 @@ Do it in two reviewable commits; on-device verification is owner-only (no emulat
   trailing prose; merging before `build` **and** `fdroid-compat` are green; bumping gradle on a cadence.
 - **Acceptance:** full CI green on the PR. **Record:** STATE changelog line; a `D-NN` only if the
   process itself changed.
+
+### 9. Running the device E2E suite on the owner's phone
+- **When:** a build needs device evidence beyond JVM tests — a fix on a scenario's path, a train
+  nearing release, or the owner asks. It covers the `auto` rows only; `DEVICE_TEST_SCRIPT.md`'s
+  `E2E auto:` line under each section names them, and every other step stays the owner's.
+- **Read first:** `e2e/README.md` (boundary, journal, run commands), DD-015 (decision and safety
+  model), DD-040 (wake scenarios).
+- **Preconditions, from the owner:** the phone unlocked and reachable over adb (the serial lives in
+  the environment, never in a file); the debug build installed; Tideo resolving to English; and
+  hands off the phone's display settings until the run ends (`e2e/README.md` "Known limits").
+  Confirmations go in `TIDEO_E2E_CONFIRM`: `automation` stands (no Tasker/MacroDroid profile acts
+  on `STATE_CHANGED`, owner 2026-10-04); `contexts` only when the owner confirms it for that run;
+  `unlock` only after asking, since each wake then waits 60 s for their fingerprint (DD-040).
+- **Steps:**
+  1. `e2e/run.sh tests/unit` — device-free.
+  2. `e2e/run.sh --preflight` — read-only; anything but exit 0 stops the run. Its "would run" list
+     is the expected set. Note the installed build's commit: a build older than the tree's last
+     `app/` change is evidence about that build, not the tree.
+  3. A new build goes on only through `e2e/run.sh --install <apk>` or by the owner's own hand.
+  4. `e2e/run.sh tests --ignore=tests/unit --junitxml=<private store>/junit-<date>.xml` — one
+     invocation; collection orders it by effect stage. JUnit XML carries skip reasons that may name
+     the device, so it goes to the private store, never under `e2e/`.
+  5. The wake pair, once the owner is at the phone: add `unlock` and run `-k "s02_10a or s02_10e"`.
+  6. `e2e/run.sh --recover` — exits 0 at once on an empty journal. A pending journal blocks every
+     later run; its conflicts are the owner's to resolve. Recovery never writes a conflicted key
+     itself, but a preference restore can rewrite one through Tideo (`e2e/README.md` "Known
+     limits").
+  7. `e2e/run.sh --preflight` again, and compare its record with step 2's: settings, grant,
+     runtime state and each of Tideo's private stores, field by field. Only churn the run
+     explains may differ; nothing compares them automatically.
+- **Failures:** classify as Tideo defect / harness / framework / timing / OEM / invalid assumption.
+  Fix in scope, rerun the node, then the group. A Tideo defect is playbook 4.
+- **Avoid:** any device mutation outside `run.sh`: the boundary covers only the harness, so a
+  hand-typed `adb shell` write is unjournaled. Never `pm clear`, uninstall, reboot or `bmgr`.
+- **Layer:** the boundary, journal and SKIP rules are code with unit tests; the preconditions,
+  asking before `unlock` and step 7's comparison are prose only.
+- **Acceptance:** every collected scenario passes, or skips with a SKIP rule's reason, and the
+  skips match preflight's list or a scenario's own stated precondition; the journal is empty; step
+  7 finds no unexplained difference. **Record:** a ledger row naming the build (versionName/versionCode and its commit) and
+  the pass/skip/fail counts; a STATE changelog line.
 
 ## Session discipline (BINDING for every maintenance session — D-161)
 
@@ -533,15 +584,15 @@ and it hunts RULE bug classes, each from this repo's history:
   filenames, or env vars (D-176).
 
 Out of scope: routine STATE.md edits (changelog lines, queue items, Current state) —
-working memory, not legislation. Two STATE sections ARE legislation and stay in scope: the
+working memory, not legislation. Two STATE-anchored texts ARE legislation and stay in scope: the
 **length-guard preamble** (guard-lockstep thresholds) and **Decided non-items** (binding
-declines). Verdict goes in the commit body ("rule-review pass: clean", or the findings and
+declines, whose body is `docs/rebuild/DECIDED_NON_ITEMS.md` under STATE's pointer, DD-037). Verdict goes in the commit body ("rule-review pass: clean", or the findings and
 their triage). The ladder's rule-file advisory (DA-006) WARNs when the *uncommitted* diff touches a file
 named in `RULE_FILES` (`amh.conf`) — that tripwire only *surfaces* the obligation, it never certifies the
 pass; the review itself stays prose-enforced (the D-162 no-attestation-gates line holds).
 STATE.md and the ledger files are deliberately outside the tripwire (they change in nearly
 every unit — warn fatigue kills tripwires), so their legislative sections stay wholly
-prose-covered. **One level of meta only:** the reviewer reports, the session triages, the
+prose-covered; so does `docs/rebuild/DECIDED_NON_ITEMS.md`, which is not in `RULE_FILES` either. **One level of meta only:** the reviewer reports, the session triages, the
 owner arbitrates via the Owner queue — nobody reviews the reviewer.
 
 ## Incident: leaked credential (DA-006)

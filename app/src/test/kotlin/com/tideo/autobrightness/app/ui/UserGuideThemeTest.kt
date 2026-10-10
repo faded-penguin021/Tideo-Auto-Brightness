@@ -7,9 +7,14 @@ import android.webkit.WebView
 import androidx.activity.ComponentActivity
 import androidx.compose.runtime.State
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.core.view.children
+import com.tideo.autobrightness.BuildConfig
 import com.tideo.autobrightness.app.ui.screens.UserGuideContent
+import com.tideo.autobrightness.app.ui.theme.AabTeal
+import com.tideo.autobrightness.app.ui.theme.AabTealAccent
+import com.tideo.autobrightness.app.ui.theme.AabTealLink
 import com.tideo.autobrightness.app.ui.theme.TideoTheme
 import java.util.Locale
 import org.junit.Rule
@@ -88,13 +93,13 @@ class UserGuideThemeTest {
         assertTrue(html.contains("background:$background; color:$foreground;"), "HTML body should follow the theme")
         if (dark) {
             val originalColors = mapOf(
-                ("h2" to "color") to "#00a986",
+                ("h2" to "color") to AabTealAccent.hex(),
                 ("strong, b" to "color") to "#ffc107",
-                ("blockquote" to "color") to "#cfeee6",
-                ("blockquote" to "background") to "#2e3633",
-                (".outro" to "color") to "#00c79e",
-                (".tip" to "background") to "#26302e",
-                (".tip .lead" to "color") to "#00c79e",
+                ("blockquote" to "color") to if (BuildConfig.DEBUG) "#cfe0f6" else "#cfeee6",
+                ("blockquote" to "background") to if (BuildConfig.DEBUG) "#2e3238" else "#2e3633",
+                (".outro" to "color") to AabTealLink.hex(),
+                (".tip" to "background") to if (BuildConfig.DEBUG) "#262c33" else "#26302e",
+                (".tip .lead" to "color") to AabTealLink.hex(),
                 (".warn" to "background") to "#3a2b2a",
                 (".warn .lead" to "color") to "#ff8a80",
                 (".warn strong, .warn b" to "color") to "#ff8a80",
@@ -109,9 +114,9 @@ class UserGuideThemeTest {
             val goldRgb = Color.parseColor(gold)
             assertTrue(Color.red(goldRgb) >= 128 && Color.red(goldRgb) > Color.green(goldRgb) && Color.blue(goldRgb) < 32,
                 "Emphasis should remain visibly golden")
-            assertGreen(tip)
-            assertGreen(cssProperty(html, "blockquote", "background"))
-            assertGreen(cssProperty(html, ".tip", "background"))
+            assertEquals(AabTeal.hex(), tip)
+            assertBrandTint(cssProperty(html, "blockquote", "background"))
+            assertBrandTint(cssProperty(html, ".tip", "background"))
             val warningRgb = Color.parseColor(warning)
             assertTrue(Color.red(warningRgb) >= 128 && Color.red(warningRgb) > 2 * Color.green(warningRgb),
                 "Warning should keep its coral color")
@@ -133,10 +138,18 @@ class UserGuideThemeTest {
             .first { it.size == 2 && it[0] == property }[1].trim()
     }
 
-    private fun assertGreen(hex: String) {
+    private fun androidx.compose.ui.graphics.Color.hex(): String =
+        String.format(Locale.ROOT, "#%06x", toArgb() and 0xffffff)
+
+    private fun assertBrandTint(hex: String) {
         val rgb = Color.parseColor(hex)
-        assertTrue(Color.green(rgb) - Color.red(rgb) >= 10 && Color.green(rgb) - Color.blue(rgb) >= 3,
-            "$hex should have a green tint")
+        if (BuildConfig.DEBUG) {
+            assertTrue(Color.blue(rgb) - Color.red(rgb) >= 10 && Color.blue(rgb) - Color.green(rgb) >= 3,
+                "$hex should have a blue tint (DD-054)")
+        } else {
+            assertTrue(Color.green(rgb) - Color.red(rgb) >= 10 && Color.green(rgb) - Color.blue(rgb) >= 3,
+                "$hex should have a green tint")
+        }
     }
 
     private fun contrast(foreground: String, background: String): Float {

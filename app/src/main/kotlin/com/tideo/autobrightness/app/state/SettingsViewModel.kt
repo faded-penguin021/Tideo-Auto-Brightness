@@ -78,6 +78,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                     detectOverrides = current.detectOverrides,
                     debugLevel = current.debugLevel,
                     panicSensitivity = current.panicSensitivity,
+                    panicRequiresPlugged = current.panicRequiresPlugged,
                 )
             }
             if (updated.serviceEnabled) AutoBrightnessRuntime.reapply(app)
@@ -89,23 +90,26 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         viewModelScope.launch { profileApplier.applyProfile(name) }
     }
 
-    fun replaceAll(newSettings: AabSettings) {
+    fun replaceAll(newSettings: AabSettings, profileName: String? = null) {
         viewModelScope.launch {
             // Import is manual load: drop baseline snapshot (D-170), latch context lock (G2R-F30).
             DataStoreContextBaselineStore(app.contextBaselineDataStore).clear()
             val updated = app.settingsDataStore.updateData { current ->
+                val incoming = newSettings.validate()
                 // Preserve service flag, DetectOverrides (G2-F8), debugLevel (G2R-F9). Neither belongs to imported profile.
-                newSettings.validate().copy(
+                (profileName?.let { DefaultProfiles.keepUserChoices(it, incoming, current) } ?: incoming).copy(
                     serviceEnabled = current.serviceEnabled,
                     detectOverrides = current.detectOverrides,
                     debugLevel = current.debugLevel,
                     panicSensitivity = current.panicSensitivity,
+                    panicRequiresPlugged = current.panicRequiresPlugged,
                     contextOverride = true,
                     // No per-capability preview on import: keep secure fields unchanged (visible preview on profile apply).
                     dimmingEnabled = current.dimmingEnabled,
                     nightLightEnabled = current.nightLightEnabled,
                     nightLightTemperature = current.nightLightTemperature,
                     nightLightCircadianEnabled = current.nightLightCircadianEnabled,
+                    extendedNightLightEnabled = current.extendedNightLightEnabled,
                     daltonizerMode = current.daltonizerMode,
                     inversionEnabled = current.inversionEnabled,
                     alwaysOnDisplayEnabled = current.alwaysOnDisplayEnabled,

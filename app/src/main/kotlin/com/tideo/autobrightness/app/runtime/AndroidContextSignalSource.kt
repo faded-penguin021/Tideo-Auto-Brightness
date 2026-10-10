@@ -1,7 +1,8 @@
 package com.tideo.autobrightness.app.runtime
 
 import android.content.Context
-import com.tideo.autobrightness.domain.circadian.SolarCalculator
+import com.tideo.autobrightness.app.settings.ExperimentPrefsStore
+import com.tideo.autobrightness.app.storage.experimentPrefsDataStore
 import com.tideo.autobrightness.domain.context.ContextSignals
 import com.tideo.autobrightness.platform.context.AndroidBatteryStateReader
 import com.tideo.autobrightness.platform.context.AndroidForegroundAppMonitor
@@ -22,10 +23,14 @@ class AndroidContextSignalSource(
     private val foregroundApp: ForegroundAppMonitor = AndroidForegroundAppMonitor(context.applicationContext),
     private val location: LocationReader = AndroidLocationReader(context.applicationContext),
     private val clock: () -> Long = System::currentTimeMillis,
+    private val solarTimes: ContextSolarTimes = ContextSolarTimes(
+        ExperimentPrefsStore(context.applicationContext.experimentPrefsDataStore),
+        location,
+    ),
 ) : ContextSignalSource {
 
     override fun batteryFlow(): Flow<BatterySignal> =
-        battery.batteryState().map { BatterySignal(percent = it.levelPercent, plugged = it.isCharging) }
+        battery.batteryState().map { BatterySignal(percent = it.levelPercent, plugged = it.isPlugged) }
 
     override fun wifiFlow(): Flow<String?> = wifi.ssidFlow()
 
@@ -49,12 +54,8 @@ class AndroidContextSignalSource(
         val nowSecs = cal.get(Calendar.HOUR_OF_DAY) * 3600 +
             cal.get(Calendar.MINUTE) * 60 + cal.get(Calendar.SECOND)
 
-        val haveFix = lat != 0.0 || lon != 0.0
-        val solarLoc = if (haveFix) lat to lon else {
-            runCatching { location.lastKnownLocation() }.getOrNull()?.let { it.latitude to it.longitude }
-        }
-        val offsetSecs = cal.timeZone.getOffset(cal.timeInMillis) / 1000L
-        val (sunrise, sunset) = solarLocalSeconds(solarLoc?.first, solarLoc?.second, cal.timeInMillis / 1000L, offsetSecs)
+        val (sunrise, sunset) = solarTimes.today(cal.timeInMillis, liveFix = lat to lon)
+            ?: (ContextSolarTimes.DEFAULT_SUNRISE to ContextSolarTimes.DEFAULT_SUNSET)
 
         return ContextSignals(
             app = app,
@@ -68,20 +69,5 @@ class AndroidContextSignalSource(
             sunriseLocalSecs = sunrise,
             sunsetLocalSecs = sunset,
         )
-    }
-
-    private fun solarLocalSeconds(lat: Double?, lon: Double?, epochSec: Long, offsetSecs: Long): Pair<Long, Long> {
-        if (lat == null || lon == null) return DEFAULT_SUNRISE to DEFAULT_SUNSET
-        return runCatching {
-            val solar = SolarCalculator.compute(lat, lon, epochSec, offsetSecs / 3600.0)
-            val rise = Math.floorMod(solar.riseEpochSec + offsetSecs, 86_400L)
-            val set = Math.floorMod(solar.setEpochSec + offsetSecs, 86_400L)
-            rise to set
-        }.getOrDefault(DEFAULT_SUNRISE to DEFAULT_SUNSET)
-    }
-
-    private companion object {
-        const val DEFAULT_SUNRISE = 21_600L // 06:00
-        const val DEFAULT_SUNSET = 64_800L  // 18:00
     }
 }
