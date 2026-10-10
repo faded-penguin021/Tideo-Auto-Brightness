@@ -65,18 +65,6 @@ stays closed (DB-051…DB-060), and Scorecard.dev is a run-once local input.
    (Settings → Actions → Workflow permissions, or the blocking ruleset) and rerun it. Settles it:
    `git ls-remote --heads origin badges` prints one line (DD-028).
 
-3. **[2026-10-09] Check again that Circadian uses a new location without restarting Tideo.**
-   Your first try read "Uncompressed scale 1,000" all evening: the card showed the last light
-   cycle's scale, from before circadian was on (DD-062). Needs a debug build after this commit.
-   Clear the app's storage, enable Tideo with the IP fallback off, turn circadian scaling on, then
-   switch the IP fallback on. Worked if, within about a minute and without toggling Tideo, the
-   card's uncompressed scale reads about 0.85 after dusk (about 1.15 at midday) and Night Light
-   tints; during dusk itself the scale should also step down every 2 minutes in steady light while
-   brightness holds (DD-063). Settles the location half: `adb exec-out run-as
-   com.tideo.autobrightness.debug cat files/datastore/experiment_prefs.preferences_pb | grep -ac
-   sun_cached_lat` prints 1 (0 means no location was stored, which is a different bug). The card
-   half only you can see (DD-061…DD-063).
-
 **This train is `1.14.0` on vc28, its ONE bump** (the owner's minor bump of 2026-10-04, moved off
 1.13.0 / vc27 when `main` shipped #141). Land further user-facing fixes in `changelogs/28.txt`
 (500-character cap), never by bumping or creating `29.txt`; re-open only for something major, and
@@ -92,6 +80,8 @@ proposing work; changing it is legislation under RUNBOOK's rule-review protocol.
 
 Newest first; ledger rows are the durable detail.
 
+- 2026-10-10 — **Owner-confirmed on device: Circadian follows a new location without a restart,
+  the live card shows the applied scale, and the dusk scale refresh steps (DD-061…DD-063).**
 - 2026-10-09 — **Open question answered (a): AAB's 2-minute prof758 re-run refreshes the scale
   readout during the dawn/dusk ramps and moves no brightness; the owner declined (b) as jitter in
   steady light. One shared helper now serves the pipeline, that tick and Night Light (DD-063).**
