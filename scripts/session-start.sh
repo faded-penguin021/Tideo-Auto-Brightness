@@ -228,7 +228,7 @@ fi
 # shipped rungs run it), and the mistake is the generalisation rather than the command.
 if [ "$MERGE_MODE" = branch-train ]; then
 	say "· merge mode: branch-train — $DEFAULT_BRANCH's history is squashed, so \`git log\` there is"
-	say "  not this repo's past. The state file and the ledger are (AMH P2)."
+	say "  not a record of what happened inside a train. The state file and the ledger are (AMH P2)."
 fi
 
 # 2c. The release window: is the version in the tree actually tagged?

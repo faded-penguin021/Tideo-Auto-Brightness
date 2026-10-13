@@ -9,7 +9,10 @@ don't extend it. The numbered deviations live in `docs/LEDGER.md`, a permanent a
 registry (never compress it; append the next number in the LIVE ledger file — base file closed
 at D-176; from `LEDGER_A.md`/DA-001 on, `LEDGER_LINE_CAP` lines per file, final row may overflow,
 next row opens `_B.md`/DB-001, …; D-153/DA-001). **Code + golden
-vectors are ground truth**; where any doc disagrees with the code, trust the code (and fix the doc).
+vectors are ground truth** for what the app does; where descriptive prose disagrees with the code,
+trust the code (and fix the prose) — never a binding rule, which the code does not settle (see the
+constitution's ground-truth note) — and never the append-only ledger, whose rows are never edited
+in place: a correction is a new row plus one appended pointer on the old one.
 
 ## Where logic lives
 
@@ -117,7 +120,7 @@ Each: *when · read first · code to touch · parity obligations · acceptance �
   points at is retained until nothing
   points at it. Mirror a segment checklist in `STATE.md` `## Active work`, creating that section if it
   is absent. Segments run **sequentially** (D-133) and each ends SHIPPABLE:
-  ladder green → STATE Changelog line → commit → push. A follow-up session bases its branch on
+  STATE Changelog line → ladder green → commit → `--guards-only` → push (discipline 3). A follow-up session bases its branch on
   the unmerged predecessor (`git checkout -B <new> origin/<old>`), else latest main. Treat the
   plan as provisional — the owner may pivot it mid-feature (D-151 replaced an entire
   already-on-branch segment; per-segment checkpoints are what made that removal cheap). At the
@@ -403,9 +406,17 @@ any moment (rate limit, window end, compaction).
 2. **Small, shippable units.** ≤ ~1 focused hour each, independently shippable, with a hard
    **binary** acceptance check (tests / `scripts/ladder.sh` / a scripted comparison — never
    "looks right"). Prefer mechanical steps with hard gates over judgment calls.
-3. **Checkpoint invariant.** Every unit ends: acceptance green → STATE.md Changelog line →
-   commit → push. Never start a second unit on top of an uncommitted first — an interrupted
-   session must lose at most the unit in flight.
+3. **Checkpoint invariant (AMH 15.0.0).** Every unit ends: STATE.md Changelog line →
+   acceptance green → commit → commit-metadata check → push. The changelog line comes FIRST so
+   the ladder verifies the tree that is committed. The check after the commit is
+   `scripts/ladder.sh --guards-only`: its poison-token and author-identity rungs read commits, so
+   the run before the commit cannot see the one being made, and the git-native pre-push rail
+   judges refs, never messages or identities. A failure there is fixed by amending the unpushed
+   commit and running the check again; a WARN that either rung checked NOTHING means the check
+   did not happen — fetch the reference it names and re-run, or report that it did not run. The
+   commit body cannot disclose that check (discipline 8); report it where the session reports its
+   outcome. Never start a second unit on top of an uncommitted first — an interrupted session
+   must lose at most the unit in flight.
 4. **You are the last reviewer.** The glue-review protocol (below) is mandatory at every model
    tier — and the rule-review protocol for harness legislation (DA-005); there is no stronger
    pass behind you. Delegate the pass itself to a fresh-context subagent where the harness
@@ -437,7 +448,8 @@ any moment (rate limit, window end, compaction).
    infinite: if the SAME blocker survives a second reset-and-retry cycle with no real progress,
    stop — do not keep thrashing it.** Reset once more to the last green checkpoint (never end a
    unit red — discipline 3/5), record the blocker (what failed, what you tried) under `STATE.md`
-   Owner queue, commit + push that STATE update so it survives session death, and end the unit.
+   Owner queue, then close it like any unit — ladder, commit, commit-metadata check, push
+   (discipline 3) — so the record survives session death, and end the unit.
    A guard/gate that won't go green is either a real fix you're missing (a code or doc problem —
    diagnose it, don't just re-run it) or an owner fork (discipline 7) — neither is solved by
    burning the usage window re-running a script (the P6 weakest-agent failure mode). The stop is
@@ -485,9 +497,11 @@ any moment (rate limit, window end, compaction).
    and its answer reported as a property of the repository. The standing trap here is git under
    this repo's `MERGE_MODE` (`amh.conf`): a squash merge lands a whole train of sessions as ONE
    commit, so every INTERMEDIATE state and superseded branch is destroyed by design. `git log`
-   and `blame` therefore cannot answer "was this ever tried", "when did this change" or "what
-   did that session do" — the ledger, the `docs/STATE.md` changelog and `docs/history/` are what
-   survive. This does NOT extend to released states: tags and `git show <tag>:<path>` remain
+   and `blame` still show each merged snapshot and what changed between them, but not what
+   happened inside a train, in what order or why, so they cannot answer "was this ever tried",
+   "when did this change" or "what did that session do", and a search of them cannot establish
+   that something never happened — the ledger, the `docs/STATE.md` changelog and `docs/history/`
+   are what survive. This does NOT extend to released states: tags and `git show <tag>:<path>` remain
    valid evidence and §6 depends on them; likewise `git show HEAD:<path>`, which several ladder
    rungs use. Prose-only, and the defect is the generalization drawn from a command's output —
    no pre-execution rail can see a belief formed after the command returned. If a later session
@@ -558,7 +572,7 @@ it before commit and record anything durable as a `D-NN`.
 Any diff that changes the harness's LEGISLATION — CLAUDE.md, this runbook's protocols or
 Session discipline, `scripts/ladder.sh` guard semantics **and their fixture suite
 `scripts/test-ladder-guards.sh`** (a weakened fixture softens the net every later guard
-change is tested against), `scripts/session-start.sh`, `scripts/redact.sh` (DA-007 — a
+change is tested against), `scripts/session-start.sh`, `scripts/redact.sh` and `scripts/redact-tool-output.sh` (DA-007 — a
 silently weakened redaction filter is a weakened rail), `scripts/command-guard.sh` (DA-009 —
 same weakened-rail rationale for the pre-execution command rail), ledger preambles, adapter permission
 rules (e.g. `.claude/settings.json` allow/deny), `AGENTS.md` — gets the same fresh-context
@@ -612,7 +626,9 @@ output: stop normal work — **containment outranks the checkpoint invariant.**
    the secret (e.g. `git filter-repo`), coordinated with the remote. Never as part of normal
    engineering.
 5. Afterward: ledger row for the incident; if a guard or deny rule could have caught it, add
-   it with a fixture test.
+   it with a fixture test. Demonstrate the fixture fails without the guard by removing the
+   behaviour and re-running the suite — never by performing the unguarded operation for real
+   (`AGENTS.md` **Destructive work**).
 
 ## Acceptance ladder
 

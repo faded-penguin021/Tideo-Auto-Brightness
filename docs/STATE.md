@@ -12,7 +12,7 @@ adds super dimming and Privileged Display.
 
 ## Current state
 
-Harness AMH 14.1.0 with its one hand step applied (DC-029…DC-036, DC-051); the live ledger is
+Harness AMH 15.1.0, scripts and hand-applied seed prose together (DD-066); the live ledger is
 `LEDGER_D.md`. **Release standing is NOT recorded here:** the session banner computes it
 (`scripts/session-facts.sh`, DC-030), settled by hand with
 `git ls-remote --tags --refs origin 'refs/tags/v*'`.
@@ -73,6 +73,17 @@ stays closed (DB-051…DB-060), and Scorecard.dev is a run-once local input.
    `git log --oneline origin/main -- app/src/test/kotlin/com/tideo/autobrightness/app/state/DraftSettingsViewModelTest.kt`
    shows a commit after 2026-10-10.
 
+3. **[2026-10-13] Decide whether to add a check that the output-redaction hook is still wired.**
+   Since AMH 15.0.0 both adapters run `scripts/redact-tool-output.sh` after every tool call, but
+   nothing in this tree notices if that `PostToolUse` group is deleted, rewired or loses its bash
+   pin — a missing redaction hook looks exactly like output that held no credential (DD-066).
+   Options: (a) a fact check in `scripts/guards/doc-facts.sh` with a fixture in
+   `scripts/tests/local-guards.sh`, a rule change under rule review; (b) leave it prose-only, as
+   disclosed in the adapter comments. Recommendation (a): upstream ships the same check in its own
+   repository for this reason. Unverified until you answer; settles it: `grep -c
+   redact-tool-output scripts/guards/*.sh` prints a nonzero count, or a STATE changelog line records
+   (b).
+
 **This train is `1.14.1` on vc29, its ONE bump** (the owner's patch bump of 2026-10-10 for #145,
 after `main` shipped 1.14.0 / vc28 as #144). Land further user-facing fixes in `changelogs/29.txt`
 (500-character cap), never by bumping or creating `30.txt`; re-open only for something major, and
@@ -87,6 +98,10 @@ proposing work; changing it is legislation under RUNBOOK's rule-review protocol.
 ## Changelog
 
 Newest first; ledger rows are the durable detail.
+
+- 2026-10-13 — **Harness AMH 14.1.0 -> 15.1.0: root/home deletions permanently denied, checkpoint
+  reordered (STATE line → ladder → commit → `--guards-only` → push), a Destructive work section in
+  AGENTS.md, output redaction wired as a `PostToolUse` hook in both adapters (DD-066).**
 
 - 2026-10-10 — **1.14.1 / vc29 for #145: a circadian Night Light key that the device moved off
   what Tideo wrote is rewritten by the next tick, and an apply gets an early tick 5 s later

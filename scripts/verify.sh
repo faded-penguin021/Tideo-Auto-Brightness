@@ -5,8 +5,9 @@
 # shipped ladder never needs a local edit (docs/HARNESS_LOCAL.md).
 #
 # Invoked by scripts/ladder.sh, never directly by CI: CI runs the ladder, so the agent and CI
-# execute the same entrypoint by construction and "green locally, red in CI" can only mean
-# environment (D-166). The five Gradle rungs are ONE invocation — the same task set
+# execute the same entrypoint by construction and "green locally, red in CI" is never a
+# forgotten lockstep (D-166). It is a different input: another commit, a staged or untracked file
+# seen differently, the environment, or a step CI adds. The five Gradle rungs are ONE invocation — the same task set
 # .github/workflows/build.yml used to spell out, now stated only here.
 set -uo pipefail
 

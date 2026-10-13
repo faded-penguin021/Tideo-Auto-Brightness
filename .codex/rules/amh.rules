@@ -1,8 +1,19 @@
 # AMH static deny rails for Codex. Wiring only; AGENTS.md and scripts/ own the
 # behavior and explanations. These prefix rules remain the static lower layer beneath
-# the config's PreToolUse command guard; neither layer can filter tool output.
+# the config's PreToolUse command guard; neither of those two filters tool output (the config's
+# declared PostToolUse hook is the redaction layer).
 
 # Environment dumps and direct secret-file reads.
+#
+# STRICTER than scripts/command-guard.sh, deliberately and knowingly. A prefix rule matches the
+# leading words of a command and cannot say "and nothing after them", so `["env"]` and `["set"]`
+# forbid every command that STARTS with those words — `env CI=1 scripts/ladder.sh` and
+# `set -euo pipefail` included — while the command guard allows both, because it can tell a dump
+# from an assignment or an option. The `declare` and `typeset` rules below diverge the same way:
+# `["declare", ["-p", "-x"]]` also forbids `declare -x FLAG=1` and `declare -p some_array`, which
+# the guard allows because a NAME follows the flag. Under Codex, spell the first as
+# `CI=1 scripts/ladder.sh`, put shell options inside the script that needs them, and export with
+# `export FLAG=1`. Read from the rule semantics; this is not an observation of a live Codex host.
 prefix_rule(pattern = ["env"], decision = "forbidden", justification = "AMH forbids environment dumps; check only whether a named key is set.")
 prefix_rule(pattern = ["printenv"], decision = "forbidden", justification = "AMH forbids environment dumps; check only whether a named key is set.")
 prefix_rule(pattern = ["set"], decision = "forbidden", justification = "AMH forbids shell state dumps.")

@@ -2,8 +2,9 @@
 
 This repository runs the **Agentic Maintenance Harness**
 ([`faded-penguin021/AMH`](https://github.com/faded-penguin021/AMH)), adopted at **amh-v9.1.0**
-and upgraded to **amh-v14.1.0** in full — shipped scripts copied, and the one hand-applied step,
-the Claude adapter's hook shell pin, applied (DC-051) — under the `full` profile.
+and upgraded to **amh-v15.1.0** in full — shipped scripts copied, and the hand-applied seed prose
+and adapter steps of 15.0.0 and 15.1.0 applied in the same commit (DD-066), on top of 14.1.0's
+hook shell pin (DC-051) — under the `full` profile.
 `AGENTS.md` is the constitution, `docs/STATE.md` the working memory,
 `docs/LEDGER*.md` the permanent registry, `docs/RUNBOOK.md` the playbooks, `scripts/ladder.sh`
 the one verification entrypoint.
@@ -18,7 +19,7 @@ any of it.
 
 | | Files | Rule |
 |---|---|---|
-| **Shipped** | `scripts/{ladder,session-start,command-guard,redact,test-ladder-guards}.sh`, `scripts/MANIFEST.sha256` | **Never edit.** Parameter-free, they read `amh.conf` at runtime. The ladder's integrity rung hashes them against the manifest every run, so a local edit is reported rather than discovered a year later by whoever upgrades. |
+| **Shipped** | `scripts/{ladder,session-start,command-guard,redact,redact-tool-output,test-ladder-guards}.sh`, `scripts/MANIFEST.sha256` | **Never edit.** Parameter-free, they read `amh.conf` at runtime. The ladder's integrity rung hashes them against the manifest every run, so a local edit is reported rather than discovered a year later by whoever upgrades. |
 | **Ours** | `amh.conf`, `scripts/verify.sh`, `scripts/guards/*.sh`, `scripts/bootstrap.sh`, `scripts/session-facts.sh`, `scripts/tests/local-guards.sh` | The extension points. Everything repo-specific goes in one of these — if a change fits none of them, the harness is missing an extension point; raise it upstream rather than carrying a local patch. |
 | **Ours (prose)** | `AGENTS.md`, `CLAUDE.md`, `docs/{STATE,RUNBOOK,LEDGER*}.md`, `docs/history/` | Seeded once, ours thereafter. Upgrades arrive as hand-applied notes, never a re-sync. |
 | **Ours (config)** | `.github/workflows/*`, `.claude/settings.json`, `.codex/*` | Written only when absent. Diff each against its upstream template on an upgrade and take what applies. |
@@ -223,7 +224,7 @@ which you chose and why.
 
 | Key | Ours | Why |
 |---|---|---|
-| `AMH_PROSE_VERSION` | `14.1.0` (no stock key) | **Ours entirely.** The version whose binding prose the tree follows, against `AMH_VERSION` for the shipped scripts. The two are **equal today** — `4e22273` landed the file copy and DC-036 landed the owed seed prose for 9.2.0 and MAJORs 10.0.0…14.0.0 — so `doc-facts.sh` is silent on the pair. The key stays because the **Upgrading** section below reads the changelog forward from it, which is the reason it exists; while the two differ the guard warns every run and fails if `AGENTS.md` drops its disclosure sentence first. Set them equal only in the commit that lands the prose (DC-031, DC-036). |
+| `AMH_PROSE_VERSION` | `15.1.0` (no stock key) | **Ours entirely.** The version whose binding prose the tree follows, against `AMH_VERSION` for the shipped scripts. The two are **equal today** — the 15.1.0 upgrade landed scripts and seed prose in one commit (DD-066), as DC-036 had closed the earlier 9.2.0…14.0.0 split — so `doc-facts.sh` is silent on the pair. The key stays because the **Upgrading** section below reads the changelog forward from it, which is the reason it exists; while the two differ the guard warns every run and fails if `AGENTS.md` drops its disclosure sentence first. Set them equal only in the commit that lands the prose (DC-031, DC-036). |
 | `BRANCH_PREFIX` | `claude` | Session branches are `claude/<codename>`, named in each session's directive. |
 | `MERGE_MODE` | `branch-train` | DA-002: branches are cut from the newest session branch, superseded ones deleted unmerged, only the final superset squash-merged. |
 | `REMOTE_FLAG` | `AAB_REMOTE` | Pre-existing neutral flag (D-176). See the adapter note below. |
@@ -234,9 +235,9 @@ which you chose and why.
 | `CITATION_EXCLUDE` | the two test paths | Their fixtures carry synthetic IDs by design. Scanning `scripts/` is safe by construction, not by luck: **upstream never writes a bare `D-NNN` in a shipped script** — it spells its own rows `AMH ledger row D004` precisely so an adopter's citation guard cannot resolve them (confirmed by the AMH maintainer, 2026-08-03; since 4.2.0 a guard in AMH's own repository fails if that ever stops being true, so the guarantee is enforced rather than promised). No upgrade check needed. Dropping the key would pull the shipped fixture suite's synthetic IDs into scope and report them as unresolved in a file we may never edit. |
 | `AUTHOR_EMAIL_ALLOW` | three no-reply aliases | The owner's forge alias, GitHub's web-UI committer, and the agent's. States which identities are expected; no regex can tell a personal address from a work one. |
 | `VERSION_FILE` | empty | This repo's version is a Kotlin DSL assignment in `app/build.gradle.kts`, not the first line of a plain file, so the release-window banner cannot read it. `release-preflight.yml` (D-124) enforces the version invariants instead. |
-| `REQUIRED_TOOLS` | `bash git java` | The ladder and its fixture suites are shell/Git programs, while the Android verification set requires the JVM. The session banner reports availability; nothing consumes the states. |
+| `REQUIRED_TOOLS` | `bash git java python3` | The ladder and its fixture suites are shell/Git programs, while the Android verification set requires the JVM. `python3` is there because the output-redaction hook (AMH 15.0.0) stands down silently without it, and the banner is the only place that stand-down is reported. The session banner reports availability; nothing consumes the states. |
 | `ADAPTER_FILES` | the Claude and Codex adapter paths | Names every adapter this repository ships. `configured` reports file presence, not that an integration or hook actually ran. |
-| `RULE_FILES` | `+ CLAUDE.md`, `scripts/{guards,tests,bootstrap.sh,session-facts.sh,verify.sh}`, **`docs/HARNESS_LOCAL.md`** | A repo-local guard is legislation exactly as a shipped one is, and `CLAUDE.md` must never diverge from the constitution it points at. The list must name every extension point `AGENTS.md` **Harness** admits, unshipped repo-local scripts included, or the rule-review tripwire has a hole exactly where local authority is widest. **This file** joined by owner decision (2026-09-04; recorded in the STATE changelog), the fourth doc in the list and the first that is neither constitution nor playbook: it is the authority on which scripts may never be edited, the adapter table saying which rails actually run, and this very table — the last prose copy of `LEDGER_LINE_CAP`. It went uncovered through two units that corrected the Codex-rail claim everywhere else while the most detailed statement of it sat here (DC-032, DC-034). |
+| `RULE_FILES` | `+ CLAUDE.md`, `scripts/{guards,tests,bootstrap.sh,session-facts.sh,verify.sh}`, `scripts/{MANIFEST.sha256,redact-tool-output.sh}`, **`docs/HARNESS_LOCAL.md`** | A repo-local guard is legislation exactly as a shipped one is, and `CLAUDE.md` must never diverge from the constitution it points at. The list must name every extension point `AGENTS.md` **Harness** admits, unshipped repo-local scripts included, or the rule-review tripwire has a hole exactly where local authority is widest. **This file** joined by owner decision (2026-09-04; recorded in the STATE changelog), the fourth doc in the list and the first that is neither constitution nor playbook: it is the authority on which scripts may never be edited, the adapter table saying which rails actually run, and this very table — the last prose copy of `LEDGER_LINE_CAP`. It went uncovered through two units that corrected the Codex-rail claim everywhere else while the most detailed statement of it sat here (DC-032, DC-034). |
 
 ## Adapter and CI notes
 
@@ -311,7 +312,8 @@ dot-dir (`.claude/`, `.codex/`). A new one must:
 - mirror the deny rails — environment dumps, force-push, pushing to `main` — if the agent
   supports permission rules;
 - wire `scripts/command-guard.sh` as a pre-execution check if the agent supports hooks;
-- pipe tool output through `scripts/redact.sh` if the agent has an output-filter hook;
+- pipe tool output through `scripts/redact.sh` if the agent has an output-filter hook, using
+  `scripts/redact-tool-output.sh` where that hook rewrites a tool RESULT rather than a stream;
 - honour one session, one branch;
 - add its config file to `RULE_FILES` in `amh.conf`, so a diff to it trips the rule-review
   tripwire.
@@ -322,8 +324,8 @@ that exist today:
 
 | Adapter | Bootstrap | Command rail | Deny rails | Output redaction | Comment rail | Inline-Python rail |
 |---|---|---|---|---|---|---|
-| `.claude/settings.json` | yes (SessionStart hook, with the remote-flag translation; a second hook runs the repo-local `scripts/session-facts.sh`) | yes (PreToolUse, stdin payload) | yes | **no** — Claude Code has no output-filter hook, so `scripts/redact.sh` is manual-pipe only and is what the ladder's secret scan uses | yes (PostToolUse on `Edit\|Write\|MultiEdit` → `comment-budget.sh --hook`, block cap only) | yes (second PreToolUse hook → `python-edit.sh --hook`, first match only) |
-| `.codex/config.toml` + `.codex/rules/amh.rules` | declared; **not observed to fire** on codex 0.152.1 or 0.153.2 — see below | declared; **not observed to fire** on either version, which would leave `command-guard.sh` an uncalled script for Codex | yes — the `.rules` prefix policy is loaded (`--ignore-rules` exists to skip it); its path vocabulary is narrower than a hook's | **no** | **no** — neither a shell hook nor a prefix rule can judge a file an edit tool wrote; `AGENTS.md` Conventions is the immediate layer | **no** — `AGENTS.md` Conventions is the only layer standing |
+| `.claude/settings.json` | yes (SessionStart hook, with the remote-flag translation; a second hook runs the repo-local `scripts/session-facts.sh`) | yes (PreToolUse on `Bash\|PowerShell`, stdin payload) | yes | configured, **not observed here** (PostToolUse on every tool → `redact-tool-output.sh`, AMH 15.0.0; fail-open, successful calls only, `redact.sh`'s shapes only, needs `python3`; no local guard checks the wiring is still present) | yes (PostToolUse on `Edit\|Write\|MultiEdit` → `comment-budget.sh --hook`, block cap only) | yes (second PreToolUse hook → `python-edit.sh --hook`, first match only) |
+| `.codex/config.toml` + `.codex/rules/amh.rules` | declared; **not observed to fire** on codex 0.152.1 or 0.153.2 — see below | declared; **not observed to fire** on either version, which would leave `command-guard.sh` an uncalled script for Codex | yes — the `.rules` prefix policy is loaded (`--ignore-rules` exists to skip it); its path vocabulary is narrower than a hook's | declared (`[[hooks.PostToolUse]]` → `redact-tool-output.sh`, which blocks and substitutes rather than rewriting); **not observed to fire**, like its other hooks | **no** — neither a shell hook nor a prefix rule can judge a file an edit tool wrote; `AGENTS.md` Conventions is the immediate layer | **no** — `AGENTS.md` Conventions is the only layer standing |
 
 **On the comment rail specifically.** The ladder guard is the coverage; the hook is only
 *salience*. A rule that lands solely in a ladder run arrives after the narrative is written and
@@ -336,7 +338,8 @@ detect that the hook stopped firing — `configured` in the session banner means
 never that a hook ran.
 
 **On the Codex adapter's hooks — declared, but not observed to fire (DC-030).** `.codex/config.toml`
-declares a `SessionStart` and a `PreToolUse` hook. On codex CLI 0.152.1, 2026-09-02, neither was
+declares a `SessionStart` and a `PreToolUse` hook (and, since AMH 15.0.0, a `PostToolUse` redaction
+hook, never measured). On codex CLI 0.152.1, 2026-09-02, neither was
 observed to run: `codex doctor` reports its `config.toml` as `~/.codex/config.toml` and lists no
 project-level layer, and `scripts/session-start.sh` prints its banner unconditionally yet that
 banner appeared in none of roughly ten `codex exec` runs inside this repository. **Re-measured on

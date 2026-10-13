@@ -678,3 +678,16 @@
   settled at the expected one; it is not a full red flash. Its cause is not established, and no
   fix is made for it; step 38a now expects it, so a later run can tell whether it grows or goes
   away.
+- DD-066: **AMH 14.1.0 -> 15.1.0 landed whole in one commit, scripts and seed prose together, so
+  the two version keys moved as one (2026-10-13).** MAJOR 15.0.0's binding notes are applied: the
+  command guard now denies `rm -rf` and `git clean -fd` aimed at a root or home directory with no
+  rerun clearance, and the checkpoint order is STATE line, ladder, commit, `--guards-only`, push
+  (AGENTS.md **Session protocol**, RUNBOOK discipline 3). Widening the Claude command guard to
+  `Bash|PowerShell` (15.1.0) meant splitting its `PreToolUse` group: the repo-local `python-edit.sh`
+  hook shared it and parses only Bash payloads, so it stays on `Bash` alone. The upstream adapter
+  `$comment` for output redaction cites an `adapter-set.sh` guard that is local to the AMH repository
+  and absent here, so it was adapted rather than copied; copied verbatim it would have claimed a
+  check that does not run, and nothing in this tree notices if the `PostToolUse` redaction group is
+  deleted. The upgrade's first command, an `rm -rf` of a scratch clone path that turned out not to
+  exist, drew the guard's one-time destructive advisory; the check showed nothing to delete, so the
+  `rm` was dropped rather than rerun.

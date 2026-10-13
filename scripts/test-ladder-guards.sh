@@ -494,6 +494,24 @@ out=$(cd "$d" && printf '%s' '{"hook_event_name":"PreToolUse","tool_name":"Read"
 rc=$?
 if [ "$rc" -eq 0 ]; then report ok "a non-Bash Codex payload fails open"; else report no "a non-Bash Codex payload fails open" "rc=$rc" "$out"; fi
 
+# The PowerShell tool's payload carries the same `tool_input.command` and goes to the PowerShell
+# reader, never the bash one. The drive root in its PowerShell spelling is denied, and a statement
+# a bash reader would misjudge — PowerShell's doubled single quote — passes as the plain command
+# it is. Shipping a matcher that names PowerShell is pointless unless the payload is read.
+out=$(cd "$d" && printf '%s' '{"hook_event_name":"PreToolUse","tool_name":"PowerShell","tool_input":{"command":"Remove-Item -Recurse -Force C:\\"}}' |
+	scripts/command-guard.sh 2>&1)
+rc=$?
+if [ "$rc" -eq 2 ] && printf '%s' "$out" | grep -qF 'the root of a Windows drive'; then
+	report ok "a PowerShell payload deleting a drive root is blocked by the PowerShell reader"
+else
+	report no "a PowerShell payload deleting a drive root is blocked by the PowerShell reader" "rc=$rc" "$out"
+fi
+
+out=$(cd "$d" && printf '%s' '{"hook_event_name":"PreToolUse","tool_name":"PowerShell","tool_input":{"command":"Write-Output '"'"'it'"''"'s fine'"'"'; Get-ChildItem"}}' |
+	scripts/command-guard.sh 2>&1)
+rc=$?
+if [ "$rc" -eq 0 ]; then report ok "an allowed PowerShell payload passes"; else report no "an allowed PowerShell payload passes" "rc=$rc" "$out"; fi
+
 # The distributed baseline does not require Python. Hide it from command lookup and prove
 # the conservative coreutils fallback still enforces a straightforward Codex Bash payload.
 fallback_path="$d/no-python-bin"
@@ -506,6 +524,55 @@ out=$(cd "$d" && printf '%s' '{"hook_event_name":"PreToolUse","tool_name":"Bash"
 	env PATH="$fallback_path" scripts/command-guard.sh 2>&1)
 rc=$?
 if [ "$rc" -eq 2 ]; then report ok "a Codex Bash payload is guarded without Python"; else report no "a Codex Bash payload is guarded without Python" "rc=$rc" "$out"; fi
+out=$(cd "$d" && printf '%s' '{"hook_event_name":"PreToolUse","tool_name":"PowerShell","tool_input":{"command":"Remove-Item -Recurse -Force C:\\"}}' |
+	env PATH="$fallback_path" scripts/command-guard.sh 2>&1)
+rc=$?
+if [ "$rc" -eq 2 ] && printf '%s' "$out" | grep -qF 'the root of a Windows drive'; then
+	report ok "a PowerShell payload is guarded without Python"
+else
+	report no "a PowerShell payload is guarded without Python" "rc=$rc" "$out"
+fi
+
+# The incident's own command, JSON-encoded as a host sends it and followed by another key. The
+# fallback must DECODE the string: read with its escapes doubled it passed, and a stock Windows
+# desktop is the host whose python3 does not run. Both readers must reach the same verdict.
+incident_payload='{"hook_event_name":"PreToolUse","tool_name":"PowerShell","tool_input":{"command":"cmd /c \"rmdir /s /q \\\"\\\\?\\C:\\x\\\"\"","description":"clean up worktrees"}}'
+out=$(cd "$d" && printf '%s' "$incident_payload" | env PATH="$fallback_path" scripts/command-guard.sh 2>&1)
+rc=$?
+if [ "$rc" -eq 2 ] && printf '%s' "$out" | grep -qF 'nested quotes'; then
+	report ok "the incident command is denied without Python, decoded from its JSON escapes"
+else
+	report no "the incident command is denied without Python, decoded from its JSON escapes" "rc=$rc" "$out"
+fi
+out=$(cd "$d" && printf '%s' "$incident_payload" | scripts/command-guard.sh 2>&1)
+rc=$?
+if [ "$rc" -eq 2 ] && printf '%s' "$out" | grep -qF 'nested quotes'; then
+	report ok "the incident command is denied through the Python reader"
+else
+	report no "the incident command is denied through the Python reader" "rc=$rc" "$out"
+fi
+
+# A command of nothing but a line end holds no command, and is not judged as one.
+out=$(cd "$d" && printf '%s' '{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"\n"}}' |
+	scripts/command-guard.sh 2>&1)
+rc=$?
+if [ "$rc" -eq 0 ]; then report ok "a payload whose command is only a line end passes"; else report no "a payload whose command is only a line end passes" "rc=$rc" "$out"; fi
+
+# A `python3` that EXISTS and does not run — the Windows Store alias on a stock desktop answers
+# with an install prompt and a non-zero exit. Its silence used to read as "no command in this
+# payload", so the rail allowed every Bash call while the fallback above would have judged it.
+stub_python_path="$d/stub-python-bin"
+mkdir -p "$stub_python_path"
+printf '#!/bin/sh\necho "Python was not found; install it from the Store" >&2\nexit 49\n' >"$stub_python_path/python3"
+chmod +x "$stub_python_path/python3"
+out=$(cd "$d" && printf '%s' '{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"cat .env"}}' |
+	env PATH="$stub_python_path:$PATH" scripts/command-guard.sh 2>&1)
+rc=$?
+if [ "$rc" -eq 2 ]; then
+	report ok "a Bash payload is guarded when the python3 on PATH does not run"
+else
+	report no "a Bash payload is guarded when the python3 on PATH does not run" "rc=$rc (0 means the rail stood down)" "$out"
+fi
 
 # The same fallback, at a payload size that makes the writer block. This is the fail-OPEN
 # direction of the `grep -q` class: grep exits at its first match, the writer takes EPIPE,
@@ -1036,6 +1103,31 @@ d=$(mk ledger_row_char_superseded_pointer_existing)
 sed_in_place 's/^LEDGER_ROW_CHAR_CAP=.*/LEDGER_ROW_CHAR_CAP=10/' "$d/amh.conf"
 printf -- '  Superseded by D-999.\n' >>"$d/docs/LEDGER.md"
 expect_pass "a sanctioned metadata-only supersession on an existing row is exempt" "$d"
+
+# A NEW volume is untracked until someone stages it, and `git diff HEAD` lists tracked paths
+# only — so the rung once never ran for the file every rollover creates, and after the commit
+# its rows were HEAD's and exempt for good. Untracked, not staged, is the case on trial: the
+# staged spelling already failed. The passing twin is what keeps the fix from being "every
+# untracked volume fails".
+d=$(mk ledger_row_untracked_volume_over_cap)
+sed_in_place 's/^LEDGER_ROW_SENTENCE_CAP=.*/LEDGER_ROW_SENTENCE_CAP=2/' "$d/amh.conf"
+printf -- '# LEDGER — volume A\n\n- DA-001: **A finding that took three sentences to state.** The second sentence carries narrative nobody will need again. The third repeats it at greater length still.\n' >"$d/docs/LEDGER_A.md"
+expect_fail "a long row in a new, untracked ledger volume fails" "$d" \
+	"DA-001: new ledger row runs to 3 sentences, crossing rejection boundary LEDGER_ROW_SENTENCE_CAP=2"
+
+# The same hole one volume earlier: a BASE ledger HEAD has never carried. The committed chain
+# is empty, so every row is new — and the rung used to return without reading any of them.
+d=$(mk ledger_row_untracked_base_volume)
+sed_in_place 's/^LEDGER_ROW_SENTENCE_CAP=.*/LEDGER_ROW_SENTENCE_CAP=2/' "$d/amh.conf"
+(cd "$d" && git rm -q --cached docs/LEDGER.md && git commit -qm "a ledger not yet committed")
+printf -- '- D-003: **A finding that took three sentences to state.** The second sentence carries narrative nobody will need again. The third repeats it at greater length still.\n' >>"$d/docs/LEDGER.md"
+expect_fail "a long row in a never-committed base ledger fails" "$d" \
+	"D-003: new ledger row runs to 3 sentences, crossing rejection boundary LEDGER_ROW_SENTENCE_CAP=2"
+
+d=$(mk ledger_row_untracked_volume_under_cap)
+printf -- '# LEDGER — volume A\n\n- DA-001: **A short finding.** It stops.\n' >"$d/docs/LEDGER_A.md"
+expect_pass_saying "a short row in a new, untracked ledger volume is measured and passes" "$d" \
+	"   ok    checked 1 new ledger row(s) — DA-001=2 sentence(s)"
 
 # --- ledger volumes past Z, and what counts as a volume at all
 #
@@ -2085,6 +2177,17 @@ chmod -x "$d/scripts/command-guard.sh"
 expect_runner_saying "a non-executable rail is still self-tested" run_rails "$d" 1 \
 	"self-test failed"
 
+# A self-test that stands down (no interpreter on the host) exits 0 having tested nothing. It
+# must read as `skip` with its own reason, never as `ok`: had the Windows fix only turned that
+# leg's six failures into a stand-down, an `ok` there would have called an untested rail tested.
+# command-guard.sh is stubbed to a clean exit because its real self-test is not on trial here and
+# costs close to a minute on the Windows leg; the rung under test runs unmodified.
+d=$(mk_unmodified rail_self_test_skipped)
+printf '#!/usr/bin/env bash\nexit 0\n' >"$d/scripts/command-guard.sh"
+printf '#!/usr/bin/env bash\nprintf "fixture self-test\\n  SKIP no interpreter on this host\\n"\n' >"$d/scripts/redact-tool-output.sh"
+expect_runner_saying "a self-test that stood down is reported as a skip, not a pass" run_rails "$d" 0 \
+	"   skip  scripts/redact-tool-output.sh self-test did not run: no interpreter on this host"
+
 d=$(mk_unmodified rail_missing)
 rm -f "$d/scripts/command-guard.sh"
 expect_runner_saying "a missing rail script loudly says that nothing self-tested it" run_rails "$d" 0 \
@@ -2251,9 +2354,9 @@ d=$(mk ss_merge_mode_train)
 sed_in_place 's/^MERGE_MODE=.*/MERGE_MODE=branch-train/' "$d/amh.conf"
 out=$(cd "$d" && env -u AMH_REMOTE bash scripts/session-start.sh 2>&1)
 if grep -qF "merge mode: branch-train — main's history is squashed" <<<"$out"; then
-	report ok "a branch-train repo is told its default branch's log is not its past"
+	report ok "a branch-train repo is told its default branch's log does not record a train's inside"
 else
-	report no "a branch-train repo is told its default branch's log is not its past" "no line" "$out"
+	report no "a branch-train repo is told its default branch's log does not record a train's inside" "no line" "$out"
 fi
 
 # The negative control, and the reason the key is read at all: under branch-per-change the
@@ -2366,8 +2469,10 @@ d=$(mk identity_committer_only)
 identity_commit "$d" amh@test.invalid dev@localhost
 # `dev@`, not `root@`: with a root address this fixture is matched by the `root@*` arm
 # first and the localhost arm never executes — it could be deleted with the suite green.
+# The assertion names the FIELD, the COMMIT and the arm in one string, which is the whole of
+# what the diagnostic may say: where the bad address is and what is wrong with it.
 expect_fail "an invented identity in the committer field alone is caught" "$d" \
-	"committer identity 'dev@localhost' names localhost"
+	"committer identity on commit $(git -C "$d" log -1 --format=%h) names localhost"
 
 d=$(mk identity_not_an_address)
 identity_commit "$d" amh-test amh@test.invalid
@@ -2383,11 +2488,11 @@ expect_fail "the machine's root account fails" "$d" "is the machine's root accou
 
 d=$(mk identity_mdns_local)
 identity_commit "$d" dev@laptop.local dev@laptop.local
-expect_fail "an mDNS .local machine name fails" "$d" "'dev@laptop.local' names a local-only host"
+expect_fail "an mDNS .local machine name fails" "$d" "names a local-only host"
 
 d=$(mk identity_localdomain)
 identity_commit "$d" dev@box.localdomain dev@box.localdomain
-expect_fail "a .localdomain machine name fails" "$d" "'dev@box.localdomain' names a local-only host"
+expect_fail "a .localdomain machine name fails" "$d" "names a local-only host"
 
 # git's own fallback when the hostname has no resolvable domain — the identity of every
 # unconfigured container, and the likeliest thing this half will ever catch.
@@ -2406,7 +2511,7 @@ expect_fail "an empty identity field fails" "$d" "is EMPTY"
 # that one line left the suite green until this fixture existed.
 d=$(mk identity_uppercase)
 identity_commit "$d" ROOT@LOCALHOST ROOT@LOCALHOST
-expect_fail "an invented identity in capitals is still caught" "$d" "'ROOT@LOCALHOST' is the machine's root account"
+expect_fail "an invented identity in capitals is still caught" "$d" "is the machine's root account"
 
 # The pair below is the whole opt-in half, and it only means something as a pair: SAME
 # address, once with the key absent and once with it set. Absent must pass — an adopter
@@ -2468,6 +2573,200 @@ identity_commit "$d" alice@corp.local alice@corp.local
 expect_pass_saying "a named address overrides the invented-shape patterns" "$d" \
 	"   ok    2 distinct field/address pair(s) over 1 commit(s); all well-formed and admitted by AUTHOR_EMAIL_ALLOW"
 
+# The diagnostic names WHERE and never WHAT. Every address this rung rejects is by definition
+# unapproved, and the constitution forbids rendering one — the personal address it exists to
+# catch is the one that must not then be printed into a CI log. EVERY rejecting arm is on trial,
+# each fed an address with a marker no other part of the output can contain: the allowlist miss
+# (riding TWO commits, so the count arm runs), the root account, `(none)`, localhost, `.local`,
+# `.localdomain` and the bare name. The empty field has nothing to leak. The positive check
+# comes first and counts the arms that fired: an absence assertion over output that never
+# reached a failure line would prove nothing, and neither would one over a single arm.
+d=$(mk identity_never_rendered)
+printf "AUTHOR_EMAIL_ALLOW='.*@test\\\\.invalid'\n" >>"$d/amh.conf"
+identity_commit "$d" fixture.person@personal.example amh@test.invalid
+identity_commit "$d" fixture.person@personal.example amh@test.invalid
+identity_commit "$d" amh@test.invalid Root@Buildbox.Example
+identity_commit "$d" 'nonemarker@host.(none)' lhmarker@localhost
+identity_commit "$d" mdnsmarker@laptop.local ldmarker@box.localdomain
+identity_commit "$d" barenamemarker amh@test.invalid
+started=$SECONDS
+out=$(run "$d")
+rc=$?
+FIXTURE_ELAPSED_SECONDS=$((SECONDS - started))
+personal_sha=$(git -C "$d" log -5 --format=%h | tail -1)
+root_sha=$(git -C "$d" log -4 --format=%h | tail -1)
+fired=$(grep -cE '^   FAIL  (author|committer) identity on commit ' <<<"$out")
+name="a rejected address is located by field and commit, and never rendered, on every arm"
+if [ "$rc" -eq 0 ] || [ "$fired" != 7 ] ||
+	! grep -qF "author identity on commit $personal_sha (and 1 other commit(s)) does not match AUTHOR_EMAIL_ALLOW" <<<"$out" ||
+	! grep -qF "committer identity on commit $root_sha is the machine's root account" <<<"$out"; then
+	report no "$name" "expected 7 located identity failures; rc=$rc, fired=$fired" "$out"
+elif grep -qiF -e 'fixture.person' -e 'personal.example' -e 'buildbox' -e 'nonemarker' \
+	-e 'lhmarker' -e 'mdnsmarker' -e 'ldmarker' -e 'barenamemarker' <<<"$out"; then
+	report no "$name" "an address, or part of one, reached the output" "$out"
+else
+	report ok "$name"
+fi
+
+# The forge's test merge (AMH ledger row DD036). A pull-request CI run checks out a merge the
+# forge composed — the branch merged into the default, HEAD detached on it, no branch pointing
+# at it — whose author the forge took from an account rather than from any commit, so no amend
+# or force-push can change it. Every case builds the topology for real: a branch `feature` off
+# the base carrying one commit by <branch-author>, then a HEAD by <head-author> in the shape
+# named, with the committer left at the suite's allowed identity as the forge's own stands in.
+#   test-merge  a --no-ff merge, detached, first parent the base, no branch at it: the forge's
+#               shape, and the only one narrowed
+#   on-branch   the same merge with HEAD on a branch
+#   branch-tip  the same merge where only an `origin/` branch points, checked out detached —
+#               what a CI that tests the branch tip rather than a test merge sees
+#   reverse     detached, but the base merged INTO the branch: first parent the branch
+#   octopus     detached, first parent the base, two branches merged at once
+#   single      detached on an ordinary one-parent commit on top of the base
+# Each case after the first pins one condition of the shape: delete it and that case goes green.
+merge_fixture() { # <dir> <shape> <head-author> <branch-author>
+	# Merge chatter goes to /dev/null: `-q` does not silence an octopus's strategy output.
+	if ! (
+		cd "$1" || exit 1
+		base="origin/$DEFAULT_BRANCH_FIXTURE"
+		# Whatever the case appended to amh.conf joins the base first, so every shape reads it.
+		# Left uncommitted, the `commit -a` below files it on `feature` alone, and a HEAD that
+		# does not carry `feature` runs with no allowlist at all — which is how `single` once
+		# passed a disallowed address as merely well-formed.
+		if ! git diff --quiet; then
+			git commit -qam "fixture configuration"
+			git update-ref "refs/remotes/$base" HEAD
+		fi
+		git checkout -q -b feature "$base"
+		printf 'feature work\n' >>docs/STATE.md
+		GIT_AUTHOR_EMAIL="$4" git commit -qam "feature work"
+		case $2 in
+		test-merge)
+			git checkout -q --detach "$base"
+			GIT_AUTHOR_EMAIL="$3" git merge -q --no-ff -m "Merge feature into base" feature
+			;;
+		on-branch)
+			git checkout -q -b integration "$base"
+			GIT_AUTHOR_EMAIL="$3" git merge -q --no-ff -m "Merge feature into integration" feature
+			;;
+		branch-tip)
+			git checkout -q -b integration "$base"
+			GIT_AUTHOR_EMAIL="$3" git merge -q --no-ff -m "Merge feature into integration" feature
+			git update-ref refs/remotes/origin/integration HEAD
+			git checkout -q --detach HEAD
+			# Only the remote-tracking ref is left, as in a CI clone, so this case pins the
+			# `origin/` half of the ref check and `on-branch` pins the local half.
+			git branch -q -D integration
+			;;
+		reverse)
+			# The base has to move, or merging it into the branch is a no-op.
+			git checkout -q --detach "$base"
+			printf 'base work\n' >notes.txt
+			git add notes.txt
+			git commit -qm "base work"
+			git update-ref "refs/remotes/$base" HEAD
+			git checkout -q --detach feature
+			GIT_AUTHOR_EMAIL="$3" git merge -q --no-ff -m "Merge base into feature" "$base"
+			;;
+		octopus)
+			git checkout -q -b feature2 "$base"
+			printf 'more work\n' >notes.txt
+			git add notes.txt
+			GIT_AUTHOR_EMAIL="$4" git commit -qm "more work"
+			git checkout -q --detach "$base"
+			GIT_AUTHOR_EMAIL="$3" git merge -q --no-ff -m "Merge two branches into base" feature feature2
+			;;
+		single)
+			git checkout -q --detach "$base"
+			printf 'single work\n' >notes.txt
+			git add notes.txt
+			GIT_AUTHOR_EMAIL="$3" git commit -qm "single work"
+			;;
+		esac
+	) >/dev/null 2>&1; then
+		printf 'FIXTURE ERROR: building the %s topology failed\n' "$2" >&2
+		exit 1
+	fi
+	# The premise, read back: HEAD exists, carries the author on trial, and has the shape
+	# asked for. A case whose merge quietly fast-forwarded, whose HEAD stayed on a branch, or
+	# whose tip no `origin/` branch carried would assert against a topology it never built.
+	local got want parents detached first_in_base=no referenced
+	got=$(git -C "$1" log -1 --format=%ae)
+	parents=$(git -C "$1" log -1 --format=%p | wc -w | tr -d ' ')
+	detached=$(git -C "$1" symbolic-ref -q HEAD >/dev/null && printf no || printf yes)
+	git -C "$1" merge-base --is-ancestor HEAD^1 "origin/$DEFAULT_BRANCH_FIXTURE" && first_in_base=yes
+	referenced=$([ -n "$(git -C "$1" for-each-ref --points-at HEAD refs/heads refs/remotes/origin)" ] && printf yes || printf no)
+	case $2 in
+	test-merge) want="yes 2 yes no" ;;
+	on-branch) want="no 2 yes yes" ;;
+	branch-tip) want="yes 2 yes yes" ;;
+	reverse) want="yes 2 no no" ;;
+	octopus) want="yes 3 yes no" ;;
+	single) want="yes 1 yes no" ;;
+	esac
+	if [ "$got" != "$3" ] || [ "$detached $parents $first_in_base $referenced" != "$want" ]; then
+		printf 'FIXTURE ERROR: %s HEAD is [detached parents first-in-base referenced: %s], wanted [%s]; author matched: %s\n' \
+			"$2" "$detached $parents $first_in_base $referenced" "$want" "$([ "$got" = "$3" ] && echo yes || echo no)" >&2
+		exit 1
+	fi
+}
+
+# The reported case, rebuilt: every commit on the branch is admitted, and only the forge's
+# merge carries an address outside the allowlist. It must pass, say why the merge went
+# unjudged, count only the branch's commit — and, like every line this rung prints, never
+# render the address it set aside.
+d=$(mk identity_test_merge)
+printf "AUTHOR_EMAIL_ALLOW='.*@test\\\\.invalid'\n" >>"$d/amh.conf"
+merge_fixture "$d" test-merge fixture.person@personal.example amh@test.invalid
+expect_pass_not_saying "the forge's test merge is not judged, and the rung says so without the address" "$d" \
+	'fixture\.person|personal\.example' \
+	"   note  HEAD ($(git -C "$d" rev-parse --short HEAD)) is a detached merge into main"
+expect_pass_saying "...and the window it judges instead is the branch the merge carries" "$d" \
+	"   ok    2 distinct field/address pair(s) over 1 commit(s); all well-formed and admitted by AUTHOR_EMAIL_ALLOW"
+
+# Not judging the merge must not mean not judging the branch: the window moves to HEAD^2,
+# it does not empty.
+d=$(mk identity_test_merge_branch_bad)
+printf "AUTHOR_EMAIL_ALLOW='.*@test\\\\.invalid'\n" >>"$d/amh.conf"
+merge_fixture "$d" test-merge amh@test.invalid fixture.person@personal.example
+expect_fail "under the forge's test merge the branch's own commits are still judged" "$d" \
+	"author identity on commit $(git -C "$d" rev-parse --short HEAD^2) does not match AUTHOR_EMAIL_ALLOW"
+
+for shape in on-branch branch-tip reverse octopus single; do
+	d=$(mk "identity_merge_$shape")
+	printf "AUTHOR_EMAIL_ALLOW='.*@test\\\\.invalid'\n" >>"$d/amh.conf"
+	merge_fixture "$d" "$shape" fixture.person@personal.example amh@test.invalid
+	expect_fail "a HEAD shaped '$shape' is not the forge's test merge and is judged like any commit" "$d" \
+		"author identity on commit $(git -C "$d" rev-parse --short HEAD) does not match AUTHOR_EMAIL_ALLOW"
+done
+
+# The branch-ref probe's own failure. Read as "no branch points here", an error from
+# `for-each-ref` would narrow the window, and nothing about the output would say so. The
+# topology IS the forge's shape, so only that probe's error separates this FAIL from the
+# narrowed pass above; the stub fails `for-each-ref` alone, which nothing else the ladder
+# runs calls.
+d=$(mk identity_test_merge_ref_probe_fails)
+printf "AUTHOR_EMAIL_ALLOW='.*@test\\\\.invalid'\n" >>"$d/amh.conf"
+merge_fixture "$d" test-merge fixture.person@personal.example amh@test.invalid
+mkdir -p "$d/stub-bin"
+real_git=$(command -v git)
+cat >"$d/stub-bin/git" <<STUB
+#!/bin/sh
+case "\$1" in for-each-ref) exit 128 ;; esac
+exec "$real_git" "\$@"
+STUB
+chmod +x "$d/stub-bin/git"
+name="a branch-ref probe that errors reads as a branch pointing here, never as narrowing"
+started=$SECONDS
+out=$(cd "$d" && CI=1 env PATH="$d/stub-bin:$PATH" scripts/ladder.sh --guards-only 2>&1)
+rc=$?
+FIXTURE_ELAPSED_SECONDS=$((SECONDS - started))
+if [ "$rc" -ne 0 ] && ! grep -q '^   note  HEAD (' <<<"$out" &&
+	grep -qF "author identity on commit $(git -C "$d" rev-parse --short HEAD) does not match AUTHOR_EMAIL_ALLOW" <<<"$out"; then
+	report ok "$name"
+else
+	report no "$name" "rc=$rc" "$out"
+fi
+
 # AMH ledger row D019's shape, in the branch whose whole purpose is to be LOUDER when
 # the guard is switched off by something that is not its subject. Nothing covered it —
 # not for this guard and not for the poison-token scan it was modelled on — so demoting
@@ -2481,6 +2780,44 @@ git -C "$d" update-ref -d "refs/remotes/origin/$DEFAULT_BRANCH_FIXTURE"
 # somewhere. Both mistakes were made here before this line read the way it does.
 expect_warn "with no upstream ref the guard says it checked NOTHING" "$d" \
 	"   WARN  author identity is unguarded locally: no main reference"
+
+# The recovery the two missing-ref warnings print has to RECOVER. In a single-branch clone a
+# bare `git fetch origin <default>` exits 0 and creates no remote-tracking ref, so advice in
+# that spelling leaves both rungs exactly as inert as before. The advice is read back out of
+# the ladder's own output and run in a real single-branch clone of a local remote — no
+# network — and the ref must exist afterwards. The premise is checked too: a clone that
+# already had the ref would pass whatever the advice said.
+d=$(mk fetch_advice)
+# The remote needs a branch actually NAMED like the fixture's default: `mk` leaves whatever
+# name `git init` chose (init.defaultBranch varies by host), and the fetch would then fail for
+# a reason that has nothing to do with the advice.
+git -C "$d" update-ref "refs/heads/$DEFAULT_BRANCH_FIXTURE" HEAD
+git -C "$d" branch -q feature
+git clone -q --bare "$d" "$WORK/fetch_advice_remote.git"
+clone="$WORK/fetch_advice_clone"
+git clone -q --single-branch --branch feature "$WORK/fetch_advice_remote.git" "$clone"
+name="the missing-ref advice creates the ref in a single-branch clone"
+started=$SECONDS
+out=$(cd "$clone" && CI=1 scripts/ladder.sh --guards-only 2>&1)
+# Both rungs print the advice, and both copies are on trial: they must be the same command,
+# so one run of it settles the pair.
+# shellcheck disable=SC2016 # the backticks are the ladder's markdown quoting around the command
+advice=$(sed -n 's/^   WARN  .*Fetch it (`\(git fetch [^`]*\)`).*/\1/p' <<<"$out" | sort -u)
+read -ra advised <<<"$advice"
+if git -C "$clone" rev-parse --verify -q "refs/remotes/origin/$DEFAULT_BRANCH_FIXTURE" >/dev/null; then
+	report no "$name" "FIXTURE ERROR: the single-branch clone already has the ref, so this proves nothing"
+elif [ "$(grep -c '^   WARN  .*Fetch it (' <<<"$out")" != 2 ] || [ "$(printf '%s\n' "$advice" | wc -l)" -ne 1 ]; then
+	report no "$name" "expected the poison-token and identity rungs to print ONE identical fetch" "$out"
+elif [ "${#advised[@]}" -lt 3 ] || [ "${advised[0]}" != git ] || [ "${advised[1]}" != fetch ]; then
+	report no "$name" "the advice is not a git fetch: $advice" "$out"
+elif ! (cd "$clone" && "${advised[@]}" >/dev/null 2>&1); then
+	report no "$name" "the advised command failed: $advice"
+elif ! git -C "$clone" rev-parse --verify -q "refs/remotes/origin/$DEFAULT_BRANCH_FIXTURE" >/dev/null; then
+	report no "$name" "the advised command succeeded and the ref is still absent: $advice"
+else
+	FIXTURE_ELAPSED_SECONDS=$((SECONDS - started))
+	report ok "$name"
+fi
 
 # --- local advisories
 # Warn-only and skipped in CI, so `run()` can never reach them: assert on the text.
