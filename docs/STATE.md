@@ -28,7 +28,9 @@ stays closed (DB-051…DB-060), and Scorecard.dev is a run-once local input.
 
 - **Bright-light hand-off (#136)** — `docs/plans/BRIGHT_LIGHT_HANDOFF.md`, spec only (owner,
   2026-10-01); it goes in the train after 1.14.0 (owner, 2026-10-07), each unit on the owner's
-  go-ahead.
+  go-ahead. The owner's AAB build of it is force-added under `dist/aab-bright-light-handoff/` as
+  the port's reference; `git rm -r` it before this train's PR merges (`clean-dist.yml` is only
+  the backstop).
 - **Low-lux settling jitter** — `docs/plans/LOW_LUX_SETTLING_JITTER.md`, spec only; its
   **Proposed fix** is approved as written and goes in the train after 1.14.0 (owner, 2026-10-08),
   each step on the owner's go-ahead.
