@@ -27,8 +27,8 @@ stays closed (DB-051…DB-060), and Scorecard.dev is a run-once local input.
 ## Active work
 
 - **Bright-light hand-off (#136)** — `docs/plans/BRIGHT_LIGHT_HANDOFF.md`, spec only (owner,
-  2026-10-01). It was rewritten on 2026-10-15 against the owner's AAB build, with nine
-  deviations and Open question 1 (HBM readout). It goes in the train after 1.14.0 (owner,
+  2026-10-01). It was rewritten on 2026-10-15 against the owner's AAB build and the owner's
+  fixes after it, with four deviations and Open question 1 (HBM readout). It goes in the train after 1.14.0 (owner,
   2026-10-07), each unit on the owner's go-ahead. The owner's AAB build of it is force-added under `dist/aab-bright-light-handoff/` as
   the port's reference; `git rm -r` it before this train's PR merges (`clean-dist.yml` is only
   the backstop).
@@ -107,6 +107,9 @@ Newest first; ledger rows are the durable detail.
   `dist/`). It uses AAB's names and decision rule, an effective threshold instead of a blocking
   validator, a 90 % hysteresis cap, ownership persistence and recovery, and a mode observer, and
   it targets 1.15.0 / vc30. Reviewed by Sol (analysis) and Astra (plan).**
+- 2026-10-15 — **The owner fixed five of the review's AAB findings and declined two as user error:
+  switching Adaptive Brightness off by hand, and a 100 % hysteresis. The plan now matches AAB on
+  those: no mode observer, and hysteresis 50–100 %. Four deviations remain.**
 
 - 2026-10-13 — **Harness AMH 14.1.0 -> 15.1.0: root/home deletions permanently denied, checkpoint
   reordered (STATE line → ladder → commit → `--guards-only` → push), a Destructive work section in
