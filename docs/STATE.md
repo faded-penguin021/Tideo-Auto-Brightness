@@ -27,8 +27,9 @@ stays closed (DB-051…DB-060), and Scorecard.dev is a run-once local input.
 ## Active work
 
 - **Bright-light hand-off (#136)** — `docs/plans/BRIGHT_LIGHT_HANDOFF.md`, spec only (owner,
-  2026-10-01); it goes in the train after 1.14.0 (owner, 2026-10-07), each unit on the owner's
-  go-ahead. The owner's AAB build of it is force-added under `dist/aab-bright-light-handoff/` as
+  2026-10-01). It was rewritten on 2026-10-15 against the owner's AAB build, with nine
+  deviations and Open question 1 (HBM readout). It goes in the train after 1.14.0 (owner,
+  2026-10-07), each unit on the owner's go-ahead. The owner's AAB build of it is force-added under `dist/aab-bright-light-handoff/` as
   the port's reference; `git rm -r` it before this train's PR merges (`clean-dist.yml` is only
   the backstop).
 - **Low-lux settling jitter** — `docs/plans/LOW_LUX_SETTLING_JITTER.md`, spec only; its
@@ -86,10 +87,11 @@ stays closed (DB-051…DB-060), and Scorecard.dev is a run-once local input.
    redact-tool-output scripts/guards/*.sh` prints a nonzero count, or a STATE changelog line records
    (b).
 
-**This train is `1.14.1` on vc29, its ONE bump** (the owner's patch bump of 2026-10-10 for #145,
-after `main` shipped 1.14.0 / vc28 as #144). Land further user-facing fixes in `changelogs/29.txt`
-(500-character cap), never by bumping or creating `30.txt`; re-open only for something major, and
-say so.
+**The tree declares `1.14.1` / vc29, and v1.14.1 is tagged** (seen 2026-10-15 with
+`git ls-remote --tags --refs origin 'refs/tags/v*'`), so the next user-facing change owes this
+train's ONE bump: **1.15.0 / vc30** with `changelogs/30.txt` (500-character cap). It is made by
+whichever planned unit lands first: the hand-off plan's unit 0 or the low-lux jitter fix. Never
+bump twice in one train.
 
 ## Decided non-items
 
@@ -100,6 +102,11 @@ proposing work; changing it is legislation under RUNBOOK's rule-review protocol.
 ## Changelog
 
 Newest first; ledger rows are the durable detail.
+
+- 2026-10-15 — **Hand-off plan (#136) rewritten against the owner's AAB build (export in
+  `dist/`). It uses AAB's names and decision rule, an effective threshold instead of a blocking
+  validator, a 90 % hysteresis cap, ownership persistence and recovery, and a mode observer, and
+  it targets 1.15.0 / vc30. Reviewed by Sol (analysis) and Astra (plan).**
 
 - 2026-10-13 — **Harness AMH 14.1.0 -> 15.1.0: root/home deletions permanently denied, checkpoint
   reordered (STATE line → ladder → commit → `--guards-only` → push), a Destructive work section in
