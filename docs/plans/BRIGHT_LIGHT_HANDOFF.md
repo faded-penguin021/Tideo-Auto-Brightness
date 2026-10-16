@@ -314,7 +314,8 @@ commit → `scripts/ladder.sh --guards-only` → push.
    - **Read-only adb facts:**
      - model and SDK;
      - `screen_brightness_mode` and `screen_brightness`;
-     - the light sensor's `maxRange` (`dumpsys sensorservice`);
+     - the light sensor's declared `maxRange` (`dumpsys display` prints it). It is not a
+       saturation point; only a reading in bright light shows one;
      - the `dumpsys display` lines for the three brightness fields, `HighBrightnessModeController`
        and `mHbmMode`, once in each mode. The owner switches modes. Open question 1 needs these.
    - **If the sensor saturates below 25 132 lx**, stop and raise it as an Owner-queue question
@@ -403,8 +404,11 @@ commit → `scripts/ladder.sh --guards-only` → push.
 
    **Unit 0's adb facts (2026-10-16, read-only, indoors, owner switched the mode):**
    - OnePlus CPH2653, SDK 36, `CPH2653_16.0.10.600(EX01)`.
-   - The light sensor is `OPLUS Fusion Light Sensor Next Gen`, `maxRange=65535.0`, so it does not
-     saturate below 25 132 lx on paper. Its true clipping point in sunlight is unmeasured.
+   - The light sensor is `OPLUS Fusion Light Sensor Next Gen`, declaring `maxRange=65535.0`.
+     **That is no saturation point.** Android does not clamp readings to `maxRange`, and the owner
+     has seen raw readings well over 100 000 lx in both Tideo and Tasker. So 25 132 lx is
+     reachable on this phone. A declared `maxRange` cannot settle unit 0's saturation check on
+     any phone. Only a reading in bright light can.
    - Display configuration: `mScreenBrightnessNormalMaximum=4095.0` and
      `mScreenBrightnessRangeMaximum=4674.0`. The OEM range runs 4095 → 4674 above the normal
      maximum.
@@ -417,9 +421,12 @@ commit → `scripts/ladder.sh --guards-only` → push.
    - In both modes, AOSP's `HighBrightnessModeController` reads `mHbmMode=off` with
      `mHbmData=null`, `mIsAutoBrightnessEnabled=false`, and
      `mCachedBrightnessInfo.hbmTransitionPoint=Infinity`. AOSP HBM is unconfigured on this
-     phone, so the OEM drives the boost and **`mHbmMode` is no HBM fact here**. For (b), the
-     candidate is `mScreenBrightness` above `mScreenBrightnessNormalMaximum`. It is unobserved,
-     since no reading was taken in bright light.
+     phone, so the OEM drives the boost and **`mHbmMode` is no HBM fact here**.
+   - **AAB's HBM rule is the dumpsys brightness above 4095 on this phone.** `_ReadBrightness`
+     extrapolates past 255, setting `%AAB_HBMFlag`, only when the raw value exceeds the one
+     calibrated at 255. That value is the panel's normal maximum, 4095 here (owner-confirmed).
+     For (b), the uncalibrated equivalent is `mScreenBrightness` above
+     `mScreenBrightnessNormalMaximum`. No reading above 4095 was taken (cloudy day).
 
 ## Execution rules
 

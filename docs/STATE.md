@@ -115,9 +115,11 @@ proposing work; changing it is legislation under RUNBOOK's rule-review protocol.
 
 Newest first; ledger rows are the durable detail.
 
-- 2026-10-16 — **Hand-off unit 0: the train opens as 1.15.0 / vc30 with `changelogs/30.txt`. The
-  owner's phone's light sensor reads to 65 535 lx, and AOSP HBM is unconfigured there (OEM boost
-  4095 → 4674), so `mHbmMode` is no HBM fact. Details in the plan's Open question 1.**
+- 2026-10-16 — **Hand-off unit 0: the train opens as 1.15.0 / vc30 with `changelogs/30.txt`. AOSP
+  HBM is unconfigured on the owner's phone (OEM boost 4095 → 4674), so `mHbmMode` is no HBM fact.
+  AAB's rule, dumpsys brightness above 4095, is. A sensor's declared `maxRange` (65 535 here) is no
+  saturation point: the owner has seen readings over 100 000 lx. Details in the plan's Open
+  question 1.**
 - 2026-10-16 — **The `DraftSettingsViewModelTest` CI-hang fix went out as PR #147 off `main`;
   Owner queue item 2 now asks for that merge.**
 - 2026-10-16 — **Every workflow pinned to `ubuntu-24.04` ahead of GitHub moving `ubuntu-latest`
