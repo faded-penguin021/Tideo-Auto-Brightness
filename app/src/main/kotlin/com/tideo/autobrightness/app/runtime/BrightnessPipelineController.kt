@@ -62,12 +62,14 @@ class BrightnessPipelineController(
 
     private val debugEmitter = PipelineDebugEmitter(debugSink)
     private val panicHandler = PanicHandler(brightness, dimming)
+    private val handoff = HandoffCoordinator(this, brightness, dimming, clock)
     private val cycleRunner = PipelineCycleRunner(
         ctx = this,
         engine = engine,
         brightness = brightness,
         animationRunner = animationRunner,
         dimming = dimming,
+        handoff = handoff,
         throttle = throttle,
         debug = debugEmitter,
         settingsProvider = settingsProvider,
@@ -90,6 +92,7 @@ class BrightnessPipelineController(
             initializing = s.initializing,
             detectOverrides = cachedSettings?.detectOverrides ?: false,
             suppressed = clock() < suppressOverrideUntilMs,
+            handedOff = s.handedOff,
         )
     }
 
@@ -118,7 +121,7 @@ class BrightnessPipelineController(
     /** Start the pipeline; the light sensor registers only once settings have loaded (DC-067). */
     fun start() {
         if (consumerJob != null) return
-        _state.update { it.copy(serviceOn = true) }
+        _state.update { it.copy(serviceOn = true, handedOff = brightness.reconcileHandoff()) }
         consumerJob = scope.launch {
             cachedSettings = settingsProvider().also { throttle.seed(it.throttleDefaultMs) }
             startSensor(RegistrationCause.START, coroutineContext.job)
@@ -134,7 +137,7 @@ class BrightnessPipelineController(
 
     /** Stop the pipeline entirely (service teardown). */
     fun stop() {
-        _state.update { it.copy(serviceOn = false) }
+        handoff.fence { _state.update { it.copy(serviceOn = false, handedOff = false) } }
         // DC-067: consumer first, so a registration still pending on it sees it cancelled.
         consumerJob?.cancel(); consumerJob = null
         admission.invalidate(SampleRejection.SERVICE_DISABLED)
@@ -234,6 +237,7 @@ class BrightnessPipelineController(
     }
 
     private fun pauseInternal() {
+        handoff.release()
         brightness.clearSelfWriteMarker()
         dimming.disengage()
         // A user-initiated Pause is NOT an override (pausedByOverride stays false → no alert, G2R-F35).

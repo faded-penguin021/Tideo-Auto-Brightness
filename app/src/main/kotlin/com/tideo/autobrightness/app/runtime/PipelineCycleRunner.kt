@@ -41,6 +41,7 @@ internal class PipelineCycleRunner(
     private val brightness: ScreenBrightnessController,
     private val animationRunner: AnimationRunner,
     private val dimming: DimmingCoordinator,
+    private val handoff: HandoffCoordinator,
     private val throttle: ThrottleController,
     private val debug: PipelineDebugEmitter,
     private val settingsProvider: suspend () -> AabSettings,
@@ -103,6 +104,8 @@ internal class PipelineCycleRunner(
                 }
                 return
             }
+            // DD-074: decided after smoothing and before the write.
+            val handedOff = handoff.ownsScreen(settings, output.smoothedLux)
             val from = brightness.read()
             // task661 act22-26 / task698 step 3: hardware floor in PWM-sensitive mode (D-050); readout tracks perceived (D-109).
             val target = applyPwmFloor(output.targetBrightness, settings)
@@ -116,10 +119,10 @@ internal class PipelineCycleRunner(
                 "scale ${round3(output.scaleDynamic)} · compress ${output.scaleDynamicCompress}"
             }
 
-            val brightnessChanged = target != from
+            val brightnessChanged = !handedOff && target != from
             var writeResult: BrightnessWriteResult? = null
             // Nothing written: `from` came from brightness.read(), so target already names the screen.
-            var applied: Int? = if (brightnessChanged) s.lastAppliedBrightness else target
+            var applied: Int? = if (handedOff) null else if (brightnessChanged) s.lastAppliedBrightness else target
             if (brightnessChanged) {
                 brightness.forceManualMode()
                 // G3-F5: publish target early so dashboard animates during sweep (D-109: perceived, not floored).
@@ -144,9 +147,7 @@ internal class PipelineCycleRunner(
                     writeResult = outcome.lastResult
                     applied = baselineAfter(writeResult, applied)
                     if (outcome is AnimationOutcome.Overridden) {
-                        // DC-004: refresh the baseline BEFORE posting, or handleOverride compares
-                        // against the PREVIOUS cycle's and pauses on our own sweep (DC-008: never
-                        // null out the continuous write record while doing so).
+                        // DC-004: refresh the baseline BEFORE posting; DC-008: keep the write record.
                         val baseline = applied
                         val write = writeResult
                         ctx.update {
@@ -163,8 +164,9 @@ internal class PipelineCycleRunner(
             }
 
             // task646→650/645: F65 uses un-floored target, not PWM-floored hardware (task661/698 floor ⟂ task650).
-            dimming.apply(output.targetBrightness, settings, output.scaleDynamic)
-            val (dimCurrent, dimDS) = dimmingReadout(output.targetBrightness, settings, output.scaleDynamic)
+            if (!handedOff) dimming.apply(output.targetBrightness, settings, output.scaleDynamic)
+            val (dimCurrent, dimDS) =
+                if (handedOff) 0.0 to 0.0 else dimmingReadout(output.targetBrightness, settings, output.scaleDynamic)
 
             // DC-001: cycle time is state (cycleTimeMs, Live Debug), not a Graph Metrics Flash —
             // %AAB_Debug 7 times chart (re)draws (features_spec §4), not this pipeline timer.
@@ -268,18 +270,11 @@ internal class PipelineCycleRunner(
         )
     }
 
-    /**
-     * task567: Manual Override settle (D-049 #1, G2R-F26/F71). Don't borrow throttle window.
-     * DB-082: the settle window is re-checked HERE too, not only where the change is observed —
-     * observe → post → consume is asynchronous, so a change seen just before the window opened can
-     * still arrive at the commit inside it.
-     */
+    /** task567: Manual Override settle (D-049 #1, G2R-F26/F71), no throttle window; DB-082: window re-checked here. */
     suspend fun handleOverride(observed: Int, source: OverrideSource) {
         if (!canPause(ctx.stateValue)) return
 
-        // DC-005: %AAB_CycleTime only — D-062(2)/F71 removed the throttle fallback on purpose, because
-        // %AAB_Throttle gates the prof760 main loop and task567 act7 is a separate settle. The floor
-        // is a yield, not a settling estimate: delay(0) never suspends.
+        // DC-005: %AAB_CycleTime only (D-062(2)/F71: no throttle fallback, task567 act7); the floor is a yield.
         val settleMs = (ctx.stateValue.cycleTimeMs?.toLong() ?: 0L).coerceAtLeast(MIN_SETTLE_MS)
         delay(settleMs)
 
@@ -367,13 +362,12 @@ internal class PipelineCycleRunner(
     /** task618 block#1: Set Initial Brightness; act20/act27 recompute both scales, so they are published (DD-062). */
     fun setInitialBrightness(settings: AabSettings) {
         val s = ctx.stateValue
-        // DB-082: arm BEFORE the lux guard and before the write. Below the guard it never armed on
-        // the one transition that needs it most — wake, where hibernate has just nulled both lux
-        // fields — and below the write it left the write's own echo unsuppressed.
+        // DB-082: arm BEFORE the lux guard (wake has no lux) and before the write (its own echo).
         ctx.armInitialSettle(clock() + INITIAL_SETTLE_MS)
-        val lux = s.smoothedLux ?: s.lastRawLux ?: return
+        val lux = s.smoothedLux ?: s.lastRawLux ?: return handoff.releaseWithoutLux(settings)
         ctx.update { it.copy(initializing = true) }
         try {
+            if (handoff.ownsScreen(settings, lux)) return
             val output = engine.evaluate(buildInput(lux, settings, PipelineState()))
             val target = applyPwmFloor(output.targetBrightness, settings)
             val perceived = output.targetBrightness
@@ -398,7 +392,7 @@ internal class PipelineCycleRunner(
         }
     }
 
-    private fun canPause(s: PipelineState): Boolean = !ctx.overrideSuppressed() && !s.hibernated &&
+    private fun canPause(s: PipelineState): Boolean = !ctx.overrideSuppressed() && !s.hibernated && !s.handedOff &&
         OverrideRules.shouldCommitPause(s.serviceOn, s.autoRunning, s.paused, s.initializing)
 
     /** task661 act22-26 / task698 step 3: hardware floor in PWM-sensitive mode (D-050, D-049 #4). */
@@ -412,8 +406,7 @@ internal class PipelineCycleRunner(
         // F64: settle window (1.5s). Also armed on wake (DB-082) — one number, one place.
         const val INITIAL_SETTLE_MS = 1500L
 
-        // DC-005: the re-read must never share a dispatch with the event that asked for it —
-        // delay(0) returns without suspending. A yield floor, not a settling estimate.
+        // DC-005: a yield floor, since delay(0) never suspends; not a settling estimate.
         const val MIN_SETTLE_MS = 1L
     }
 }

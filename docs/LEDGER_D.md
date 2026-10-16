@@ -773,3 +773,24 @@
   mode starts the service normally but keeps the marker until a MANUAL lands, since the mode may
   still be Tideo's AUTOMATIC (glue review, 2026-10-16, narrowing the plan's "MANUAL or unreadable
   clears").
+- DD-074 [cited]: **The runtime hands off and back through one coordinator that decides after
+  smoothing and before the write, and at Set Initial Brightness on the lux already held, while an
+  entry in flight and `stop()`'s `serviceOn` flip serialize on one lock: `stop()` does not join the
+  consumer (DC-047), and an AUTOMATIC landing after `restoreMode()` would be stranded with no
+  marker, then saved as the user's mode at the next start.** The lock spans only the entry's
+  `serviceOn` check, dimming release and mode flip and `stop()`'s flag write, so `stop()` waits at
+  most those secure-settings writes and one mode write and commit, never an animation, and DC-047's
+  declined join and torn-down flag stand for every other write (Sol review, 2026-10-16). Entry sets the flag, arms the settle window (DC-009), drops dimming, flips
+  the mode, re-arms the window from the end of the flip and marks the brightness baseline UNKNOWN;
+  exit arms, reclaims, re-arms and only then clears the flag; a handed-off cycle publishes lux, band
+  and α but writes, animates and dims nothing and tells the throttle nothing changed, and every
+  decision that leaves Android in charge releases dimming again, so a release refused at entry is
+  retried (glue review). Both override
+  gates close on the flag, the observer gate and the commit's `canPause`, the second for an
+  override admitted before the entry and committed after its settle window, which would otherwise
+  reclaim MANUAL as `DISMISSED_MODE` and undo the hand-off. With no lux held, only an exit that
+  needs none (feature off, or no effective threshold) is decided and the next wake writes; Pause
+  hands back first and pauses even when the reclaim is refused, keeping the flag so Resume
+  re-decides. The flag survives hibernate, start reads it from `reconcileHandoff()` before any
+  observer or cycle, `stop()` clears it, and the coordinator keeps the curve's minimum per curve
+  config because finding it scans up to 100 000 points.

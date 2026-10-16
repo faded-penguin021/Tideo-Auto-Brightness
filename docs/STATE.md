@@ -31,12 +31,14 @@ stays closed (DB-051…DB-060), and Scorecard.dev is a run-once local input.
   fixes after it, with four deviations and Open question 1 (HBM readout). It goes in the train after 1.14.0 (owner,
   2026-10-07), each unit on the owner's go-ahead. The owner's AAB build of it is force-added under `dist/aab-bright-light-handoff/` as
   the port's reference; `git rm -r` it before this train's PR merges (`clean-dist.yml` is only
-  the backstop). Units, in the plan's order:
+  the backstop). A `BUDGET_app` comment-budget raise, if unit 5 needs one, is pre-approved and
+  folds into that unit (owner, 2026-10-16); it still takes the DA-005 rule review. Units, in the
+  plan's order:
   - [x] 0 open the train (1.15.0 / vc30, adb facts)
   - [x] 1 domain `HandoffRules` + DD rows (DD-070…DD-072)
   - [x] 2 settings
   - [x] 3 platform (glue review)
-  - [ ] 4 runtime (glue review)
+  - [x] 4 runtime (glue review)
   - [ ] 5 UI (glue review)
   - [ ] 6 close-out
   - [ ] 7 HBM readout, only if Open question 1 says so
@@ -106,6 +108,10 @@ proposing work; changing it is legislation under RUNBOOK's rule-review protocol.
 
 Newest first; ledger rows are the durable detail.
 
+- 2026-10-16 — **Hand-off unit 4: a runtime `HandoffCoordinator` hands Android AUTOMATIC above the
+  effective threshold and takes it back below the exit, with no write, dimming or override while
+  handed off; Apply, a context swap, Resume and Pause decide at once, start reconciles the marker,
+  and an entry and `stop()` serialize (DD-074). Nothing shows it until unit 5.**
 - 2026-10-16 — **Hand-off unit 3: the brightness controller hands Android AUTOMATIC under a
   persisted `handed_off` marker committed with the saved mode first, reclaims MANUAL, and
   reconciles the marker at start, so Tideo's own AUTOMATIC is never saved as the user's mode

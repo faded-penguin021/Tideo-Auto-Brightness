@@ -18,11 +18,13 @@ class OverrideMonitor(
         val detectOverrides: Boolean,
         // S12.7a, F64: post-init settle window (ignores trailing self-write echo)
         val suppressed: Boolean = false,
+        // DD-070: AAB's Allow Override requires %AAB_AdaptiveHandoff !~ 1.
+        val handedOff: Boolean = false,
     )
 
     fun overrides(): Flow<Int> = observer.externalChanges().mapNotNull { observed ->
         val g = gateProvider()
-        if (g.suppressed) return@mapNotNull null
+        if (g.suppressed || g.handedOff) return@mapNotNull null
         val isOverride = OverrideRules.isManualOverride(
             isServiceOn = g.serviceOn,
             isAutoRunning = g.autoRunning,

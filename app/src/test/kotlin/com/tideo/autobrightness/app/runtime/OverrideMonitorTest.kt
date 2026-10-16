@@ -53,4 +53,9 @@ class OverrideMonitorTest {
     fun serviceOff_dropsAll() = runTest {
         assertEquals(emptyList<Int>(), overridesFor(openGate.copy(serviceOn = false), 120))
     }
+
+    @Test
+    fun handedOff_dropsAll_DD070() = runTest {
+        assertEquals(emptyList<Int>(), overridesFor(openGate.copy(handedOff = true), 120, 200))
+    }
 }

@@ -36,6 +36,8 @@ data class PipelineState(
     val pausedByOverride: Boolean = false,
     // prof759/task545: proximity damps smoothing alpha ×0.1.
     val proximityNear: Boolean = false,
+    // DD-070 %AAB_AdaptiveHandoff: Android owns brightness; survives hibernate, reconciled at start (DD-073).
+    val handedOff: Boolean = false,
     val smoothedLux: Double? = null,
     val lastRawLux: Double? = null,
     val lastAcceptedMs: Long? = null,
