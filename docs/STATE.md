@@ -33,7 +33,7 @@ stays closed (DB-051…DB-060), and Scorecard.dev is a run-once local input.
   the port's reference; `git rm -r` it before this train's PR merges (`clean-dist.yml` is only
   the backstop). Units, in the plan's order:
   - [x] 0 open the train (1.15.0 / vc30, adb facts)
-  - [ ] 1 domain `HandoffRules` + DD row
+  - [x] 1 domain `HandoffRules` + DD rows (DD-070…DD-072)
   - [ ] 2 settings
   - [ ] 3 platform (glue review)
   - [ ] 4 runtime (glue review)
@@ -106,6 +106,10 @@ proposing work; changing it is legislation under RUNBOOK's rule-review protocol.
 
 Newest first; ledger rows are the durable detail.
 
+- 2026-10-16 — **Hand-off unit 1: domain `HandoffRules` decides enter/stay/exit with AAB's strict
+  edges and finds the curve's minimum hand-off lux (25 132 on the default curve) by a downward
+  scan that holds on non-monotone curves. DD-070…DD-072 record the AAB reference before `dist/`
+  goes.**
 - 2026-10-16 — **`DraftSettingsViewModelTest`'s intermittent CI hang fixed, test-only: an earlier
   test's in-flight `apply()` wedged the DataStore writer across Robolectric's looper reset
   (DD-069).**

@@ -710,3 +710,50 @@
   writes now go off-main while idling the main looper, bounded at 5 s, and an `@After` barrier
   drains every test's writes. Left open (Sol): `SettingsViewModel`'s init `ensureSeeded()` writes
   `userProfilesDataStore` from Main the same way, unobserved as a hang.
+- DD-070 [cited]: **AAB's bright-light hand-off (#136), the owner's build of 2026-10-15 with that
+  day's fixes, is the port's reference: above an entry lux it hands brightness to Android Adaptive
+  Brightness, writes nothing and detects no override, and takes it back below entry × hysteresis.**
+  Per profile it keeps `%AAB_AdaptiveOn` (false), `%AAB_AdaptiveHandoffThresh` (decimal, 25130 lx)
+  and `%AAB_HandoffHysteresis` (0.8, slider 50–100 %) in JSON
+  `adaptive_handoff.{enabled,threshold,hysteresis}`, a missing key loading its default, and the
+  unsaved runtime flag `%AAB_AdaptiveHandoff` is 1 while handed off. `_Hand-offDecider` enters
+  when `AdaptiveOn`, not handed off and `SmoothedLux > threshold`, and exits when handed off and
+  `!AdaptiveOn` or `SmoothedLux < threshold × hysteresis`; it runs after smoothing and before Map
+  Lux, at Set Initial Brightness on the raw reading, on Apply, and after a profile load while the
+  service is on and not overridden, never on a dead-band refusal. Entry sets the flag, turns Auto
+  on, then drops dimming; exit turns Auto off, reads brightness, zeroes the flag and
+  `%AAB_HBMFlag`, then falls through to the write; while handed off the `Allow Override` profile,
+  both transitions' writes and override checks, and Map Lux's PWM/DC-like path are skipped, and
+  the service toggle hands back on disable and forces MANUAL then re-decides on enable. Validity
+  is `base(threshold) ≥ 0.9 × MaxBright` on the unclamped, unscaled base curve, the minimum being
+  `10 × Form3A` when that reaches Zone2End, else a 50-step bisection over [0, max(Zone2End,
+  10000)]; Apply replaces a low value with it for a second tap, and a curve save or profile load
+  raises the global silently. Switching Adaptive Brightness off by hand during a hand-off and a
+  100 % hysteresis are declined as user error (owner).
+- DD-071 [cited]: **Tideo's port of DD-070 departs from AAB in four places (owner-approved,
+  2026-10-15).** It enters at `max(stored, minimum)` instead of blocking Apply or rewriting the
+  profile, so an undone curve edit restores the user's value; Resume and service start keep a
+  still-valid hand-off; the minimum is the lowest whole lux from which the base curve stays ≥ 0.9 ×
+  max up to 100 000 lx, found by a downward scan that is exact on DD-012's non-monotone curves
+  while zone ends are whole lux, as settings store them, and null when none exists; and the HBM
+  readout (DD-072) is outside the core units. Lux is stored whole, an AAB decimal importing
+  rounded up, and the default is 25 132 because Tideo derives Form3A with form2B as 8.8f; a
+  hysteresis outside [0.5, 1.0] or non-finite imports as 0.8. Apply, a context swap, import and
+  Resume are decided when their queued control event runs, on the lux already held and never
+  ahead of an earlier event (DC-069, DC-070), and nothing dims while handed off. `HandoffRules`
+  never enters without an effective threshold and exits when it vanishes mid-hand-off, so a curve
+  whose minimum passes 100 000 lx cannot strand AUTOMATIC. Tideo's own AUTOMATIC is never saved as
+  the user's pre-service mode (D-134), which AAB, keeping no saved mode, never needed.
+- DD-072: **AAB's HBM readout, the reference for the open HBM question, shows real brightness
+  above 255 while handed off.** `_CalibrateDisplayRange` writes 13 `screen_brightness` points in
+  MANUAL mode, reads `dumpsys display` at each (the first of `mScreenBrightness`,
+  `mDisplayBrightness`, `mCurrentScreenBrightness`) through `%AAB_SecondaryPrivilege` (Root, ADB
+  WiFi, Shizuku, else DUMP), and stores `"value:raw,…"` in `%AAB_BrightCal` keyed to
+  `Build.FINGERPRINT`. `_ReadBrightness` reads the same way and maps raw to `%AAB_CurrentBright`,
+  extrapolating past the 255 point and setting `%AAB_HBMFlag`; it runs every 2 s while display and
+  service are on, handed off and not overridden (profile `High Brightness Updates`), and both
+  transitions call it while handed off when a calibration exists and is not `error`. On the
+  owner's OnePlus CPH2653 (SDK 36, read 2026-10-16) AOSP HBM is unconfigured (`mHbmMode=off`,
+  `mHbmData=null`) and the OEM boost runs 4095 → 4674 above `mScreenBrightnessNormalMaximum`, so
+  AAB's HBM rule there is the dumpsys brightness above 4095. The light sensor's declared
+  `maxRange` 65535 is no saturation point: the owner has seen readings over 100 000 lx.

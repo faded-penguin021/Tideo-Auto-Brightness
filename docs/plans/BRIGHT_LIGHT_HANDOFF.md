@@ -2,8 +2,8 @@
 
 ## Status
 
-Spec only. No Tideo code has changed. The owner has built the feature in AAB (handed over
-2026-10-15). That build is now the reference for this port, and this plan was rewritten against it.
+Units 0 and 1 are done (domain `HandoffRules`, DD-070…DD-072); the rest is spec. The owner has
+built the feature in AAB (handed over 2026-10-15). That build is now the reference for this port, and this plan was rewritten against it.
 The export is force-added under `dist/aab-bright-light-handoff/`. It is temporary: unit 6 removes
 it, and unit 1 copies every fact the port depends on into the ledger first. The owner fixed five
 review findings in AAB after the export and declined two; both lists are below, and the export
@@ -160,8 +160,9 @@ switched off by hand during a hand-off. Where it deviates, the reason is given.
 2. **Resume and service start keep a hand-off that is still valid.** They do not force MANUAL and
    then re-enter, as AAB's enable does.
 3. **The minimum is the lowest whole lux from which the base curve stays ≥ 0.9 × max up to
-   100 000 lx** (unclamped, as AAB). AAB's analytic zone-3 shortcut is used when it applies.
-   Otherwise a log-spaced scan then bisection, because DD-012 allows non-monotone curves. If
+   100 000 lx** (unclamped, as AAB). A downward whole-lux scan from 100 000 finds it,
+   exact while the zone ends are whole lux (as `AabSettings` stores them) where AAB's
+   bisection is not, because DD-012 allows non-monotone curves. If
    none exists, the result is null and the feature never enters. AAB stores a decimal; Tideo
    stores whole lux and imports AAB's value rounded up.
 4. **HBM readout is out of the core units** (Open question 1).
@@ -278,7 +279,7 @@ In `runCycle`, after smoothing and before the write, as AAB orders it:
 
 - The DD row from unit 1 carries this plan's AAB reference section: names, decision, order,
   validation and defaults. That keeps the port auditable once `dist/` is gone.
-- Ported logic gets `// Tasker: "_Hand-offDecider" (AAB hand-off export, DD-067)`-style markers,
+- Ported logic gets `// Tasker: "_Hand-offDecider" (AAB hand-off export, DD-070)`-style markers,
   as AGENTS.md asks for ported logic. The `comment-budget.sh` manifest is a floor, so new markers
   need no manifest edit.
 - These tasks are not in the V3.3 XML, so the markers name the task and carry no `L` coordinate.
@@ -331,7 +332,7 @@ commit → `scripts/ladder.sh --guards-only` → push.
    - null while active → EXIT;
    - strict edges, including 100 % (exit equals entry).
 
-   Append ledger row **DD-067** (or the next free DD row) `[cited]`: the feature, the AAB reference
+   Append ledger rows **DD-070…DD-072** (DD-067…DD-069 were taken): the feature, the AAB reference
    section above with the owner's fixes and declines, the parity points and deviations 1–4.
 2. **Settings.** Fields, contract, validate, display, the key=value and `adaptive_handoff` JSON
    import, and the hysteresis import mapping. Extend `AabSettingsClampTest`,
@@ -378,7 +379,7 @@ commit → `scripts/ladder.sh --guards-only` → push.
    - Update `datastore_map.md` and `aab_settings_schema.md`.
    - Add a STATE changelog line, plus an Owner-queue item "run §18 on 1.15.0-debug".
    - **`git rm -r dist/aab-bright-light-handoff`**, then remove its STATE pointer.
-   - Delete this file. By then its content lives in DD-067 and the changelog lines.
+   - Delete this file. By then its content lives in DD-070…DD-072 and the changelog lines.
 7. **HBM readout (optional, only if Open question 1 says so).**
    - Prefer a direct HBM fact from `dumpsys display` (`mHbmMode`, the brightness float against the
      normal maximum) over AAB's 13-point calibration. That needs no screen stepping and no

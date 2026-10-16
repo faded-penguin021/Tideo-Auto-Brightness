@@ -23,10 +23,7 @@ object OverrideRules {
     }
 
     // Decide if override (pause) condition still valid after re-check delay (task567 act8).
-    // DC-006: [isManualMode] is a deliberate deviation — task567/prof755 never consult the mode.
-    // A non-MANUAL mode means Tideo no longer owns the mode it writes against, so the event is
-    // ambiguous rather than user input. Defaults to true: the pre-settle gate is state-only, and a
-    // failed mode read must fail toward pausing.
+    // DC-006: [isManualMode] deviates from task567/prof755; it defaults to true so a failed read pauses.
     fun shouldCommitPause(
         isServiceOn: Boolean,
         isAutoRunning: Boolean,
