@@ -17,7 +17,7 @@ Harness AMH 15.1.0, scripts and hand-applied seed prose together (DD-066); the l
 (`scripts/session-facts.sh`, DC-030), settled by hand with
 `git ls-remote --tags --refs origin 'refs/tags/v*'`.
 
-The tree declares 1.14.1 / vc29 (the train paragraph under the Owner queue); 1.14.0's device
+The tree declares 1.15.0 / vc30 (the train paragraph under the Owner queue); 1.14.0's device
 round passed on 1.14.0-debug vc28 (DD-036), and step 38a's #145 check passed on 1.14.1-debug vc29
 with a brief warmer tint before the expected one (DD-065). The 0–4095 conversion
 path stays frozen as built (DC-011…DC-013, DC-025…DC-028, DB-083), the light-stall findings H1/H2
@@ -31,7 +31,15 @@ stays closed (DB-051…DB-060), and Scorecard.dev is a run-once local input.
   fixes after it, with four deviations and Open question 1 (HBM readout). It goes in the train after 1.14.0 (owner,
   2026-10-07), each unit on the owner's go-ahead. The owner's AAB build of it is force-added under `dist/aab-bright-light-handoff/` as
   the port's reference; `git rm -r` it before this train's PR merges (`clean-dist.yml` is only
-  the backstop).
+  the backstop). Units, in the plan's order:
+  - [x] 0 open the train (1.15.0 / vc30, adb facts)
+  - [ ] 1 domain `HandoffRules` + DD row
+  - [ ] 2 settings
+  - [ ] 3 platform (glue review)
+  - [ ] 4 runtime (glue review)
+  - [ ] 5 UI (glue review)
+  - [ ] 6 close-out
+  - [ ] 7 HBM readout, only if Open question 1 says so
 - **Low-lux settling jitter** — `docs/plans/LOW_LUX_SETTLING_JITTER.md`, spec only; its
   **Proposed fix** is approved as written and goes in the train after 1.14.0 (owner, 2026-10-08),
   each step on the owner's go-ahead.
@@ -92,11 +100,10 @@ stays closed (DB-051…DB-060), and Scorecard.dev is a run-once local input.
    `grep -rc 'ubuntu-24.04' .github/workflows/` prints 0 for every file, or a STATE changelog line
    records (b).
 
-**The tree declares `1.14.1` / vc29, and v1.14.1 is tagged** (seen 2026-10-15 with
-`git ls-remote --tags --refs origin 'refs/tags/v*'`), so the next user-facing change owes this
-train's ONE bump: **1.15.0 / vc30** with `changelogs/30.txt` (500-character cap). It is made by
-whichever planned unit lands first: the hand-off plan's unit 0 or the low-lux jitter fix. Never
-bump twice in one train.
+**The tree declares `1.15.0` / vc30, this train's ONE bump**, made by the hand-off plan's unit 0
+after v1.14.1 was seen tagged on 2026-10-16 (`git ls-remote --tags --refs origin 'refs/tags/v*'`).
+The hand-off units and the low-lux jitter fix each add a sentence to `changelogs/30.txt`
+(500-character cap) instead. Never bump twice in one train.
 
 ## Decided non-items
 
@@ -108,6 +115,9 @@ proposing work; changing it is legislation under RUNBOOK's rule-review protocol.
 
 Newest first; ledger rows are the durable detail.
 
+- 2026-10-16 — **Hand-off unit 0: the train opens as 1.15.0 / vc30 with `changelogs/30.txt`. The
+  owner's phone's light sensor reads to 65 535 lx, and AOSP HBM is unconfigured there (OEM boost
+  4095 → 4674), so `mHbmMode` is no HBM fact. Details in the plan's Open question 1.**
 - 2026-10-16 — **The `DraftSettingsViewModelTest` CI-hang fix went out as PR #147 off `main`;
   Owner queue item 2 now asks for that merge.**
 - 2026-10-16 — **Every workflow pinned to `ubuntu-24.04` ahead of GitHub moving `ubuntu-latest`

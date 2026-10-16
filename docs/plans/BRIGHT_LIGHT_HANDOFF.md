@@ -401,6 +401,26 @@ commit → `scripts/ladder.sh --guards-only` → push.
    **Recommendation:** (a) for this train, then (b) if unit 0's adb facts show an HBM field on
    the owner's phone. (c) costs a 13-step screen sweep and re-calibration after every OS update.
 
+   **Unit 0's adb facts (2026-10-16, read-only, indoors, owner switched the mode):**
+   - OnePlus CPH2653, SDK 36, `CPH2653_16.0.10.600(EX01)`.
+   - The light sensor is `OPLUS Fusion Light Sensor Next Gen`, `maxRange=65535.0`, so it does not
+     saturate below 25 132 lx on paper. Its true clipping point in sunlight is unmeasured.
+   - Display configuration: `mScreenBrightnessNormalMaximum=4095.0` and
+     `mScreenBrightnessRangeMaximum=4674.0`. The OEM range runs 4095 → 4674 above the normal
+     maximum.
+   - MANUAL (`screen_brightness_mode` 0, `screen_brightness` 755):
+     `mScreenBrightness`, `mCurrentScreenBrightness` and `mCachedBrightnessInfo.brightness` all
+     read 755.0. There is no `mDisplayBrightness` line.
+   - AUTOMATIC (mode 1, `screen_brightness` 1390): those three read 1390.0. The OEM's
+     `OplusAutomaticBrightnessController` reports `mAutoStrategyEnable=true` and
+     `mScreenAutoBrightness=1390.0846`.
+   - In both modes, AOSP's `HighBrightnessModeController` reads `mHbmMode=off` with
+     `mHbmData=null`, `mIsAutoBrightnessEnabled=false`, and
+     `mCachedBrightnessInfo.hbmTransitionPoint=Infinity`. AOSP HBM is unconfigured on this
+     phone, so the OEM drives the boost and **`mHbmMode` is no HBM fact here**. For (b), the
+     candidate is `mScreenBrightness` above `mScreenBrightnessNormalMaximum`. It is unobserved,
+     since no reading was taken in bright light.
+
 ## Execution rules
 
 - **Phone over adb: read-only.** Allowed: `settings get`, `dumpsys`, `getprop`, `logcat -d`,
