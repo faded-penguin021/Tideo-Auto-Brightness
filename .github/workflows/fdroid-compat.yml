@@ -59,7 +59,7 @@ jobs:
   # something to inspect. No repository secret is used or needed.
   release-build:
     name: Stage 2 — normal release build
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - name: Checkout (clean)
@@ -154,7 +154,7 @@ jobs:
   # tooling evolves, this stage follows it for free.
   fdroid-build:
     name: Stage 3 — F-Droid compatibility build
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 45
     env:
       FDROID_IMAGE: registry.gitlab.com/fdroid/fdroidserver:buildserver
@@ -249,7 +249,7 @@ jobs:
   # environment, which is where reproducibility actually breaks.
   reproducibility:
     name: Stage 4 — reproducibility validation
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs: [release-build, fdroid-build]
     timeout-minutes: 20
     steps:
@@ -312,7 +312,7 @@ jobs:
   # tool F-Droid runs against submissions; the other two are ours, covering gaps it has.
   fdroid-checks:
     name: Stage 3 — fdroidserver scanner + metadata
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs: [release-build]
     timeout-minutes: 20
     steps:

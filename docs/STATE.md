@@ -87,6 +87,15 @@ stays closed (DB-051…DB-060), and Scorecard.dev is a run-once local input.
    redact-tool-output scripts/guards/*.sh` prints a nonzero count, or a STATE changelog line records
    (b).
 
+4. **[2026-10-16] Move CI to Ubuntu 26.04 when you choose; nothing breaks if you wait.** Every
+   workflow is pinned to `ubuntu-24.04` (DD-068), so GitHub's switch of `ubuntu-latest` to 26.04
+   (2026-10-19 to 11-19) changes nothing here. Options: (a) move after the rollout settles, in a
+   PR that changes only the runner labels; (b) stay on 24.04 until GitHub announces its
+   retirement. Recommendation (a): accept it only when that PR's `Build` and all four
+   `F-Droid compatibility` stages are green, the reproducibility stage above all. Settles it:
+   `grep -rc 'ubuntu-24.04' .github/workflows/` prints 0 for every file, or a STATE changelog line
+   records (b).
+
 **The tree declares `1.14.1` / vc29, and v1.14.1 is tagged** (seen 2026-10-15 with
 `git ls-remote --tags --refs origin 'refs/tags/v*'`), so the next user-facing change owes this
 train's ONE bump: **1.15.0 / vc30** with `changelogs/30.txt` (500-character cap). It is made by
@@ -103,6 +112,8 @@ proposing work; changing it is legislation under RUNBOOK's rule-review protocol.
 
 Newest first; ledger rows are the durable detail.
 
+- 2026-10-16 — **Every workflow pinned to `ubuntu-24.04` ahead of GitHub moving `ubuntu-latest`
+  to 26.04 (DD-068); the move itself is Owner queue item 4.**
 - 2026-10-16 — **CI speed: `build.yml` runs the guard fixture suites only after a failed ladder,
   since `verify.sh` already runs them (~80 s a run, DD-067).**
 - 2026-10-15 — **Hand-off plan (#136) rewritten against the owner's AAB build (export in

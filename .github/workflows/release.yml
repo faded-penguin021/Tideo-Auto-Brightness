@@ -44,7 +44,7 @@ jobs:
   release:
     permissions:
       contents: write  # needed to create/update the GitHub Release + upload assets
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30  # cap a hung build/sign step (GitHub's default is 360)
     steps:
       - name: Checkout

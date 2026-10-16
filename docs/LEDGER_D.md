@@ -695,3 +695,8 @@
   failed ladder (owner's CI speed request, 2026-10-16).** `verify.sh` already runs both before
   Gradle, so a green run paid ~80 s of a ~7 min job twice (run 38048938933). A red guard still
   gets its fixture verdict, now one step after the ladder instead of one before it.
+- DD-068 [cited]: **All nine workflows run on `ubuntu-24.04` instead of `ubuntu-latest` (owner's
+  question, 2026-10-16).** GitHub moves `latest` to 26.04 gradually from 2026-10-19 to 11-19, so
+  two runs of one commit, a release among them, could land on different images. The JDK and the
+  Gradle inputs do not depend on the image, but the preinstalled SDK, Python, pipx and apt do;
+  the move to 26.04 is a later change of its own, accepted when `fdroid-compat.yml` is green on it.

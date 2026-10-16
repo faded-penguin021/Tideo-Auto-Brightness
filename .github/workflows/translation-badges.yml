@@ -31,7 +31,7 @@ jobs:
     if: github.ref == 'refs/heads/main'
     permissions:
       contents: write  # needed to push the JSON to the badges branch
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10  # quick git op; cap a hang
     steps:
       - name: Checkout
