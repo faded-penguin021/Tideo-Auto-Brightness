@@ -200,6 +200,43 @@ class LegacyImportRoundTripTest {
         assertFalse(s.scalingEnabled, "absent circadian section keeps the default")
     }
 
+    // DD-070: AAB's _ProfileManager writes `adaptive_handoff.{enabled,threshold,hysteresis}`, threshold a decimal.
+    @Test
+    fun `nested JSON adaptive_handoff section imports, its decimal lux rounded up DD071`() {
+        val s = TaskerLegacyProfileSerializer.deserialize(
+            """{ "adaptive_handoff": { "enabled": true, "threshold": 30000.2, "hysteresis": 0.65 } }""",
+        )
+        assertTrue(s.handoffEnabled)
+        assertEquals(30_001, s.handoffLux, "30000.2 rounds up, never down")
+        assertEquals(0.65, s.handoffHysteresis, 1e-9)
+        assertEquals(25_130, TaskerLegacyProfileSerializer.deserialize(
+            """{ "adaptive_handoff": { "threshold": 25130.0 } }""",
+        ).handoffLux, "AAB's default stays 25 130; the runtime raises it to the curve's minimum")
+    }
+
+    @Test
+    fun `a missing adaptive_handoff section or key loads the defaults, not the previous profile's DD070`() {
+        val d = AabSettings()
+        val none = TaskerLegacyProfileSerializer.deserialize("""{ "misc": { "min_bright": 30.0 } }""")
+        assertEquals(listOf<Any>(false, d.handoffLux, d.handoffHysteresis), listOf(none.handoffEnabled, none.handoffLux, none.handoffHysteresis))
+        val partial = TaskerLegacyProfileSerializer.deserialize("""{ "adaptive_handoff": { "enabled": true } }""")
+        assertTrue(partial.handoffEnabled)
+        assertEquals(d.handoffLux, partial.handoffLux)
+        assertEquals(d.handoffHysteresis, partial.handoffHysteresis)
+    }
+
+    @Test
+    fun `an imported hand-off hysteresis outside 0_5 to 1_0 becomes the default and lux clamps DD071`() {
+        val s = TaskerLegacyProfileSerializer.deserialize(
+            """{ "adaptive_handoff": { "threshold": 250000.0, "hysteresis": 0.3 } }""",
+        )
+        assertEquals(0.8, s.handoffHysteresis)
+        assertEquals(100_000, s.handoffLux)
+        assertEquals(1, TaskerLegacyProfileSerializer.deserialize(
+            """{ "adaptive_handoff": { "threshold": -5.5, "hysteresis": 1.0 } }""",
+        ).handoffLux)
+    }
+
     // G2R-F70: Tasker stores curve params as continuous doubles, so a legacy export may carry a
     // decimal for fields the rebuild keeps as Int (Form2C/MinBright/Throttle round); but Form1A is a
     // continuous Double (G2R-F70) and must keep its decimal — the old `toIntOrNull()` returned null on

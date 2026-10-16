@@ -74,6 +74,9 @@ data class AabSettings(
     // Android-14+ HDR-format disabling (experimental). On older devices the field is inert: the coordinator
     // checks the controller's availability gate and never writes it.
     val hdrForceSdrEnabled: Boolean = false,
+    val handoffEnabled: Boolean = false,
+    val handoffLux: Int = 25_132,
+    val handoffHysteresis: Double = 0.8,
 )
 
 /** [AabSettings.daltonizerMode] value for "color correction off". */
@@ -162,5 +165,8 @@ object AabSettingsContract {
         AabSettingRule("%AAB_AlwaysOnDisplay", "alwaysOnDisplayEnabled", AabValueType.Boolean, "false", "must be true|false"),
         AabSettingRule("%AAB_StayAwakeCharging", "stayAwakeChargingEnabled", AabValueType.Boolean, "false", "must be true|false"),
         AabSettingRule("%AAB_HdrForceSdr", "hdrForceSdrEnabled", AabValueType.Boolean, "false", "must be true|false (inert below Android 14)"),
+        AabSettingRule("%AAB_AdaptiveOn", "handoffEnabled", AabValueType.Boolean, "false", "must be true|false"),
+        AabSettingRule("%AAB_AdaptiveHandoffThresh", "handoffLux", AabValueType.Int, "25132", "range 1..100000; entered at max(this, the curve's minimum)"),
+        AabSettingRule("%AAB_HandoffHysteresis", "handoffHysteresis", AabValueType.Double, "0.8", "range 0.5..1.0, else the default"),
     )
 }

@@ -124,8 +124,20 @@ class AabSettingsMigrationTest {
         "panicSensitivity":8,"contextOverride":false,"panicRequiresPlugged":false,
         "setupTitle":"Advanced Auto Brightness Setup","nightLightEnabled":false,"nightLightTemperature":null,
         "nightLightCircadianEnabled":false,"extendedNightLightEnabled":false,"daltonizerMode":"OFF","inversionEnabled":false,
-        "alwaysOnDisplayEnabled":false,"stayAwakeChargingEnabled":false,"hdrForceSdrEnabled":false}
+        "alwaysOnDisplayEnabled":false,"stayAwakeChargingEnabled":false,"hdrForceSdrEnabled":false,
+        "handoffEnabled":false,"handoffLux":25132,"handoffHysteresis":0.8}
     """.trimIndent()
+
+    @Test
+    fun `a file written before the hand-off reads it off at the defaults, and set values round-trip`() = runTest {
+        val old = readV3("""{ "hdrForceSdrEnabled": true }""")
+        assertEquals(listOf<Any>(false, 25_132, 0.8), listOf(old.handoffEnabled, old.handoffLux, old.handoffHysteresis))
+        val out = java.io.ByteArrayOutputStream()
+        AabSettingsSerializer.writeTo(AabSettings(handoffEnabled = true, handoffLux = 30_000, handoffHysteresis = 0.65), out)
+        val back = AabSettingsSerializer.readFrom(out.toByteArray().inputStream())
+        assertEquals(listOf<Any>(true, 30_000, 0.65), listOf(back.handoffEnabled, back.handoffLux, back.handoffHysteresis))
+        assertEquals(3, back.schemaVersion, "DD-071: additive fields, no schema bump")
+    }
 
     @Test
     fun `a file written before the extended Night Light flag reads it off, and a set flag round-trips`() = runTest {

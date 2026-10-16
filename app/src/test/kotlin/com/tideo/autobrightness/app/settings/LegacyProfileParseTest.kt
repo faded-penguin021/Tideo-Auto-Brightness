@@ -48,4 +48,23 @@ class LegacyProfileParseTest {
         assertEquals(false, TaskerLegacyProfileSerializer.deserialize("%AAB_ExtendedNightLight = false").extendedNightLightEnabled)
         assertEquals(false, TaskerLegacyProfileSerializer.deserialize("%AAB_MinBright = 42").extendedNightLightEnabled)
     }
+
+    @Test
+    fun `AAB's hand-off globals parse from key=value DD070`() {
+        val s = TaskerLegacyProfileSerializer.deserialize(
+            "%AAB_AdaptiveOn = true\n%AAB_AdaptiveHandoffThresh = 25130.4\n%AAB_HandoffHysteresis = 0.9",
+        )
+        assertEquals(true, s.handoffEnabled)
+        assertEquals(25_131, s.handoffLux, "DD-071: a decimal rounds up")
+        assertEquals(0.9, s.handoffHysteresis)
+    }
+
+    @Test
+    fun `malformed hand-off globals fall back to the defaults DD071`() {
+        val s = TaskerLegacyProfileSerializer.deserialize(
+            "%AAB_AdaptiveOn = maybe\n%AAB_AdaptiveHandoffThresh = Infinity\n%AAB_HandoffHysteresis = NaN",
+        )
+        assertEquals(AabSettings(), s)
+        assertEquals(0.8, TaskerLegacyProfileSerializer.deserialize("%AAB_HandoffHysteresis = 1.5").handoffHysteresis)
+    }
 }

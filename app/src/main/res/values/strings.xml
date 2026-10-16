@@ -725,6 +725,9 @@
     <string name="settings_night_light_extended">Night Light extended range</string>
     <string name="settings_pwm_exponent">PWM curve</string>
     <string name="settings_night_light_temperature">Night Light temperature</string>
+    <string name="settings_handoff_enabled">Hand off to Adaptive Brightness</string>
+    <string name="settings_handoff_lux">Hand-off lux</string>
+    <string name="settings_handoff_hysteresis">Hand-off hysteresis</string>
     <string name="settings_form1a">Zone 1 scaling</string>
     <string name="settings_form2b">Zone 2 scaling</string>
     <string name="settings_form2c">Zone 2 offset</string>

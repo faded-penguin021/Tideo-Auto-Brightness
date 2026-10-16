@@ -83,6 +83,12 @@ object TaskerLegacyProfileSerializer {
             d.intRound("spread")?.let { s = s.copy(dimSpread = it) }
             d.flt("pwm_exp")?.let { s = s.copy(pwmExponent = it) }
         }
+        // Tasker: "_ProfileManager" (AAB hand-off export, DD-070).
+        (root["adaptive_handoff"] as? JsonObject)?.let { h ->
+            h.bool("enabled")?.let { s = s.copy(handoffEnabled = it) }
+            h.dbl("threshold")?.let { s = s.copy(handoffLux = ceilLux(it)) }
+            h.dbl("hysteresis")?.let { s = s.copy(handoffHysteresis = it) }
+        }
         return s.validate()
     }
 
@@ -157,6 +163,10 @@ object TaskerLegacyProfileSerializer {
         map["%AAB_AlwaysOnDisplay"]?.let { settings = settings.copy(alwaysOnDisplayEnabled = it.asBoolean(settings.alwaysOnDisplayEnabled)) }
         map["%AAB_StayAwakeCharging"]?.let { settings = settings.copy(stayAwakeChargingEnabled = it.asBoolean(settings.stayAwakeChargingEnabled)) }
         map["%AAB_HdrForceSdr"]?.let { settings = settings.copy(hdrForceSdrEnabled = it.asBoolean(settings.hdrForceSdrEnabled)) }
+        map["%AAB_AdaptiveOn"]?.let { settings = settings.copy(handoffEnabled = it.asBoolean(settings.handoffEnabled)) }
+        map["%AAB_AdaptiveHandoffThresh"]?.trim()?.toDoubleOrNull()?.takeIf { it.isFinite() }
+            ?.let { settings = settings.copy(handoffLux = ceilLux(it)) }
+        map["%AAB_HandoffHysteresis"]?.trim()?.toDoubleOrNull()?.let { settings = settings.copy(handoffHysteresis = it) }
 
         return settings.validate()
     }
@@ -173,6 +183,8 @@ object TaskerLegacyProfileSerializer {
     private fun String.asRoundedInt(): Int? = trim().toDoubleOrNull()?.takeIf { it.isFinite() }
         ?.let { Math.round(it).takeIf { rounded -> rounded in Int.MIN_VALUE..Int.MAX_VALUE }?.toInt() }
     private fun String.asRoundedLong(): Long? = trim().toDoubleOrNull()?.takeIf { it.isFinite() }?.let { Math.round(it) }
+
+    private fun ceilLux(lux: Double): Int = kotlin.math.ceil(lux).toInt()
 
     // Nested-JSON value readers (tolerant of variants: doubles, booleans, "On"/"Off"/"1").
 

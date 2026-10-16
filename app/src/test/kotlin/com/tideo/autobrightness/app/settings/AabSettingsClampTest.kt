@@ -82,6 +82,25 @@ class AabSettingsClampTest {
     }
 
     @Test
+    fun `hand-off lux clamps to 1 through 100 000 DD071`() {
+        assertEquals(1, AabSettings(handoffLux = 0).validate().handoffLux)
+        assertEquals(1, AabSettings(handoffLux = Int.MIN_VALUE).validate().handoffLux)
+        assertEquals(100_000, AabSettings(handoffLux = 100_001).validate().handoffLux)
+        assertEquals(25_132, AabSettings().validate().handoffLux)
+    }
+
+    @Test
+    fun `a hand-off hysteresis outside 0_5 to 1_0 or non-finite is the default, never clamped DD071`() {
+        listOf(0.49, 1.01, 0.0, -0.8, Double.NaN, Double.POSITIVE_INFINITY, Double.NEGATIVE_INFINITY).forEach {
+            assertEquals(0.8, AabSettings(handoffHysteresis = it).validate().handoffHysteresis, "hysteresis $it")
+        }
+        // Both edges are valid: 1.0 is AAB's declined-as-user-error 100 % (exit equals entry).
+        listOf(0.5, 0.65, 1.0).forEach {
+            assertEquals(it, AabSettings(handoffHysteresis = it).validate().handoffHysteresis)
+        }
+    }
+
+    @Test
     fun `unknown daltonizer mode resets to OFF instead of poisoning the profile D151`() {
         // The D-146 spirit for the string field: a newer-schema / hand-edited import cannot persist
         // a value the coordinator and the mode picker cannot represent.

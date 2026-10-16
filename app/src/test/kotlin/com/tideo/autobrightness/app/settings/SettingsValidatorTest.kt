@@ -1,5 +1,6 @@
 package com.tideo.autobrightness.app.settings
 
+import com.tideo.autobrightness.domain.brightness.HandoffRules
 import kotlin.math.sqrt
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -207,5 +208,16 @@ class SettingsValidatorTest {
             assertTrue(SettingsValidator.validate(AabSettings(nightLightTemperature = inside)).none { it.field == "nightLightTemperature" })
         }
         assertTrue(SettingsValidator.validate(AabSettings()).none { it.field == "nightLightTemperature" })
+    }
+
+    @Test
+    fun `a hand-off lux below the curve's minimum raises no error, since the runtime raises it DD071`() {
+        val unreachable = AabSettings(form1A = 1.2, zone1End = 25_000, form2B = 1f, form2C = 18, zone2End = 150_000)
+        assertEquals(null, HandoffRules.minimumHandoffLux(unreachable.toBrightnessCurveConfig()), "fixture never reaches 90 % of max")
+        for (s in listOf(AabSettings(handoffEnabled = true, handoffLux = 1), unreachable.copy(handoffEnabled = true))) {
+            val errors = SettingsValidator.validate(s)
+            assertTrue(errors.none { it.field.startsWith("handoff") }, "no hand-off error; got $errors")
+            assertEquals(SettingsValidator.validate(s.copy(handoffEnabled = false)), errors)
+        }
     }
 }

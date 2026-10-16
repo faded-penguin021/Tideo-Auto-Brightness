@@ -1177,4 +1177,14 @@ class ContextEngineTest {
         assertEquals(true, merged.stayAwakeChargingEnabled, "stayAwakeChargingEnabled comes from the profile")
         assertEquals(true, merged.hdrForceSdrEnabled, "hdrForceSdrEnabled comes from the profile")
     }
+
+    @Test
+    fun mergeProfile_swapsHandoffFields_DD070() {
+        // DD-070: the hand-off is per profile in AAB, so a swap takes it, off included, from the profile.
+        val on = AabSettings(handoffEnabled = true, handoffLux = 40_000, handoffHysteresis = 0.6)
+        val swapped = mergeProfile(on, AabSettings())
+        assertEquals(listOf<Any>(false, 25_132, 0.8), listOf(swapped.handoffEnabled, swapped.handoffLux, swapped.handoffHysteresis))
+        val back = mergeProfile(AabSettings(), on)
+        assertEquals(listOf<Any>(true, 40_000, 0.6), listOf(back.handoffEnabled, back.handoffLux, back.handoffHysteresis))
+    }
 }

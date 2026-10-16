@@ -4,6 +4,7 @@ import com.tideo.autobrightness.domain.brightness.AnimationConfig
 import com.tideo.autobrightness.domain.brightness.BrightnessFormulae
 import com.tideo.autobrightness.domain.brightness.BrightnessCurveConfig
 import com.tideo.autobrightness.domain.brightness.DynamicScalingConfig
+import com.tideo.autobrightness.domain.brightness.HandoffRules
 import com.tideo.autobrightness.domain.brightness.ThresholdConfig
 import com.tideo.autobrightness.platform.display.SecureDisplayController
 
@@ -113,5 +114,8 @@ fun AabSettings.validate(): AabSettings {
         // D-151: display-toggle fields; unknown daltonizer resets to OFF (D-146 spirit).
         nightLightTemperature = nightLightTemperature?.coerceIn(SecureDisplayController.NIGHT_LIGHT_RAIL_K),
         daltonizerMode = if (daltonizerMode in DALTONIZER_MODES) daltonizerMode else DALTONIZER_OFF,
+        handoffLux = handoffLux.coerceIn(1, HandoffRules.MAX_LUX),
+        // DD-071: the default, never clamped.
+        handoffHysteresis = handoffHysteresis.takeIf { it in 0.5..1.0 } ?: d.handoffHysteresis,
     )
 }

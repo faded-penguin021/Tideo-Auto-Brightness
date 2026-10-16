@@ -87,6 +87,9 @@ private val SETTING_LABELS: Map<String, Int> = mapOf(
     "alwaysOnDisplayEnabled" to R.string.pd_always_on,
     "stayAwakeChargingEnabled" to R.string.pd_stay_awake,
     "hdrForceSdrEnabled" to R.string.pd_hdr_force_sdr,
+    "handoffEnabled" to R.string.settings_handoff_enabled,
+    "handoffLux" to R.string.settings_handoff_lux,
+    "handoffHysteresis" to R.string.settings_handoff_hysteresis,
 )
 
 /** Formatted value for contract key. Explicit `when` (no reflection, keep aligned). */
@@ -143,6 +146,9 @@ internal fun AabSettings.valueFor(key: String): String = when (key) {
     "alwaysOnDisplayEnabled" -> alwaysOnDisplayEnabled.toString()
     "stayAwakeChargingEnabled" -> stayAwakeChargingEnabled.toString()
     "hdrForceSdrEnabled" -> hdrForceSdrEnabled.toString()
+    "handoffEnabled" -> handoffEnabled.toString()
+    "handoffLux" -> handoffLux.toString()
+    "handoffHysteresis" -> handoffHysteresis.toString()
     // Fail fast on schema drift (S12.9c #2). SettingsDisplayContractDriftTest guards.
     else -> throw IllegalArgumentException("Unknown AabSettings key: '$key' (not in valueFor's when)")
 }

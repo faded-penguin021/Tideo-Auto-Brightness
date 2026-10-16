@@ -26,8 +26,8 @@ data class FieldError(
 /**
  * Tasker-faithful validation of brightness-curve parameters.
  *
- * Implements exactly 5 rules from two Tasker tasks:
- *   - task583 `_RedInvalidFormulae` (3 advisory): form2A<0, form3A<0, form2C>zone1End
+ * Ports the rules of two Tasker tasks, then adds the rebuild's range and cross-field advisories:
+ *   - task583 `_RedInvalidFormulae`: form2A<0 and form2C>zone1End (CRITICAL), form3A<0 (ADVISORY)
  *   - task707 `_ValidateBrightnessParams` (2 safety): predicted brightness@1000lux<25, MaxBright default 255
  *
  * Tasker: task583 L23084–L23190; task707 L38095–L38256.

@@ -61,6 +61,16 @@ class CurveParamFreedomTest {
     }
 
     @Test
+    fun `a hand-off lux below any curve's minimum neither blocks Apply nor is rewritten DD071`() {
+        for ((name, curve) in weirdCurves) {
+            val s = curve.copy(handoffEnabled = true, handoffLux = 1, handoffHysteresis = 0.5)
+            val critical = SettingsValidator.validate(s).filter { it.severity == Severity.CRITICAL }
+            assertTrue(critical.isEmpty(), "$name: the hand-off adds no CRITICAL error, got $critical")
+            assertEquals(s, s.validate(), "$name: the runtime raises the threshold; the profile keeps the user's value")
+        }
+    }
+
+    @Test
     fun `every weird curve survives a DataStore write and cold read`() = runTest {
         for ((name, s) in weirdCurves) {
             val out = ByteArrayOutputStream()

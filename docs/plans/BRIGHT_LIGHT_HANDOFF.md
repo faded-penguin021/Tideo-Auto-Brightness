@@ -2,7 +2,8 @@
 
 ## Status
 
-Units 0 and 1 are done (domain `HandoffRules`, DD-070…DD-072); the rest is spec. The owner has
+Units 0–2 are done (domain `HandoffRules`, DD-070…DD-072; the per-profile settings); the rest is
+spec. The owner has
 built the feature in AAB (handed over 2026-10-15). That build is now the reference for this port, and this plan was rewritten against it.
 The export is force-added under `dist/aab-bright-light-handoff/`. It is temporary: unit 6 removes
 it, and unit 1 copies every fact the port depends on into the ledger first. The owner fixed five

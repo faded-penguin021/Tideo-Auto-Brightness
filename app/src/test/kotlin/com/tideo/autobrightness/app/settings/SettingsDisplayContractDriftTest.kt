@@ -33,4 +33,17 @@ class SettingsDisplayContractDriftTest {
         }
         assertEquals(AabSettingsContract.rules.size, resolved)
     }
+
+    @Test
+    fun `the hand-off rows carry AAB's names, their real defaults, and show as changed when set DD070`() {
+        val rows = AabSettingsContract.rules.filter { it.key.startsWith("handoff") }
+        assertEquals(
+            mapOf("%AAB_AdaptiveOn" to "handoffEnabled", "%AAB_AdaptiveHandoffThresh" to "handoffLux", "%AAB_HandoffHysteresis" to "handoffHysteresis"),
+            rows.associate { it.taskerVariable to it.key },
+        )
+        rows.forEach { assertEquals(it.defaultValue, settings.valueFor(it.key), it.key) }
+        val changed = AabSettings(handoffEnabled = true, handoffLux = 30_000, handoffHysteresis = 0.7)
+            .displayRows().filter { it.changed }.map { it.taskerVariable }
+        assertEquals(rows.map { it.taskerVariable }, changed)
+    }
 }
