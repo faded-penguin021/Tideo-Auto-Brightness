@@ -63,16 +63,12 @@ stays closed (DB-051…DB-060), and Scorecard.dev is a run-once local input.
    'name="settings_night_light_extended"' -e 'name="pd_night_light_extended'
    app/src/main/res/values-b+zh+Hans/strings.xml` prints 11.
 
-2. **[2026-10-10] Fix the intermittent CI hang in `DraftSettingsViewModelTest`; until then, rerun
-   on a hang.** The `Build` run on `main` for #144 (run 38039291255, attempt 1) sat in the ladder
-   step until cancelled; its thread dump shows Robolectric's main thread parked in
-   `setBaseline`'s `runBlocking { settingsDataStore.updateData { … } }`
-   (`DraftSettingsViewModelTest.kt:42`, from `edit_marksDirty_thenDiscardReverts`) with every
-   coroutine worker idle. The same tree passed on the PR, and attempt 2 got past it. The test is
-   old and flaked before (D-071, D-080). `release.yml` and `release-signing.yml` run the same
-   tests, so a hang there costs their 30-minute cap and a rerun, never a bad release; F-Droid
-   builds `assembleRelease` only and never runs tests. Needs a follow-up fix PR off `main`, on
-   your go-ahead. Worked when that PR is merged and a `Build` run on `main` is green; settles it:
+2. **[2026-10-10] Merge PR #147 off `main`, which fixes the intermittent CI hang in
+   `DraftSettingsViewModelTest`; until then, rerun on a hang.** An earlier test's `apply()` write
+   was left waiting on the main looper, Robolectric's looper reset dropped it, and the settings
+   DataStore stayed stuck for the rest of the test JVM. The fix is test-only and passed the full
+   ladder locally (DD-069 on that branch). Worked when #147 is merged and the next `Build` run on
+   `main` is green; settles it:
    `git log --oneline origin/main -- app/src/test/kotlin/com/tideo/autobrightness/app/state/DraftSettingsViewModelTest.kt`
    shows a commit after 2026-10-10.
 
@@ -112,6 +108,8 @@ proposing work; changing it is legislation under RUNBOOK's rule-review protocol.
 
 Newest first; ledger rows are the durable detail.
 
+- 2026-10-16 — **The `DraftSettingsViewModelTest` CI-hang fix went out as PR #147 off `main`;
+  Owner queue item 2 now asks for that merge.**
 - 2026-10-16 — **Every workflow pinned to `ubuntu-24.04` ahead of GitHub moving `ubuntu-latest`
   to 26.04 (DD-068); the move itself is Owner queue item 4.**
 - 2026-10-16 — **CI speed: `build.yml` runs the guard fixture suites only after a failed ladder,
