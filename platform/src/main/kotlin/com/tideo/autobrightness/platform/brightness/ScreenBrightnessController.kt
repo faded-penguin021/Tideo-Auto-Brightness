@@ -24,6 +24,9 @@ interface ScreenBrightnessController {
     fun read(): Int
     fun write(level: Int): BrightnessWriteResult
     fun forceManualMode(): Boolean
+    fun handOffToSystem(): Boolean
+    fun reclaimFromSystem(): Boolean
+    fun reconcileHandoff(): Boolean
     fun restoreMode()
     fun isManualMode(): Boolean
     /** True if raw device value equals last write (task567 self-write vs override). */
@@ -37,6 +40,7 @@ class AndroidScreenBrightnessController(
     // Test seam (DC-002): Robolectric stores what it is given; normalization/refusal/read-back failure need one.
     private val rawWrite: ((Int) -> Boolean)? = null,
     private val rawRead: (() -> Int?)? = null,
+    private val rawModeWrite: ((Int) -> Boolean)? = null,
 ) : ScreenBrightnessController {
     private val resolver: ContentResolver get() = context.contentResolver
 
@@ -50,12 +54,22 @@ class AndroidScreenBrightnessController(
         }
     }
 
-    // D-134: persisted pre-service SCREEN_BRIGHTNESS_MODE survives process death.
-    // commit() for durability (not apply()).
+    // D-134, DD-073: saved mode and hand-off marker survive process death; commit(), never apply().
     private val prefs by lazy { context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE) }
 
     private fun savedMode(): Int? =
         prefs.getInt(KEY_SAVED_MODE, -1).takeIf { it >= 0 }
+
+    private fun handedOff(): Boolean = prefs.getBoolean(KEY_HANDED_OFF, false)
+
+    private fun clearHandedOff() = prefs.edit().remove(KEY_HANDED_OFF).commit()
+
+    private fun currentMode(): Int = Settings.System.getInt(
+        resolver, Settings.System.SCREEN_BRIGHTNESS_MODE, Settings.System.SCREEN_BRIGHTNESS_MODE_MANUAL,
+    )
+
+    private fun writeMode(mode: Int): Boolean =
+        rawModeWrite?.invoke(mode) ?: Settings.System.putInt(resolver, Settings.System.SCREEN_BRIGHTNESS_MODE, mode)
 
     @Volatile
     private var lastSelfWriteDevice: Int? = null
@@ -139,19 +153,55 @@ class AndroidScreenBrightnessController(
 
     override fun forceManualMode(): Boolean =
         runCatching {
-            val current = Settings.System.getInt(
-                resolver, Settings.System.SCREEN_BRIGHTNESS_MODE,
-                Settings.System.SCREEN_BRIGHTNESS_MODE_MANUAL,
-            )
-            // MANUAL is ambiguous (may be our residue); any non-MANUAL current mode is unambiguously user's.
-            if (current != Settings.System.SCREEN_BRIGHTNESS_MODE_MANUAL || savedMode() == null) {
+            val current = currentMode()
+            // MANUAL may be our residue; any non-MANUAL mode is the user's unless handed off (DD-073).
+            if (!handedOff() && (current != Settings.System.SCREEN_BRIGHTNESS_MODE_MANUAL || savedMode() == null)) {
                 prefs.edit().putInt(KEY_SAVED_MODE, current).commit()
             }
-            Settings.System.putInt(
-                resolver, Settings.System.SCREEN_BRIGHTNESS_MODE,
-                Settings.System.SCREEN_BRIGHTNESS_MODE_MANUAL,
-            )
+            writeMode(Settings.System.SCREEN_BRIGHTNESS_MODE_MANUAL).also { landed ->
+                if (landed && handedOff()) clearHandedOff()
+            }
         }.getOrElse { if (it is SecurityException) false else throw it }
+
+    override fun handOffToSystem(): Boolean {
+        val alreadyHandedOff = handedOff()
+        if (!alreadyHandedOff) {
+            val current = currentMode()
+            val saved = savedMode()
+            val original = if (current != Settings.System.SCREEN_BRIGHTNESS_MODE_MANUAL || saved == null) current else saved
+            // DD-073: one commit before AUTOMATIC exists; a failed commit() has still changed memory.
+            val persisted = prefs.edit()
+                .putInt(KEY_SAVED_MODE, original)
+                .putBoolean(KEY_HANDED_OFF, true)
+                .commit()
+            if (!persisted) { clearHandedOff(); return false }
+        }
+        var landed = false
+        try {
+            landed = runCatching { writeMode(Settings.System.SCREEN_BRIGHTNESS_MODE_AUTOMATIC) }
+                .getOrElse { if (it is SecurityException) false else throw it }
+        } finally {
+            if (!landed && !alreadyHandedOff) clearHandedOff()
+        }
+        return landed
+    }
+
+    override fun reclaimFromSystem(): Boolean {
+        val landed = runCatching { writeMode(Settings.System.SCREEN_BRIGHTNESS_MODE_MANUAL) }
+            .getOrElse { if (it is SecurityException) false else throw it }
+        if (landed) clearHandedOff()
+        return landed
+    }
+
+    override fun reconcileHandoff(): Boolean {
+        if (!handedOff()) return false
+        val mode = runCatching {
+            Settings.System.getInt(resolver, Settings.System.SCREEN_BRIGHTNESS_MODE)
+        }.getOrNull() ?: return false
+        if (mode == Settings.System.SCREEN_BRIGHTNESS_MODE_AUTOMATIC) return true
+        clearHandedOff()
+        return false
+    }
 
     override fun isManualMode(): Boolean = runCatching {
         Settings.System.getInt(
@@ -161,12 +211,11 @@ class AndroidScreenBrightnessController(
     }.getOrDefault(true)
 
     override fun restoreMode() {
-        savedMode()?.let {
-            runCatching {
-                Settings.System.putInt(resolver, Settings.System.SCREEN_BRIGHTNESS_MODE, it)
-            }.exceptionOrNull()?.let { e -> if (e !is SecurityException) throw e }
-        }
-        prefs.edit().remove(KEY_SAVED_MODE).commit()
+        val landed = savedMode()?.let {
+            runCatching { writeMode(it) }.getOrElse { e -> if (e is SecurityException) false else throw e }
+        } ?: true
+        if (!landed && handedOff()) return
+        prefs.edit().remove(KEY_SAVED_MODE).remove(KEY_HANDED_OFF).commit()
     }
 
     override fun isSelfWrite(rawDeviceValue: Int): Boolean = selfWriteInProgress ||
@@ -180,5 +229,6 @@ class AndroidScreenBrightnessController(
     companion object {
         internal const val PREFS_NAME = "screen_brightness_controller"
         internal const val KEY_SAVED_MODE = "saved_brightness_mode"
+        internal const val KEY_HANDED_OFF = "handed_off"
     }
 }

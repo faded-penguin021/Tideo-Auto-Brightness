@@ -37,6 +37,9 @@ class ControlFloodBoundTest {
         override fun write(level: Int) = ackWrite(level).also { value = level }
         override fun forceManualMode() = true
         override fun restoreMode() = Unit
+        override fun handOffToSystem() = true
+        override fun reclaimFromSystem() = true
+        override fun reconcileHandoff() = false
         override fun isManualMode() = true
         override fun isSelfWrite(rawDeviceValue: Int): Boolean = false
         override fun clearSelfWriteMarker() = Unit

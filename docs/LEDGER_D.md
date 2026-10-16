@@ -757,3 +757,19 @@
   `mHbmData=null`) and the OEM boost runs 4095 → 4674 above `mScreenBrightnessNormalMaximum`, so
   AAB's HBM rule there is the dumpsys brightness above 4095. The light sensor's declared
   `maxRange` 65535 is no saturation point: the owner has seen readings over 100 000 lx.
+- DD-073 [cited]: **A bright-light hand-off (DD-070) owns Android's AUTOMATIC through a persisted
+  `handed_off` marker beside D-134's saved mode, so Tideo's own AUTOMATIC is never saved as the
+  user's pre-service mode.** `handOffToSystem()` commits the original mode (the saved one, or the
+  current mode when none is saved or it is not MANUAL) together with the marker in ONE `commit()`
+  before writing AUTOMATIC, and clears a marker it created when that write does not land (an
+  existing hand-off keeps its marker); a failed commit also rolls the in-memory marker back,
+  because Android's `commit()` changes the in-memory map before reporting the disk failure and a
+  retry would otherwise skip the persist. While the marker is set, `forceManualMode()` saves
+  nothing, and any landed MANUAL (`forceManualMode()`, `reclaimFromSystem()`) clears it, so a
+  later AUTOMATIC is the user's again (Sol review, 2026-10-16). `restoreMode()` clears both keys
+  unless its write fails during a hand-off, when it keeps both for the next start to reconcile
+  and restore. At start, `reconcileHandoff()` keeps the hand-off only when the marker is set and
+  the mode reads AUTOMATIC, and MANUAL clears the marker with the saved mode intact. An unreadable
+  mode starts the service normally but keeps the marker until a MANUAL lands, since the mode may
+  still be Tideo's AUTOMATIC (glue review, 2026-10-16, narrowing the plan's "MANUAL or unreadable
+  clears").

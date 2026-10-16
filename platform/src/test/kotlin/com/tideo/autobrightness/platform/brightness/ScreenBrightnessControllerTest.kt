@@ -338,4 +338,263 @@ class ScreenBrightnessControllerTest {
         assertTrue(controller.forceManualMode())
         assertTrue(controller.isManualMode())
     }
+
+    private val manual = Settings.System.SCREEN_BRIGHTNESS_MODE_MANUAL
+    private val automatic = Settings.System.SCREEN_BRIGHTNESS_MODE_AUTOMATIC
+
+    private fun mode() = Settings.System.getInt(context.contentResolver, Settings.System.SCREEN_BRIGHTNESS_MODE, -1)
+
+    private fun setMode(mode: Int) {
+        Settings.System.putInt(context.contentResolver, Settings.System.SCREEN_BRIGHTNESS_MODE, mode)
+    }
+
+    private fun prefs() = context.getSharedPreferences(
+        AndroidScreenBrightnessController.PREFS_NAME, Context.MODE_PRIVATE,
+    )
+
+    private fun marker() = prefs().getBoolean(AndroidScreenBrightnessController.KEY_HANDED_OFF, false)
+
+    private fun saved(): Int? = prefs().getInt(AndroidScreenBrightnessController.KEY_SAVED_MODE, -1).takeIf { it >= 0 }
+
+    private fun modeSeam(refuse: (Int) -> Boolean) = AndroidScreenBrightnessController(
+        context,
+        rawModeWrite = { mode ->
+            if (refuse(mode)) false
+            else Settings.System.putInt(context.contentResolver, Settings.System.SCREEN_BRIGHTNESS_MODE, mode)
+        },
+    )
+
+    @Test
+    fun savedManual_survivesHandoff_thenForceManual_thenRestore() {
+        setMode(manual)
+        controller.forceManualMode()
+        assertTrue(controller.handOffToSystem())
+        assertEquals(automatic, mode())
+        assertTrue(marker())
+        controller.forceManualMode()
+        assertEquals(manual, saved(), "Tideo's own AUTOMATIC must not be saved as the user's")
+        assertFalse(marker(), "a landed MANUAL ends the hand-off")
+        controller.restoreMode()
+        assertEquals(manual, mode())
+        assertFalse(marker())
+        assertNull(saved())
+    }
+
+    @Test
+    fun afterForceManualEndsAHandoff_theUsersLaterAutomaticIsSavedAgain() {
+        setMode(manual)
+        controller.forceManualMode()
+        controller.handOffToSystem()
+        controller.forceManualMode()
+        setMode(automatic)
+        controller.forceManualMode()
+        assertEquals(automatic, saved(), "the user's own AUTOMATIC")
+        controller.restoreMode()
+        assertEquals(automatic, mode())
+    }
+
+    @Test
+    fun refusedRestoreDuringHandoff_keepsMarkerAndSavedMode_forTheNextStart() {
+        setMode(manual)
+        var refuse = false
+        val oem = modeSeam { refuse }
+        oem.forceManualMode()
+        oem.handOffToSystem()
+        refuse = true
+        oem.restoreMode()
+        assertEquals(automatic, mode())
+        assertTrue(marker())
+        assertEquals(manual, saved())
+        val afterRestart = AndroidScreenBrightnessController(context)
+        assertTrue(afterRestart.reconcileHandoff())
+        afterRestart.restoreMode()
+        assertEquals(manual, mode())
+        assertFalse(marker())
+    }
+
+    @Test
+    fun refusedRestoreOutsideHandoff_stillForgetsTheSavedMode_D134() {
+        setMode(automatic)
+        val oem = modeSeam { it == automatic }
+        oem.forceManualMode()
+        oem.restoreMode()
+        assertNull(saved())
+    }
+
+    @Test
+    fun reclaim_landsManual_clearsMarker_andKeepsTheSavedMode() {
+        setMode(manual)
+        controller.forceManualMode()
+        controller.handOffToSystem()
+        assertTrue(controller.reclaimFromSystem())
+        assertEquals(manual, mode())
+        assertFalse(marker())
+        assertEquals(manual, saved())
+    }
+
+    @Test
+    fun firstEntry_withNoSavedModeYet_savesTheOriginalManual() {
+        setMode(manual)
+        assertNull(saved())
+        assertTrue(controller.handOffToSystem())
+        assertEquals(manual, saved())
+        controller.restoreMode()
+        assertEquals(manual, mode())
+    }
+
+    @Test
+    fun firstEntry_fromTheUsersAutomatic_savesAutomatic() {
+        setMode(automatic)
+        assertTrue(controller.handOffToSystem())
+        assertEquals(automatic, saved())
+        controller.reclaimFromSystem()
+        controller.restoreMode()
+        assertEquals(automatic, mode())
+    }
+
+    @Test
+    fun secondEntry_whileHandedOff_neverSavesTideosAutomatic() {
+        setMode(manual)
+        controller.forceManualMode()
+        controller.handOffToSystem()
+        assertTrue(controller.handOffToSystem())
+        assertEquals(manual, saved())
+        assertTrue(marker())
+    }
+
+    @Test
+    fun failedAutomaticWrite_leavesNoMarker_andTheModeAlone() {
+        setMode(manual)
+        val refusing = modeSeam { it == automatic }
+        refusing.forceManualMode()
+        assertFalse(refusing.handOffToSystem())
+        assertFalse(marker())
+        assertEquals(manual, mode())
+        assertEquals(manual, saved())
+    }
+
+    @Test
+    fun deniedAutomaticWrite_leavesNoMarker() {
+        setMode(manual)
+        val denying = AndroidScreenBrightnessController(
+            context,
+            rawModeWrite = { throw SecurityException("WRITE_SETTINGS revoked") },
+        )
+        assertFalse(denying.handOffToSystem())
+        assertFalse(marker())
+    }
+
+    @Test
+    fun unexpectedThrowableOnEntry_isRethrown_andLeavesNoMarker() {
+        setMode(manual)
+        val exploding = AndroidScreenBrightnessController(
+            context,
+            rawModeWrite = { throw IllegalStateException("provider") },
+        )
+        assertFailsWith<IllegalStateException> { exploding.handOffToSystem() }
+        assertFalse(marker())
+    }
+
+    @Test
+    fun failedReclaim_keepsTheMarker_soTheNextAttemptAndARestartStillKnowItIsOurs() {
+        setMode(manual)
+        var refuseManual = false
+        val oem = modeSeam { it == manual && refuseManual }
+        oem.forceManualMode()
+        assertTrue(oem.handOffToSystem())
+        refuseManual = true
+        assertFalse(oem.reclaimFromSystem())
+        assertTrue(marker())
+        assertEquals(automatic, mode())
+        oem.forceManualMode()
+        assertEquals(manual, saved(), "a refused MANUAL leaves our AUTOMATIC unsaved")
+        assertTrue(AndroidScreenBrightnessController(context).reconcileHandoff())
+    }
+
+    @Test
+    fun deniedReclaim_keepsTheMarker() {
+        setMode(manual)
+        controller.handOffToSystem()
+        val denying = AndroidScreenBrightnessController(
+            context,
+            rawModeWrite = { throw SecurityException("WRITE_SETTINGS revoked") },
+        )
+        assertFalse(denying.reclaimFromSystem())
+        assertTrue(marker())
+    }
+
+    @Test
+    fun newInstance_markerSet_modeAutomatic_staysHandedOff() {
+        setMode(manual)
+        controller.forceManualMode()
+        controller.handOffToSystem()
+        val afterRestart = AndroidScreenBrightnessController(context)
+        assertTrue(afterRestart.reconcileHandoff())
+        assertTrue(marker())
+        afterRestart.restoreMode()
+        assertEquals(manual, mode(), "the true pre-service mode survives process death mid-hand-off")
+    }
+
+    @Test
+    fun newInstance_markerSet_modeManual_clearsTheMarker_andKeepsTheSavedMode() {
+        setMode(automatic)
+        controller.forceManualMode()
+        prefs().edit().putBoolean(AndroidScreenBrightnessController.KEY_HANDED_OFF, true).commit()
+        val afterRestart = AndroidScreenBrightnessController(context)
+        assertFalse(afterRestart.reconcileHandoff())
+        assertFalse(marker())
+        afterRestart.restoreMode()
+        assertEquals(automatic, mode())
+    }
+
+    @Test
+    fun newInstance_markerSet_modeUnreadable_startsNormally_butKeepsTheMarker_untilManualLands() {
+        prefs().edit()
+            .putInt(AndroidScreenBrightnessController.KEY_SAVED_MODE, manual)
+            .putBoolean(AndroidScreenBrightnessController.KEY_HANDED_OFF, true)
+            .commit()
+        val afterRestart = AndroidScreenBrightnessController(context)
+        assertFalse(afterRestart.reconcileHandoff())
+        assertTrue(marker(), "an unknown mode may still be our AUTOMATIC")
+        setMode(automatic)
+        afterRestart.forceManualMode()
+        assertEquals(manual, saved(), "the AUTOMATIC read after an unreadable start is not saved")
+        assertFalse(marker())
+        afterRestart.restoreMode()
+        assertEquals(manual, mode())
+    }
+
+    @Test
+    fun failedRepeatEntry_keepsTheExistingMarker() {
+        setMode(manual)
+        var refuse = false
+        val oem = modeSeam { refuse }
+        oem.forceManualMode()
+        assertTrue(oem.handOffToSystem())
+        refuse = true
+        assertFalse(oem.handOffToSystem())
+        assertTrue(marker(), "only a marker this call created is rolled back")
+        assertEquals(manual, saved())
+    }
+
+    @Test
+    fun reconcile_withoutMarker_isFalse_andTouchesNothing() {
+        setMode(automatic)
+        assertFalse(controller.reconcileHandoff())
+        assertEquals(automatic, mode())
+        assertNull(saved())
+    }
+
+    @Test
+    fun panicDuringHandoff_restoresTheTrueMode_andClearsTheMarker() {
+        setMode(manual)
+        controller.forceManualMode()
+        controller.handOffToSystem()
+        controller.forceManualMode()
+        controller.write(255)
+        controller.restoreMode()
+        assertEquals(manual, mode())
+        assertFalse(marker())
+        assertNull(saved())
+    }
 }

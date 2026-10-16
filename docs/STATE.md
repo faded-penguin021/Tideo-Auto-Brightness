@@ -35,7 +35,7 @@ stays closed (DB-051…DB-060), and Scorecard.dev is a run-once local input.
   - [x] 0 open the train (1.15.0 / vc30, adb facts)
   - [x] 1 domain `HandoffRules` + DD rows (DD-070…DD-072)
   - [x] 2 settings
-  - [ ] 3 platform (glue review)
+  - [x] 3 platform (glue review)
   - [ ] 4 runtime (glue review)
   - [ ] 5 UI (glue review)
   - [ ] 6 close-out
@@ -106,6 +106,10 @@ proposing work; changing it is legislation under RUNBOOK's rule-review protocol.
 
 Newest first; ledger rows are the durable detail.
 
+- 2026-10-16 — **Hand-off unit 3: the brightness controller hands Android AUTOMATIC under a
+  persisted `handed_off` marker committed with the saved mode first, reclaims MANUAL, and
+  reconciles the marker at start, so Tideo's own AUTOMATIC is never saved as the user's mode
+  (DD-073). Nothing calls it until unit 4.**
 - 2026-10-16 — **Hand-off unit 2: per-profile `handoffEnabled` / `handoffLux` (25 132) /
   `handoffHysteresis` (0.8) under AAB's `%AAB_` names, imported from AAB's key=value and
   `adaptive_handoff` JSON with lux rounded up; a hysteresis outside 0.5–1.0 becomes 0.8, and no

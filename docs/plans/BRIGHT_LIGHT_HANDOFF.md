@@ -2,8 +2,8 @@
 
 ## Status
 
-Units 0–2 are done (domain `HandoffRules`, DD-070…DD-072; the per-profile settings); the rest is
-spec. The owner has
+Units 0–3 are done (domain `HandoffRules`, DD-070…DD-072; the per-profile settings; the
+controller's ownership marker, DD-073); the rest is spec. The owner has
 built the feature in AAB (handed over 2026-10-15). That build is now the reference for this port, and this plan was rewritten against it.
 The export is force-added under `dist/aab-bright-light-handoff/`. It is temporary: unit 6 removes
 it, and unit 1 copies every fact the port depends on into the ledger first. The owner fixed five
@@ -218,18 +218,23 @@ this part is Tideo's own. The fix:
   2. Writes the saved mode and a **persisted `handed_off` marker** in one `commit()` to the same
      SharedPreferences, so both survive process death together (the D-034(c) class).
   3. Only then writes AUTOMATIC.
-  4. If that write fails, it clears the marker and returns false.
+  4. If that write fails, it clears the marker it set and returns false. An existing hand-off
+     keeps its marker.
 - `reclaimFromSystem()` writes MANUAL. It clears the marker only after the write succeeds.
-- `forceManualMode()` never saves the mode while the marker is set.
-- `restoreMode()` clears the marker.
+- `forceManualMode()` never saves the mode while the marker is set, and clears the marker once
+  its MANUAL write lands (unit 3, DD-073).
+- `restoreMode()` clears the marker, except when its write does not land during a hand-off: it
+  then keeps the marker and the saved mode for the next start (unit 3, DD-073).
+- `reconcileHandoff()` is the startup read below; unit 4 calls it.
 - Every caller is covered: cycle, `setInitialBrightness`, `reclaimManualMode`, `PanicHandler`.
 - **Startup reconciliation.** `BrightnessPipelineController` start reads the marker **before** it
   registers observers or runs the first cycle:
   - **Marker set, mode AUTOMATIC:** start with `handedOff = true`. The first decision keeps or
     exits the hand-off; deviation 2 relies on this.
-  - **Marker set, mode MANUAL or unreadable:** death came between the persist and the mode
-    write, or the user took control. Clear the marker and start normally. The saved mode is
-    intact.
+  - **Marker set, mode MANUAL:** death came between the persist and the mode write, or the user
+    took control. Clear the marker and start normally. The saved mode is intact.
+  - **Marker set, mode unreadable:** start normally but keep the marker until a MANUAL lands,
+    since the mode may still be Tideo's AUTOMATIC (unit 3 glue review, DD-073).
 
 ### Runtime state "handed off"
 
@@ -352,7 +357,9 @@ commit → `scripts/ladder.sh --guards-only` → push.
 
    Glue review.
 4. **Runtime.** `HandoffCoordinator`, state, startup reconciliation, both override gates, and the
-   event handling. Pipeline tests:
+   event handling. The `_Hand-offToAdaptive` and `_HandBackToAAB` Tasker markers go on the
+   coordinator's enter and exit, not on the controller: `:platform` sat at its comment budget in
+   unit 3. Pipeline tests:
    - enter and exit at the band edges, with no write and no dimming while handed off;
    - a failed entry or failed reclaim follows the rules above;
    - observer and commit overrides ignored;

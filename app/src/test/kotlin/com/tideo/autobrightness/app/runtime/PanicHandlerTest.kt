@@ -15,6 +15,9 @@ class PanicHandlerTest {
             override fun write(level: Int): BrightnessWriteResult { calls += "brightness:$level"; error("provider") }
             override fun forceManualMode(): Boolean { calls += "manual"; error("provider") }
             override fun restoreMode() { calls += "restore"; error("provider") }
+            override fun handOffToSystem() = true
+            override fun reclaimFromSystem() = true
+            override fun reconcileHandoff() = false
             override fun isManualMode() = true
             override fun isSelfWrite(rawDeviceValue: Int) = false
             override fun clearSelfWriteMarker() = Unit

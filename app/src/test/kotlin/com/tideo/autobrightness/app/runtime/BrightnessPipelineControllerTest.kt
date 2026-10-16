@@ -78,6 +78,9 @@ class BrightnessPipelineControllerTest {
             return forceManualSucceeds
         }
         override fun restoreMode() { modeRestores++ }
+        override fun handOffToSystem() = true
+        override fun reclaimFromSystem() = true
+        override fun reconcileHandoff() = false
         override fun isManualMode(): Boolean = manualMode
         override fun isSelfWrite(rawDeviceValue: Int): Boolean = rawDeviceValue == lastWrite
         override fun clearSelfWriteMarker() { lastWrite = null }

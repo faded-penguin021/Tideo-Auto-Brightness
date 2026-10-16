@@ -30,6 +30,9 @@ class AnimationRunnerTest {
         }
         override fun forceManualMode() = true
         override fun restoreMode() = Unit
+        override fun handOffToSystem() = true
+        override fun reclaimFromSystem() = true
+        override fun reconcileHandoff() = false
         override fun isManualMode() = true
         override fun isSelfWrite(rawDeviceValue: Int): Boolean = rawDeviceValue == lastWrite
         override fun clearSelfWriteMarker() { lastWrite = null }
@@ -191,6 +194,9 @@ class AnimationRunnerTest {
         }
         override fun forceManualMode() = true
         override fun restoreMode() = Unit
+        override fun handOffToSystem() = true
+        override fun reclaimFromSystem() = true
+        override fun reconcileHandoff() = false
         override fun isManualMode() = true
         override fun isSelfWrite(rawDeviceValue: Int) = false
         override fun clearSelfWriteMarker() = Unit
@@ -202,6 +208,9 @@ class AnimationRunnerTest {
         override fun write(level: Int) = unlandedWrite(level, WriteStatus.REFUSED)
         override fun forceManualMode() = true
         override fun restoreMode() = Unit
+        override fun handOffToSystem() = true
+        override fun reclaimFromSystem() = true
+        override fun reconcileHandoff() = false
         override fun isManualMode() = true
         override fun isSelfWrite(rawDeviceValue: Int) = false
         override fun clearSelfWriteMarker() = Unit
