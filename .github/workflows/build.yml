@@ -52,16 +52,6 @@ jobs:
       - name: Validate Gradle wrapper
         uses: gradle/actions/wrapper-validation@3f5f9adaf7d9fecd50b5935e54106014257a94e6  # v6.4.0
 
-      # Runs the shipped guards' own fixture suite BEFORE the ladder, and deliberately so: the
-      # ladder exits on the first guard failure without reaching scripts/verify.sh, where this
-      # suite otherwise lives. Without this step a red guard tells you nothing about whether the
-      # guards themselves regressed — which is the case you most want distinguished. Seconds of
-      # pure shell against sandbox fixture repos, so it also fails fast, before toolchain setup.
-      - name: Guard fixture suites
-        run: |
-          bash scripts/test-ladder-guards.sh
-          bash scripts/tests/local-guards.sh
-
       # JDK 21: Robolectric 4.16+ requires it to run tests under SDK 36 (Android 16 / targetSdk 36).
       # The app still compiles to 17 bytecode (sourceCompatibility/jvmTarget = 17) — this is only the
       # JDK that runs Gradle + the test JVM.
@@ -106,6 +96,7 @@ jobs:
       # scripts/verify.sh adds --no-daemon --no-configuration-cache itself when CI is set. The
       # local-only advisories self-skip under CI.
       - name: Acceptance ladder (scripts/ladder.sh)
+        id: ladder
         timeout-minutes: 20
         run: scripts/ladder.sh
 
@@ -118,6 +109,16 @@ jobs:
             echo "=== jstack $p ($(ps -o args= -p "$p" | cut -c1-120)) ==="
             jstack "$p" || true
           done
+
+      # The ladder exits after a guard failure without reaching scripts/verify.sh, where both
+      # fixture suites run, so a red guard alone cannot say whether the guards themselves
+      # regressed. This step answers that, and only on a failed ladder: on a green one verify.sh
+      # has already run both suites, and running them up front as well cost ~80 s a run (DD-067).
+      - name: Guard fixture suites (red ladder only)
+        if: failure() && steps.ladder.outcome == 'failure'
+        run: |
+          bash scripts/test-ladder-guards.sh
+          bash scripts/tests/local-guards.sh
 
       - name: Upload debug APK
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1

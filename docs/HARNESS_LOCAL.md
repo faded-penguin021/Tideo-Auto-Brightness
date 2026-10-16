@@ -255,8 +255,9 @@ never reach a shipped script or `amh.conf`.
 **`.github/workflows/build.yml`** invokes `scripts/ladder.sh` with no arguments. The shipped
 ladder forwards nothing to Gradle, so the `--no-daemon --no-configuration-cache` pair that used
 to sit on the CI command line now lives in `scripts/verify.sh`, which adds it when `CI` is set
-(DA-017: CI's single invocation only ever pays the config-cache *store* cost). The separate
-guard-self-test step is gone because `verify.sh` runs both fixture suites as its first rungs.
+(DA-017: CI's single invocation only ever pays the config-cache *store* cost). `verify.sh` runs
+both fixture suites as its first rungs, so `build.yml` runs them separately only after a failed
+ladder, to tell a red guard from a regressed one (DD-067).
 The `ci.yml` that `amh-init` installs was deleted: `build.yml` already runs the ladder and
 carries this repo's JDK/SDK/cache setup.
 

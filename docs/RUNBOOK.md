@@ -644,8 +644,8 @@ guards were added, DA-008 F8). To see what runs, read `scripts/ladder.sh`'s `run
 function and `ls scripts/guards/`; the ladder also names every rung as it executes. Both
 fixture suites — `scripts/test-ladder-guards.sh` for the shipped guards and
 `scripts/tests/local-guards.sh` for ours — run inside `scripts/verify.sh`, and again as a
-standalone `build.yml` step before the ladder so that a red guard still tells you whether the
-guards themselves regressed. Run them whenever you change a guard (D-173).
+standalone `build.yml` step after a failed ladder only, so that a red guard still tells you
+whether the guards themselves regressed (DD-067). Run them whenever you change a guard (D-173).
 
 On remote containers the session bootstrap runs `scripts/bootstrap.sh`, which launches
 `scripts/warm-gradle.sh` in the background (D-173), so by the time you first run the ladder the

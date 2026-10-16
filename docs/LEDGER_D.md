@@ -691,3 +691,7 @@
   deleted. The upgrade's first command, an `rm -rf` of a scratch clone path that turned out not to
   exist, drew the guard's one-time destructive advisory; the check showed nothing to delete, so the
   `rm` was dropped rather than rerun.
+- DD-067 [cited]: **`build.yml` runs the two guard fixture suites up front no more, only after a
+  failed ladder (owner's CI speed request, 2026-10-16).** `verify.sh` already runs both before
+  Gradle, so a green run paid ~80 s of a ~7 min job twice (run 38048938933). A red guard still
+  gets its fixture verdict, now one step after the ladder instead of one before it.

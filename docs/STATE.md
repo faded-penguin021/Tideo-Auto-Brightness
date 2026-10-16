@@ -103,6 +103,8 @@ proposing work; changing it is legislation under RUNBOOK's rule-review protocol.
 
 Newest first; ledger rows are the durable detail.
 
+- 2026-10-16 — **CI speed: `build.yml` runs the guard fixture suites only after a failed ladder,
+  since `verify.sh` already runs them (~80 s a run, DD-067).**
 - 2026-10-15 — **Hand-off plan (#136) rewritten against the owner's AAB build (export in
   `dist/`). It uses AAB's names and decision rule, an effective threshold instead of a blocking
   validator, a 90 % hysteresis cap, ownership persistence and recovery, and a mode observer, and
