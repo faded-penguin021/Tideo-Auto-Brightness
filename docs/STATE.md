@@ -60,19 +60,6 @@ stays closed (DB-051…DB-060), and Scorecard.dev is a run-once local input.
    'name="settings_night_light_extended"' -e 'name="pd_night_light_extended'
    app/src/main/res/values-b+zh+Hans/strings.xml` prints 11.
 
-2. **[2026-10-10] Fix the intermittent CI hang in `DraftSettingsViewModelTest`; until then, rerun
-   on a hang.** The `Build` run on `main` for #144 (run 38039291255, attempt 1) sat in the ladder
-   step until cancelled; its thread dump shows Robolectric's main thread parked in
-   `setBaseline`'s `runBlocking { settingsDataStore.updateData { … } }`
-   (`DraftSettingsViewModelTest.kt:42`, from `edit_marksDirty_thenDiscardReverts`) with every
-   coroutine worker idle. The same tree passed on the PR, and attempt 2 got past it. The test is
-   old and flaked before (D-071, D-080). `release.yml` and `release-signing.yml` run the same
-   tests, so a hang there costs their 30-minute cap and a rerun, never a bad release; F-Droid
-   builds `assembleRelease` only and never runs tests. Needs a follow-up fix PR off `main`, on
-   your go-ahead. Worked when that PR is merged and a `Build` run on `main` is green; settles it:
-   `git log --oneline origin/main -- app/src/test/kotlin/com/tideo/autobrightness/app/state/DraftSettingsViewModelTest.kt`
-   shows a commit after 2026-10-10.
-
 **This train is `1.14.1` on vc29, its ONE bump** (the owner's patch bump of 2026-10-10 for #145,
 after `main` shipped 1.14.0 / vc28 as #144). Land further user-facing fixes in `changelogs/29.txt`
 (500-character cap), never by bumping or creating `30.txt`; re-open only for something major, and
@@ -88,6 +75,9 @@ proposing work; changing it is legislation under RUNBOOK's rule-review protocol.
 
 Newest first; ledger rows are the durable detail.
 
+- 2026-10-16 — **`DraftSettingsViewModelTest`'s intermittent CI hang fixed, test-only: an earlier
+  test's in-flight `apply()` wedged the DataStore writer across Robolectric's looper reset
+  (DD-069).**
 - 2026-10-10 — **1.14.1 / vc29 for #145: a circadian Night Light key that the device moved off
   what Tideo wrote is rewritten by the next tick, and an apply gets an early tick 5 s later
   (DD-064); owner-verified on device, with a brief warmer tint before the expected one (DD-065).**

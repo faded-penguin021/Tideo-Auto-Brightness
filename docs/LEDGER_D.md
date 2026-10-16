@@ -678,3 +678,13 @@
   settled at the expected one; it is not a full red flash. Its cause is not established, and no
   fix is made for it; step 38a now expects it, so a later run can tell whether it grows or goes
   away.
+- DD-069 [cited]: **`DraftSettingsViewModelTest`'s intermittent CI hang (run 38039291255 on `main`)
+  was a DataStore write wedged by an earlier test; fixed in the test only.** DataStore 1.1.1 holds
+  its write lock while it runs a transform in the caller's context, so `apply()`'s write from
+  `viewModelScope` waits on Robolectric's paused main looper. A test ending before that ran
+  (`apply_announcesTheClamp_onlyWhenTheValueActuallyMoved` re-applies a value already stored, so its
+  wait returns at once) had the message dropped by the looper reset, wedging the store for the
+  fork; the next `runBlocking` write parked forever. A scratch repro showed all three steps. Test
+  writes now go off-main while idling the main looper, bounded at 5 s, and an `@After` barrier
+  drains every test's writes. Left open (Sol): `SettingsViewModel`'s init `ensureSeeded()` writes
+  `userProfilesDataStore` from Main the same way, unobserved as a hang.
