@@ -5,8 +5,10 @@ import android.os.Looper
 import androidx.test.core.app.ApplicationProvider
 import com.tideo.autobrightness.app.settings.AabSettings
 import com.tideo.autobrightness.app.storage.settingsDataStore
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
@@ -14,6 +16,7 @@ import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.setMain
+import org.junit.After
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -36,10 +39,25 @@ class DraftSettingsViewModelTest {
     // D-125: clear process-global preview holder to prevent leaks between tests.
     @Before fun clearPreview() = CurveSuggestionPreview.clear()
 
+    @After fun drainWrites() = write { it } // DD-069: an in-flight write must land before the looper reset.
+
     private fun idle() = shadowOf(Looper.getMainLooper()).idle()
 
-    private fun setBaseline(settings: AabSettings) {
-        runBlocking { app.settingsDataStore.updateData { settings } }
+    private fun setBaseline(settings: AabSettings) = write { settings }
+
+    private fun write(transform: (AabSettings) -> AabSettings) {
+        val done = CoroutineScope(Dispatchers.IO).async { app.settingsDataStore.updateData(transform) }
+        val deadline = System.nanoTime() + 5_000_000_000L
+        try {
+            while (!done.isCompleted) {
+                check(System.nanoTime() < deadline) { "settingsDataStore write wedged (DD-069)" }
+                idle()
+                Thread.sleep(5)
+            }
+            done.getCompleted()
+        } finally {
+            done.cancel()
+        }
         idle()
     }
 
@@ -214,6 +232,16 @@ class DraftSettingsViewModelTest {
         idle()
         assertEquals(10, vm.draft.value.minBrightness, "discard reverts the draft to committed")
         assertFalse(vm.dirty.value)
+    }
+
+    @Test
+    fun aWriteQueuedBehindAnInFlightApply_lands_DD069() {
+        setBaseline(AabSettings(dimmingStrength = 25))
+        val vm = seededVm()
+        vm.edit { it.copy(dimmingStrength = 40) }
+        vm.apply()
+        setBaseline(AabSettings(dimmingStrength = 30))
+        assertEquals(30, committed().dimmingStrength)
     }
 
     @Test

@@ -71,16 +71,7 @@ stays closed (DB-051…DB-060), and Scorecard.dev is a run-once local input.
    'name="settings_night_light_extended"' -e 'name="pd_night_light_extended'
    app/src/main/res/values-b+zh+Hans/strings.xml` prints 11.
 
-2. **[2026-10-10] Merge PR #147 off `main`, which fixes the intermittent CI hang in
-   `DraftSettingsViewModelTest`; until then, rerun on a hang.** An earlier test's `apply()` write
-   was left waiting on the main looper, Robolectric's looper reset dropped it, and the settings
-   DataStore stayed stuck for the rest of the test JVM. The fix is test-only and passed the full
-   ladder locally (DD-069 on that branch). Worked when #147 is merged and the next `Build` run on
-   `main` is green; settles it:
-   `git log --oneline origin/main -- app/src/test/kotlin/com/tideo/autobrightness/app/state/DraftSettingsViewModelTest.kt`
-   shows a commit after 2026-10-10.
-
-3. **[2026-10-13] Decide whether to add a check that the output-redaction hook is still wired.**
+2. **[2026-10-13] Decide whether to add a check that the output-redaction hook is still wired.**
    Since AMH 15.0.0 both adapters run `scripts/redact-tool-output.sh` after every tool call, but
    nothing in this tree notices if that `PostToolUse` group is deleted, rewired or loses its bash
    pin — a missing redaction hook looks exactly like output that held no credential (DD-066).
@@ -91,7 +82,7 @@ stays closed (DB-051…DB-060), and Scorecard.dev is a run-once local input.
    redact-tool-output scripts/guards/*.sh` prints a nonzero count, or a STATE changelog line records
    (b).
 
-4. **[2026-10-16] Move CI to Ubuntu 26.04 when you choose; nothing breaks if you wait.** Every
+3. **[2026-10-16] Move CI to Ubuntu 26.04 when you choose; nothing breaks if you wait.** Every
    workflow is pinned to `ubuntu-24.04` (DD-068), so GitHub's switch of `ubuntu-latest` to 26.04
    (2026-10-19 to 11-19) changes nothing here. Options: (a) move after the rollout settles, in a
    PR that changes only the runner labels; (b) stay on 24.04 until GitHub announces its
@@ -115,6 +106,9 @@ proposing work; changing it is legislation under RUNBOOK's rule-review protocol.
 
 Newest first; ledger rows are the durable detail.
 
+- 2026-10-16 — **`DraftSettingsViewModelTest`'s intermittent CI hang fixed, test-only: an earlier
+  test's in-flight `apply()` wedged the DataStore writer across Robolectric's looper reset
+  (DD-069).**
 - 2026-10-16 — **Hand-off unit 0: the train opens as 1.15.0 / vc30 with `changelogs/30.txt`. AOSP
   HBM is unconfigured on the owner's phone (OEM boost 4095 → 4674), so `mHbmMode` is no HBM fact.
   AAB's rule, dumpsys brightness above 4095, is. A sensor's declared `maxRange` (65 535 here) is no
@@ -123,7 +117,7 @@ Newest first; ledger rows are the durable detail.
 - 2026-10-16 — **The `DraftSettingsViewModelTest` CI-hang fix went out as PR #147 off `main`;
   Owner queue item 2 now asks for that merge.**
 - 2026-10-16 — **Every workflow pinned to `ubuntu-24.04` ahead of GitHub moving `ubuntu-latest`
-  to 26.04 (DD-068); the move itself is Owner queue item 4.**
+  to 26.04 (DD-068); the move itself is Owner queue item 3.**
 - 2026-10-16 — **CI speed: `build.yml` runs the guard fixture suites only after a failed ladder,
   since `verify.sh` already runs them (~80 s a run, DD-067).**
 - 2026-10-15 — **Hand-off plan (#136) rewritten against the owner's AAB build (export in
