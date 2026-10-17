@@ -773,6 +773,45 @@ E2E auto: none; every row, with its reason, is in `e2e/scenarios.toml`.
     its normal actions (Reset back), and removes that dot, leaving the others. Repeat with Resume:
     it resumes and the dot stays.
 
+## 18. Bright-light hand-off (DD-070…DD-081)
+
+E2E auto: none; every row, with its reason, is in `e2e/scenarios.toml`.
+
+Needs direct sunlight or a strong torch held at the sensor: on the default curve the hand-off
+lux cannot go below 25 132. Before starting, note the phone's own mode with
+`adb shell settings get system screen_brightness_mode` (0 = MANUAL, 1 = Adaptive Brightness). On
+**Menu → Hand-off Behavior**, switch **Hand off to Adaptive Brightness** on, keep the lux at the
+curve's minimum or set one a little above, and Apply; note the card's "Takes back control below
+N lx". Watch Live Debug's Light Sensor card for smoothed lux.
+
+58. **Entry and exit at the band edges.** Service running, take the phone from shade into the
+    light, then back. Sample `screen_brightness_mode` about once a second throughout.
+    **Expected:** the mode reads 1 only once smoothed lux is above the hand-off lux, the flash
+    "Adaptive Brightness on — Tideo handed control to Android" shows once, the notification reads
+    "Android is controlling brightness · N lx", and the dashboard pill, widget and tile read
+    "Android". Between the two levels nothing changes. Once smoothed lux is below the hand-off lux
+    × the hand-back level, exactly (the card's "Takes back control below N lx" shows it floored,
+    so a reading between N and N + 1 may already count as below), the mode reads 0 again, "Adaptive Brightness off — Tideo is back in control" shows once, and
+    Tideo's curve drives brightness again. While handed off, `screen_brightness` moves only with
+    the OEM's own Adaptive Brightness, never to Tideo's target.
+59. **No override pause in sunlight.** Stay handed off for at least two minutes in changing light
+    while the OEM moves brightness. **Expected:** no override heads-up (Discard · Resume ·
+    Disable), Live Debug's Hand-off still reads Android, and Curve & Brightness shows no new blue
+    dot.
+60. **Disable restores the original mode.** Start with the phone's own mode at MANUAL (0), get
+    handed off as in step 58, then switch Tideo off on the Dashboard while still in the light.
+    **Expected:** `screen_brightness_mode` reads 0, the mode noted before starting, not Tideo's
+    1, and no "back in control" flash shows. Repeat starting from Adaptive Brightness on (1):
+    after Disable it reads 1.
+61. **Display calibration and the HBM readout.** With the DUMP grant
+    (`adb shell pm grant com.tideo.autobrightness[.debug] android.permission.DUMP`), root or
+    Shizuku, the service on and the screen untouched, tap **Calibrate display** on Hand-off
+    Behavior. **Expected:** the screen steps through 13 levels for a few seconds, then
+    "Calibrated" and its flash. Handed off in direct sunlight, the dashboard and Live Debug show
+    Android's brightness, above 255 when the OEM boosts past its normal maximum (`adb shell
+    dumpsys display | grep mScreenBrightness` above `mScreenBrightnessNormalMaximum`), with "High
+    Brightness Mode activated" flashed once. Uncalibrated, the readout stops at 255.
+
 ---
 
 **On completion:** flip the affected `PARITY_CHECKLIST.md` rows to `device-verified`; record any failures

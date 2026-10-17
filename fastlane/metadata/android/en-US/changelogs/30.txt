@@ -1,2 +1,4 @@
 New:
-- Bright-light hand-off: above a lux you set per profile, Tideo hands brightness to Android's Adaptive Brightness so the phone's sunlight boost works, and takes it back below it. Set it in Menu → Hand-off Behavior; a message marks each switch, and the notification, widget and tile say "Android" meanwhile; calibrate the display there to see Android's brightness meanwhile, above 255 when High Brightness Mode boosts it
+- Bright-light hand-off: above a lux you set per profile, Android's Adaptive Brightness takes over so the phone's sunlight boost works, and Tideo takes back below it. Set it in Menu → Hand-off Behavior
+- a message marks each switch; the notification, widget and tile say "Android" meanwhile
+- calibrate the display there to see Android's brightness, above 255 when High Brightness Mode boosts it

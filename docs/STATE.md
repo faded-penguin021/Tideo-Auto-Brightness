@@ -26,25 +26,9 @@ stays closed (DB-051…DB-060), and Scorecard.dev is a run-once local input.
 
 ## Active work
 
-- **Bright-light hand-off (#136)** — `docs/plans/BRIGHT_LIGHT_HANDOFF.md`, spec only (owner,
-  2026-10-01). It was rewritten on 2026-10-15 against the owner's AAB build and the owner's
-  fixes after it, with four deviations and Open question 1 (HBM readout). It goes in the train after 1.14.0 (owner,
-  2026-10-07), each unit on the owner's go-ahead. The owner's AAB build of it is force-added under `dist/aab-bright-light-handoff/` as
-  the port's reference; `git rm -r` it before this train's PR merges (`clean-dist.yml` is only
-  the backstop). A `BUDGET_app` comment-budget raise, if unit 5 needs one, is pre-approved and
-  folds into that unit (owner, 2026-10-16); it still takes the DA-005 rule review. Units, in the
-  plan's order:
-  - [x] 0 open the train (1.15.0 / vc30, adb facts)
-  - [x] 1 domain `HandoffRules` + DD rows (DD-070…DD-072)
-  - [x] 2 settings
-  - [x] 3 platform (glue review)
-  - [x] 4 runtime (glue review)
-  - [x] 5 UI (glue review)
-  - [ ] 6 close-out
-  - [x] 7 HBM readout and display calibration (owner's answer to Open question 1)
 - **Low-lux settling jitter** — `docs/plans/LOW_LUX_SETTLING_JITTER.md`, spec only; its
-  **Proposed fix** is approved as written and goes in the train after 1.14.0 (owner, 2026-10-08),
-  each step on the owner's go-ahead.
+  **Proposed fix** is approved as written (owner, 2026-10-08) and deferred to the train after
+  1.15.0 (owner, 2026-10-17), each step on the owner's go-ahead.
 
 ## Owner queue
 
@@ -94,10 +78,20 @@ stays closed (DB-051…DB-060), and Scorecard.dev is a run-once local input.
    `grep -rc 'ubuntu-24.04' .github/workflows/` prints 0 for every file, or a STATE changelog line
    records (b).
 
+4. **[2026-10-17] Run the bright-light hand-off checks, `docs/rebuild/DEVICE_TEST_SCRIPT.md`
+   §18 steps 58–60, on 1.15.0-debug vc30.** Your sunlight test already passed step 61, the
+   calibration and HBM readout (DD-081). Not yet seen on the phone: entry and exit at the two lux
+   levels, no override pause while Android is in control, and Disable putting back the mode you
+   had. Install the debug build over adb, then follow §18 in sunlight or with a strong torch. It
+   worked when `adb shell settings get system screen_brightness_mode` reads 1 above the hand-off
+   lux and 0 below the hand-off lux × the hand-back level, no override heads-up appears while handed
+   off, and after Disable it reads what it read before you started. Settles it: your report of
+   the three steps, which a ledger row then records (DD-070…DD-081).
+
 **The tree declares `1.15.0` / vc30, this train's ONE bump**, made by the hand-off plan's unit 0
 after v1.14.1 was seen tagged on 2026-10-16 (`git ls-remote --tags --refs origin 'refs/tags/v*'`).
-The hand-off units and the low-lux jitter fix each add a sentence to `changelogs/30.txt`
-(500-character cap) instead. Never bump twice in one train.
+`changelogs/30.txt` (500-character cap) carries only the hand-off, since the low-lux jitter fix
+moved to the next train. Never bump twice in one train.
 
 ## Decided non-items
 
@@ -109,62 +103,29 @@ proposing work; changing it is legislation under RUNBOOK's rule-review protocol.
 
 Newest first; ledger rows are the durable detail.
 
-- 2026-10-17 — **Owner's sunlight test of unit 7 passed on 1.15.0-debug vc30: calibrated 255 →
-  4095, handed off at 92 048 lx, 4171 raw shown as 260 and 258, the HBM flash seen; Play Protect
-  blocks a file-manager install, so debug builds go on over adb (DD-081).**
+- 2026-10-17 — **Hand-off unit 6 closes the #136 plan: `30.txt` final, parity gap dev-03,
+  DEVICE_TEST_SCRIPT §18 steps 58–61 with their e2e rows, the settings schema and the DataStore
+  map (now listing `display_prefs` and the controller's `screen_brightness_controller` prefs);
+  the AAB export in `dist/` and the plan file are deleted, the plan's last unrecorded facts kept
+  as DD-082 and DD-083 (Sol review). Owner queue item 4 asks for §18. The
+  low-lux jitter fix is deferred to the train after 1.15.0 (owner).**
 
-- 2026-10-17 — **Hand-off unit 7, the owner's answer to Open question 1: while handed off, the
-  dashboard, widget and Live Debug show Android's brightness from `dumpsys display` (DUMP, root,
-  then Shizuku, now a fourth Shizuku use), above 255 under High Brightness Mode, after a display
-  calibration on Hand-off Behavior; AAB's 2 s loop, HBM flashes and calibration card (DD-077…DD-080).**
-
-- 2026-10-17 — **Owner's device test of unit 5: the hand-off settings move to their own Menu
-  screen, Hand-off Behavior, as AAB's scene, and each hand-off and hand-back flashes AAB's message
-  (Pause and Disable stay silent) (DD-076).**
-
-- 2026-10-17 — **Hand-off unit 5: a hand-off card on Curve & Brightness (switch, lux with the
-  curve's minimum, 50–100 % hand-back slider) and a graph marker at the effective threshold; the
-  notification, pill, widget, tile and Live Debug say "Android", and brightness readouts blank
-  while handed off; help in tooltips and guide section 10 (DD-075).**
-
-- 2026-10-16 — **Hand-off unit 4: a runtime `HandoffCoordinator` hands Android AUTOMATIC above the
-  effective threshold and takes it back below the exit, with no write, dimming or override while
-  handed off; Apply, a context swap, Resume and Pause decide at once, start reconciles the marker,
-  and an entry and `stop()` serialize (DD-074). Nothing shows it until unit 5.**
-- 2026-10-16 — **Hand-off unit 3: the brightness controller hands Android AUTOMATIC under a
-  persisted `handed_off` marker committed with the saved mode first, reclaims MANUAL, and
-  reconciles the marker at start, so Tideo's own AUTOMATIC is never saved as the user's mode
-  (DD-073). Nothing calls it until unit 4.**
-- 2026-10-16 — **Hand-off unit 2: per-profile `handoffEnabled` / `handoffLux` (25 132) /
-  `handoffHysteresis` (0.8) under AAB's `%AAB_` names, imported from AAB's key=value and
-  `adaptive_handoff` JSON with lux rounded up; a hysteresis outside 0.5–1.0 becomes 0.8, and no
-  validator rule blocks Apply (DD-071).**
-- 2026-10-16 — **Hand-off unit 1: domain `HandoffRules` decides enter/stay/exit with AAB's strict
-  edges and finds the curve's minimum hand-off lux (25 132 on the default curve) by a downward
-  scan that holds on non-monotone curves. DD-070…DD-072 record the AAB reference before `dist/`
-  goes.**
+- 2026-10-15..17 — **Bright-light hand-off (#136) on 1.15.0 / vc30, from the owner's AAB build:
+  AAB's reference (DD-070, DD-072), domain `HandoffRules` and per-profile settings with four
+  owner-approved deviations (DD-071), the controller's `handed_off` marker (DD-073), the runtime coordinator (DD-074),
+  surfaces that say "Android", the Hand-off Behavior screen and AAB's flashes (DD-075, DD-076),
+  and the HBM readout with display calibration (DD-077…DD-080), which passed the owner's sunlight
+  test on the phone (DD-081; debug builds go on over adb, as Play Protect blocks a file-manager
+  install).**
 - 2026-10-16 — **`DraftSettingsViewModelTest`'s intermittent CI hang fixed, test-only: an earlier
   test's in-flight `apply()` wedged the DataStore writer across Robolectric's looper reset
   (DD-069).**
-- 2026-10-16 — **Hand-off unit 0: the train opens as 1.15.0 / vc30 with `changelogs/30.txt`. AOSP
-  HBM is unconfigured on the owner's phone (OEM boost 4095 → 4674), so `mHbmMode` is no HBM fact.
-  AAB's rule, dumpsys brightness above 4095, is. A sensor's declared `maxRange` (65 535 here) is no
-  saturation point: the owner has seen readings over 100 000 lx. Details in the plan's Open
-  question 1.**
 - 2026-10-16 — **The `DraftSettingsViewModelTest` CI-hang fix went out as PR #147 off `main`;
   Owner queue item 2 now asks for that merge.**
 - 2026-10-16 — **Every workflow pinned to `ubuntu-24.04` ahead of GitHub moving `ubuntu-latest`
   to 26.04 (DD-068); the move itself is Owner queue item 3.**
 - 2026-10-16 — **CI speed: `build.yml` runs the guard fixture suites only after a failed ladder,
   since `verify.sh` already runs them (~80 s a run, DD-067).**
-- 2026-10-15 — **Hand-off plan (#136) rewritten against the owner's AAB build (export in
-  `dist/`). It uses AAB's names and decision rule, an effective threshold instead of a blocking
-  validator, a 90 % hysteresis cap, ownership persistence and recovery, and a mode observer, and
-  it targets 1.15.0 / vc30. Reviewed by Sol (analysis) and Astra (plan).**
-- 2026-10-15 — **The owner fixed five of the review's AAB findings and declined two as user error:
-  switching Adaptive Brightness off by hand, and a 100 % hysteresis. The plan now matches AAB on
-  those: no mode observer, and hysteresis 50–100 %. Four deviations remain.**
-
 - 2026-10-13 — **Harness AMH 14.1.0 -> 15.1.0: root/home deletions permanently denied, checkpoint
   reordered (STATE line → ladder → commit → `--guards-only` → push), a Destructive work section in
   AGENTS.md, output redaction wired as a `PostToolUse` hook in both adapters (DD-066).**

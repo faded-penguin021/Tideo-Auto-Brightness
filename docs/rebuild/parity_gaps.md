@@ -196,3 +196,24 @@ because on a device whose raw range is 3000+ one domain step is 12–16 raw unit
 crossing a boundary paused the pipeline. The cost is stated rather than hidden: a persistent
 deviation of ≤1 domain unit is deliberately undetectable. It is bounded in magnitude, which a
 time-based grace period would not be.
+
+### dev-03 — the bright-light hand-off's entry, resume and minimum (DD-071, 1.15.0)
+
+The hand-off ports the owner's AAB build of 2026-10-15 (DD-070), not the V3.3 XML, which has no
+such feature. Three departures were owner-approved on 2026-10-15:
+
+1. **Effective threshold.** Tideo enters at `max(stored lux, the live curve's minimum)`. AAB
+   blocks Apply on a low value and silently raises the stored global after a curve save or a
+   profile load. Tideo never blocks Apply and never rewrites a profile, so undoing a curve edit
+   restores the user's own value.
+2. **Resume and service start keep a valid hand-off.** AAB's enable forces MANUAL and then
+   re-decides; Tideo keeps Android in charge when the lux still clears the threshold, with no mode
+   flip.
+3. **The minimum is found by a downward whole-lux scan from 100 000 lx** for the lowest lux from
+   which the unclamped base curve stays at or above 0.9 × max. AAB bisects, which is not exact on
+   the non-monotone curves DD-012 allows. No such lux means the feature never enters. Lux is
+   stored whole and AAB's decimal imports rounded up; the default is 25 132 against AAB's 25 130
+   because Tideo derives Form3A with form2B as `8.8f`.
+
+Tideo also never saves its own AUTOMATIC as the user's pre-service mode (DD-073); AAB keeps no
+saved mode, so it has nothing to depart from. The HBM readout's departures are DD-079 and DD-080.

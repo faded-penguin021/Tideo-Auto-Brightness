@@ -43,6 +43,12 @@ Typed profile schema lives in `AabSettings` and stores migrated Tasker settings 
 | `%AAB_QSUse` | `quickSettingsEnabled` | Boolean | `false` | must be true/false |
 | `%AAB_NotifyUse` | `notificationsEnabled` | Boolean | `true` | must be true/false |
 | `%AAB_Debug` | `debugLevel` | Int | `0` | `0..5` |
+| `%AAB_AdaptiveOn` | `handoffEnabled` | Boolean | `false` | must be true/false (DD-071) |
+| `%AAB_AdaptiveHandoffThresh` | `handoffLux` | Int | `25132` | `1..100000`; entered at `max(this, the curve's minimum)`; an AAB decimal imports rounded up (DD-071) |
+| `%AAB_HandoffHysteresis` | `handoffHysteresis` | Double | `0.8` | `0.5..1.0`, else (or non-finite) the default (DD-071) |
+
+The three hand-off fields also import from AAB's JSON section
+`adaptive_handoff.{enabled,threshold,hysteresis}`, a missing key loading its default (DD-070).
 
 Legacy migration parser accepts Tasker-style lines:
 

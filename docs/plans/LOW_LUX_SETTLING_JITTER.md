@@ -3,7 +3,9 @@
 ## Status
 
 Spec only. No code has changed. The owner approved the rule under **Proposed fix** as written
-(2026-10-08). It goes in the train after 1.14.0, and each step needs the owner's go-ahead. The new
+(2026-10-08). It was meant for the train after 1.14.0, but the owner deferred it to the train
+after 1.15.0 (2026-10-17), and each step needs the owner's go-ahead. That train makes its own
+version bump. The new
 ledger row recording the DC-070 departure lands with the code.
 
 ## Symptom (owner report, 2026-09-27)

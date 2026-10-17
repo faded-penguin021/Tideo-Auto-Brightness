@@ -496,3 +496,27 @@ id = "s17_57"
 status = "partial"
 effects = ["service_toggle", "settings_write", "override_record", "notification_action", "ui_nav"]
 reason = "Discard is allowlisted (owner, 2026-10-02) and every §2 control pause uses it; the Resume half keeps its curve point, which the suite cannot remove"
+
+# §18 Bright-light hand-off (added after the plan)
+[[scenario]]
+id = "s18_58"
+status = "partial"
+effects = ["service_toggle", "prefs_ui", "ui_nav"]
+reason = "lux above the hand-off threshold needs sunlight or a torch; the mode sampling is automatable"
+
+[[scenario]]
+id = "s18_59"
+status = "partial"
+effects = ["service_toggle", "ui_nav"]
+reason = "needs minutes in changing bright light; the absence of a pause is readable"
+
+[[scenario]]
+id = "s18_60"
+status = "partial"
+effects = ["service_toggle", "settings_write", "prefs_ui", "ui_nav"]
+reason = "entering the hand-off needs bright light; the pre-service mode and the Disable readback are automatable"
+
+[[scenario]]
+id = "s18_61"
+status = "manual"
+reason = "calibration sweeps the live panel, and the HBM readout needs direct sunlight"

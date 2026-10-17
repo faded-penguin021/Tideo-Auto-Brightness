@@ -1,13 +1,13 @@
 # DataStore, personal-data, and backup map (DA-034)
 
-The rebuild deliberately uses **nine independent DataStores** instead of one mega-store. Each owns a
+The rebuild deliberately uses **ten independent DataStores** instead of one mega-store. Each owns a
 single cohesive concern with its own lifetime, write cadence and failure mode, so a corrupt or
 schema-drifted file in one never takes down the others. They are declared in
 `app/.../storage/AppDataStores.kt`.
 
 | # | Store (extension) | File | Type | Payload | Schema ver | Serializer | Why independent |
 |---|---|---|---|---|---|---|---|
-| 1 | `settingsDataStore` | `aab_settings.json` | typed JSON | `AabSettings` (flat, 51 fields) | **3** (`CURRENT_SCHEMA_VERSION`) | `AabSettingsSerializer` | The core tuned curve/threshold/dimming parameters; versioned + migrated (v1→v2→v3; the 7 D-151/D-152 display-toggle fields joined additively at v3; DD-030 changed the animation defaults without a bump and writes every key). High read frequency (every pipeline reapply). |
+| 1 | `settingsDataStore` | `aab_settings.json` | typed JSON | `AabSettings` (flat, 55 fields) | **3** (`CURRENT_SCHEMA_VERSION`) | `AabSettingsSerializer` | The core tuned curve/threshold/dimming parameters; versioned + migrated (v1→v2→v3; the 7 D-151/D-152 display-toggle fields joined additively at v3; DD-030 changed the animation defaults without a bump and writes every key; the three per-profile bright-light hand-off fields joined additively without a bump, DD-071). High read frequency (every pipeline reapply). |
 | 2 | `serviceHealthDataStore` | `service_health.preferences_pb` | Preferences | heartbeat timestamps, degraded flag/reason | n/a (schema-less) | — (Preferences) | Volatile runtime diagnostics written by `MaintenanceWorker`; losing it is harmless. |
 | 3 | `experimentPrefsDataStore` | `experiment_prefs.preferences_pb` | Preferences | fixed date + lat/lon override, geo-IP opt-in, daily cached lat/lon/day | n/a (schema-less) | — (Preferences) | Circadian experiment and acquisition state. It contains precise coordinates and a privacy consent choice. |
 | 4 | `contextRulesDataStore` | `aab_context_rules.json` | typed JSON | `ContextOverrideConfig` (rule list) | **1** (`ContextOverrideConfig.SCHEMA_VERSION`) | `ContextRulesSerializer` | The context-override rule set; edited from the Contexts UI, read by `ContextEngine`. Tasker-JSON interop lives here, separate from settings. |
@@ -16,6 +16,13 @@ schema-drifted file in one never takes down the others. They are declared in
 | 7 | `powerDrawDataStore` | `power_draw.preferences_pb` | Preferences | measured OLED current/power samples (task524) | n/a (schema-less) | — (Preferences) | Disposable device-specific diagnostic/calibration data. |
 | 8 | `controlPrefsDataStore` | `control_prefs.preferences_pb` | Preferences | `external_control_enabled` (opt-in gate) | n/a (schema-less) | — (Preferences) | **D-157**: the device-local consent flag for the external intent-control surface. Its OWN store — deliberately **not** an `AabSettings` field — so profile apply/import/reset can never flip it. |
 | 9 | `contextBaselineDataStore` | `aab_context_baseline.json` | typed JSON | `ContextBaseline` (nullable `AabSettings` snapshot + `userProfileName`) | **2** (`ContextBaseline.SCHEMA_VERSION`) | `ContextBaselineSerializer` | **D-170**: the pre-override baseline snapshot (Tasker task626 `_ContextResume` / `%AAB_ProfileUser` revert file). Context-rule loads write through to store 1; this holds what the no-match revert restores. Kept apart so the snapshot/clear cadence and a corrupt snapshot (degrades to "no revert reference") never touch the live settings file. **DA-018**: v2 added `userProfileName` — the persisted `%AAB_ProfileUser` name (the last manually-loaded profile, default `"Default"`), the no-match/Resume revert TARGET. It outlives the snapshot (a snapshot `clear()` preserves it via `copy`). Additive → v1 files decode with the default; no migration hook reads the constant. |
+| 10 | `displayPrefsDataStore` | `display_prefs.preferences_pb` | Preferences | device display facts: the Night Light verdict (`night_light_key_not_honoured`, DD-048), the Night Light anchor and prior (`night_light_anchor_k`, `night_light_prior_on`, `night_light_prior_k`, DC-056, DD-059), and the display calibration (`display_calibration` as `level:raw,…` or `error`, `display_calibration_field`, `display_calibration_build`, DD-077) | n/a (schema-less) | — (Preferences) | Facts about this device and OS build, never part of a profile, so profile apply/import/reset cannot touch them; the verdict and the calibration are stamped with `Build.FINGERPRINT` and lapse after an OS update. |
+
+One file outside DataStore: `:platform`'s brightness controller keeps D-134's saved pre-service
+brightness mode (`saved_brightness_mode`) and the bright-light hand-off marker (`handed_off`) in the
+SharedPreferences file `screen_brightness_controller`, written together in one `commit()` so both
+survive process death (DD-073). `:platform` has no DataStore; the file is read at service start to
+reconcile a hand-off.
 
 ## Versioning policy
 
@@ -37,9 +44,9 @@ schema-drifted file in one never takes down the others. They are declared in
   reinstall. `userProfiles` always wrote every key; its `factoryRevision` moves an untouched
   built-in to new factory values once. A future default change must extend that pin to its key
   (layer: `AabSettingsMigrationTest`'s frozen-defaults test fails until it is looked at).
-- The four **Preferences** stores (`service_health`, `experiment_prefs`, `power_draw`, `control_prefs`)
-  are intentionally schema-less key/value bags (no serializer, no version); they hold disposable/optional
-  data.
+- The five **Preferences** stores (`service_health`, `experiment_prefs`, `power_draw`, `control_prefs`,
+  `display_prefs`) are intentionally schema-less key/value bags (no serializer, no version); they hold
+  disposable/optional data or device facts.
 
 ## Why not one store
 
@@ -85,6 +92,8 @@ enter backup. DataStore files resolve under the `file` domain at `datastore/<nam
 | Service health (`service_health.preferences_pb`) | **No** | **No** | Volatile timestamps/reasons are diagnostics and meaningless after restore. |
 | Power draw (`power_draw.preferences_pb`) | **No** | **No** | Device-specific measurements must not be applied to different hardware. |
 | External-control gate (`control_prefs.preferences_pb`) | **No** | **No** | Consent is device-local and defaults off after restore/transfer; a migrated install must explicitly re-enable its exported control surface. |
+| Display facts (`display_prefs.preferences_pb`) | **No** | **No** | The Night Light verdict and the display calibration describe one panel and one OS build; another device must probe and calibrate its own. |
+| Brightness-mode state (`shared_prefs/screen_brightness_controller.xml`) | **No** | **No** | The saved pre-service mode and the hand-off marker describe this device's live mode; restored elsewhere they would restore or reclaim a mode that was never saved there. |
 | Crash files (`crash/`) | **No** | **No** | Sensitive diagnostics are local-only and irrelevant on a replacement/restored install. |
 | App-private exported profiles (`files/*.json`) | **No** | **No** | Redundant copies with user-chosen names/content; users migrate explicitly exported SAF documents themselves. |
 

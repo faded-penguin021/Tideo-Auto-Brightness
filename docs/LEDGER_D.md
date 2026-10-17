@@ -730,6 +730,7 @@
   10000)]; Apply replaces a low value with it for a second tap, and a curve save or profile load
   raises the global silently. Switching Adaptive Brightness off by hand during a hand-off and a
   100 % hysteresis are declined as user error (owner).
+  Completed by DD-082.
 - DD-071 [cited]: **Tideo's port of DD-070 departs from AAB in four places (owner-approved,
   2026-10-15).** It enters at `max(stored, minimum)` instead of blocking Apply or rewriting the
   profile, so an undone curve edit restores the user's value; Resume and service start keep a
@@ -757,6 +758,7 @@
   `mHbmData=null`) and the OEM boost runs 4095 → 4674 above `mScreenBrightnessNormalMaximum`, so
   AAB's HBM rule there is the dumpsys brightness above 4095. The light sensor's declared
   `maxRange` 65535 is no saturation point: the owner has seen readings over 100 000 lx.
+  Its device readings are DD-083.
 - DD-073 [cited]: **A bright-light hand-off (DD-070) owns Android's AUTOMATIC through a persisted
   `handed_off` marker beside D-134's saved mode, so Tideo's own AUTOMATIC is never saved as the
   user's pre-service mode.** `handOffToSystem()` commits the original mode (the saved one, or the
@@ -894,3 +896,24 @@
   258 at 73 601 lx in partial shade. This phone gives apps a 0–255 brightness scale (Settings API
   max 255) that it maps to its own 0–4095, which is why the sweep, written through Tideo's
   conversion, reaches 4095 at 255 (DD-079).
+- DD-082: **Facts of AAB's hand-off reference (DD-070) that lived only in the hand-off plan, kept
+  here before unit 6 deleted it (Sol review, 2026-10-17).** AAB's threshold check has no upper
+  bound, where Tideo clamps the stored lux to 1..100 000 and finds no minimum past 100 000 lx
+  (DD-071). In the export, Smooth Brightness Transition V5 returns at once while handed off and
+  breaks out mid-animation when the flag flips, and the DC-like transition skipped its write and
+  override check but still applied dimming, until the owner's fix made Map Lux skip that path. The
+  owner's other fixes of 2026-10-15 deleted V5's leftover A10 Java block, made the scene's Apply
+  run `_Hand-offDecider`, and made `_CalibrateDisplayRange` read `dumpsys display` through
+  `%AAB_SecondaryPrivilege`, as `_ReadBrightness` does.
+- DD-083: **Unit 0's read-only adb facts behind DD-072, on the owner's OnePlus CPH2653 (SDK 36,
+  `CPH2653_16.0.10.600(EX01)`, 2026-10-16, indoors, the owner switching the mode).** The light
+  sensor is `OPLUS Fusion Light Sensor Next Gen`, declaring `maxRange=65535.0`. In MANUAL (mode 0,
+  `screen_brightness` 755) `mScreenBrightness`, `mCurrentScreenBrightness` and
+  `mCachedBrightnessInfo.brightness` all read 755.0, and in AUTOMATIC (mode 1, 1390) all three
+  read 1390.0 while the OEM's `OplusAutomaticBrightnessController` reported
+  `mAutoStrategyEnable=true` and `mScreenAutoBrightness=1390.0846`; no `mDisplayBrightness` line
+  exists. In both modes AOSP's `HighBrightnessModeController` read `mHbmMode=off`,
+  `mHbmData=null` and `mIsAutoBrightnessEnabled=false` with
+  `mCachedBrightnessInfo.hbmTransitionPoint=Infinity`, and the display reported
+  `mScreenBrightnessNormalMaximum=4095.0` and `mScreenBrightnessRangeMaximum=4674.0`. No reading
+  above 4095 was taken that day, which was cloudy; DD-081 took one in sunlight.
