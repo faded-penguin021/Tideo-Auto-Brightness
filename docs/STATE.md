@@ -93,6 +93,11 @@ proposing work; changing it is legislation under RUNBOOK's rule-review protocol.
 
 Newest first; ledger rows are the durable detail.
 
+- 2026-10-17 — **E2E suite on 1.15.0-debug vc30: 17 of 20 auto rows pass, 3 skip on their own
+  preconditions, journal empty, after one harness-timing teardown miss that `--recover` fixed
+  (DD-086). #136's OxygenOS 16 calibration needed "Disable system optimization" on; it stays a
+  workaround (DD-087).**
+
 - 2026-10-17 — **Owner's cursory pass of DEVICE_TEST_SCRIPT §18 on the phone found it all fine;
   Owner queue item 4 is closed and the train goes to its PR (DD-084). Astra's ship check said
   HOLD on an interrupted calibration, left to the owner's merge call, and a data-keeping

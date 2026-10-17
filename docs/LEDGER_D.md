@@ -933,3 +933,23 @@
   1.14.1 that keeps app data while handed off makes 1.14.1's `forceManualMode()` save Tideo's
   AUTOMATIC over the user's mode, which the `handed_off` marker (DD-073) cannot prevent there;
   Android keeps data across a downgrade only for a debuggable build or with root.
+- DD-086: **RUNBOOK playbook 9 on 1.15.0-debug vc30 (`v1.15.0`, 77d8147, owner's CPH2653,
+  2026-10-17): 17 of 20 auto rows pass and 3 skip on their own preconditions, as in DD-044
+  (s06_16, s02_10c, s11_32c at daltonizer 13); the journal ends empty.** The debug package was
+  absent, so the build went on through `--install` as a first install. In the first invocation
+  s13_42's teardown read `external_control_enabled` still `true` after its restore, and the
+  leftover journal errored the six rows after it at setup; `--recover` restored it at once and
+  all seven passed on a rerun, so harness timing, not fixed. Step 7 found only explained churn,
+  `saved_brightness_mode` included: the run's service stops clear it (`restoreMode()`) and only
+  a brightness write re-saves it, with the mode at the owner's MANUAL either way. §18 has no auto
+  row.
+- DD-087: **#136 after v1.15.0: on a OnePlus 15 (OxygenOS 16) display calibration (DD-079) needed
+  Developer options → "Disable system optimization" on, both for `pm grant … DUMP` (a
+  `SecurityException` otherwise) and for the calibration itself, which with DUMP held but the
+  option off failed "Tideo couldn't read dumpsys display" (reporter, 2026-10-17).** The
+  calibration and the readout above 255 survived turning it off again and a reboot. The owner's
+  CPH2653 calibrated on DUMP alone (DD-081) and could not reproduce it; the reporter declined to
+  break a working setup for logs, so it stays as is and similar reports get this workaround
+  (owner). A Pixel 9 Pro on crDroid (Android 16) cannot calibrate and has no such option; the owner
+  asked for `dumpsys display` at high lux under Adaptive Brightness, and calibration only feeds the
+  readout, never the hand-off.
