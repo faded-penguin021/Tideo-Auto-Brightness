@@ -13,6 +13,7 @@ import com.tideo.autobrightness.app.ui.screens.AboutScreen
 import com.tideo.autobrightness.app.ui.screens.CircadianScreen
 import com.tideo.autobrightness.app.ui.screens.CurveBrightnessScreen
 import com.tideo.autobrightness.app.ui.screens.DashboardScreen
+import com.tideo.autobrightness.app.ui.screens.HandoffScreen
 import com.tideo.autobrightness.app.ui.screens.LiveDebugScreen
 import com.tideo.autobrightness.app.ui.screens.MenuScreen
 import com.tideo.autobrightness.app.ui.screens.MiscScreen
@@ -43,6 +44,7 @@ fun AppNavGraph(
         composable(AppRoute.Dashboard.route) { DashboardScreen(navController) }
         composable(AppRoute.Onboarding.route) { OnboardingScreen(navController) }
         composable(AppRoute.CurveBrightness.route) { CurveBrightnessScreen(navController) }
+        composable(AppRoute.Handoff.route) { HandoffScreen(navController) }
         composable(AppRoute.Reactivity.route) { ReactivityScreen(navController) }
         composable(AppRoute.SuperDimming.route) { SuperDimmingScreen(navController) }
         composable(AppRoute.Circadian.route) { CircadianScreen(navController) }

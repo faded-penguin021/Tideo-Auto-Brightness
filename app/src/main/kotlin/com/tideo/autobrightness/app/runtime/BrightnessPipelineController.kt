@@ -42,6 +42,7 @@ class BrightnessPipelineController(
     private val proximitySource: ProximitySensorSource? = null,
     private val callbackLog: SensorCallbackLog = SensorCallbackLog(),
     private val scaleRefreshPeriodMs: Long = 0L,
+    handoffSink: HandoffSink = NoOpHandoffSink,
 ) : ControllerHook, PipelineRuntimeContext {
 
     private val engine = BrightnessEngine()
@@ -62,7 +63,7 @@ class BrightnessPipelineController(
 
     private val debugEmitter = PipelineDebugEmitter(debugSink)
     private val panicHandler = PanicHandler(brightness, dimming)
-    private val handoff = HandoffCoordinator(this, brightness, dimming, clock)
+    private val handoff = HandoffCoordinator(this, brightness, dimming, clock, handoffSink)
     private val cycleRunner = PipelineCycleRunner(
         ctx = this,
         engine = engine,

@@ -34,17 +34,11 @@ import com.tideo.autobrightness.app.ui.components.DraftSettingsScaffold
 import com.tideo.autobrightness.app.ui.components.KeyValueRow
 import com.tideo.autobrightness.app.ui.components.NumberSettingField
 import com.tideo.autobrightness.app.ui.components.SectionHeader
-import com.tideo.autobrightness.app.ui.components.IntSliderSettingField
 import com.tideo.autobrightness.app.ui.components.SettingsColumn
-import com.tideo.autobrightness.app.ui.components.SwitchSettingRow
 import com.tideo.autobrightness.app.ui.graph.BrightnessCurveChart
-import com.tideo.autobrightness.domain.brightness.BrightnessCurveConfig
-import com.tideo.autobrightness.domain.brightness.HandoffRules
 import com.tideo.autobrightness.domain.wizard.OverridePoint
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import kotlin.math.floor
-import kotlin.math.roundToInt
 
 internal fun List<FieldError>.forField(name: String): String? = firstOrNull { it.field == name }?.message
 
@@ -207,55 +201,7 @@ fun CurveBrightnessContent(
                 errors.forField("zone2End")?.let { ErrorBanner(it, "error_zone2End") }
                 errors.forField("safetyBrightness")?.let { ErrorBanner(it, "error_safetyBrightness") }
             }
-
-            HandoffCard(draft, committed, epoch, handoff, onEdit)
         }
-    }
-}
-
-internal data class HandoffPreview(val minimum: Int?, val effective: Int?)
-
-internal fun handoffPreview(draft: AabSettings, curve: BrightnessCurveConfig): HandoffPreview? {
-    if (!draft.handoffEnabled) return null
-    val minimum = HandoffRules.minimumHandoffLux(curve)
-    return HandoffPreview(minimum, minimum?.let { maxOf(draft.handoffLux, it) })
-}
-
-@Composable
-private fun HandoffCard(
-    draft: AabSettings,
-    committed: AabSettings,
-    epoch: Int,
-    preview: HandoffPreview?,
-    onEdit: ((AabSettings) -> AabSettings) -> Unit,
-) {
-    val on = draft.handoffEnabled
-    AabCard {
-        SectionHeader(stringResource(R.string.curve_handoff_header), divider = true)
-        SwitchSettingRow(
-            stringResource(R.string.settings_handoff_enabled), on, { v -> onEdit { it.copy(handoffEnabled = v) } },
-            help = TaskerHelp.HANDOFF_ENABLED, testTag = "switch_handoffEnabled",
-        )
-        val luxNote = when {
-            preview == null -> null
-            preview.minimum == null -> stringResource(R.string.curve_handoff_unreachable)
-            preview.minimum > draft.handoffLux -> stringResource(R.string.curve_handoff_raised, preview.minimum)
-            else -> stringResource(R.string.curve_handoff_minimum, preview.minimum)
-        }
-        NumberSettingField(
-            stringResource(R.string.settings_handoff_lux), draft.handoffLux, { onEdit { s -> s.copy(handoffLux = it.toInt()) } },
-            epoch = epoch, committed = committed.handoffLux, helper = luxNote, enabled = on,
-            help = TaskerHelp.HANDOFF_LUX, testTag = "field_handoffLux",
-        )
-        val exitNote = preview?.effective?.let {
-            stringResource(R.string.curve_handoff_exit, floor(HandoffRules.exitLux(it, draft.handoffHysteresis)).toInt())
-        }
-        IntSliderSettingField(
-            stringResource(R.string.curve_handoff_hysteresis_pct), (draft.handoffHysteresis * 100).roundToInt(), 50..100,
-            { pct -> onEdit { it.copy(handoffHysteresis = pct / 100.0) } },
-            committed = (committed.handoffHysteresis * 100).roundToInt(), helper = exitNote, enabled = on,
-            help = TaskerHelp.HANDOFF_HYSTERESIS, testTag = "slider_handoffHysteresis",
-        )
     }
 }
 

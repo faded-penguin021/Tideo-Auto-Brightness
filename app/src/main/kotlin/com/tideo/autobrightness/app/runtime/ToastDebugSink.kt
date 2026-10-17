@@ -3,6 +3,7 @@ package com.tideo.autobrightness.app.runtime
 import android.content.Context
 import android.os.Handler
 import android.os.Looper
+import com.tideo.autobrightness.R
 
 /**
  * Android DebugSink (G2-F15): flashes debug message per category via AabFlash (S12.7e, G2R-F51/F50).
@@ -31,5 +32,17 @@ class ToastContextLoadSink(context: Context) : ContextLoadSink {
     override fun onContextLoaded(contextName: String, profileName: String) {
         val text = "Context \"$contextName\" → profile \"$profileName\""
         mainHandler.post { AabFlash.show(appContext, text) }
+    }
+}
+
+class ToastHandoffSink(context: Context) : HandoffSink {
+    private val appContext = context.applicationContext
+    private val mainHandler = Handler(Looper.getMainLooper())
+
+    override fun onHandoff(toAndroid: Boolean) {
+        val res = if (toAndroid) R.string.flash_handoff_to_android else R.string.flash_handoff_back
+        mainHandler.post {
+            AabFlash.show(appContext, AmbientMonitoringService.notificationLanguageContext(appContext).getString(res))
+        }
     }
 }

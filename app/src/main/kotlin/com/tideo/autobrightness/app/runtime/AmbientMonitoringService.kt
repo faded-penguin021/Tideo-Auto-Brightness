@@ -613,7 +613,7 @@ class AmbientMonitoringService : Service() {
             refreshNotificationChannels(context)
         }
 
-        private fun notificationLanguageContext(context: Context): Context {
+        internal fun notificationLanguageContext(context: Context): Context {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU || !activityLocalesInitialized) {
                 return ContextCompat.getContextForLanguage(context)
             }

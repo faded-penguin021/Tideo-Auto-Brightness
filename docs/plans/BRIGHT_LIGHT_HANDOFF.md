@@ -3,8 +3,8 @@
 ## Status
 
 Units 0–5 are done (domain `HandoffRules`, DD-070…DD-072; the per-profile settings; the
-controller's ownership marker, DD-073; the runtime coordinator, DD-074; the UI, DD-075); the rest
-is spec. The owner has
+controller's ownership marker, DD-073; the runtime coordinator, DD-074; the UI, DD-075, given its
+own screen and AAB's hand-off flashes after the owner's device test, DD-076); the rest is spec. The owner has
 built the feature in AAB (handed over 2026-10-15). That build is now the reference for this port, and this plan was rewritten against it.
 The export is force-added under `dist/aab-bright-light-handoff/`. It is temporary: unit 6 removes
 it, and unit 1 copies every fact the port depends on into the ledger first. The owner fixed five
@@ -293,13 +293,16 @@ In `runCycle`, after smoothing and before the write, as AAB orders it:
 
 ### What the user sees
 
-- **Curve & Brightness** gets a hand-off card:
+- **Hand-off Behavior**, its own Menu screen after Curve & Brightness as AAB's own scene (DD-076),
+  holds the hand-off card:
   - a switch;
   - a lux field (default 25 132), with a live note of the curve's minimum. It says when the
     effective threshold is raised to that minimum, and says when the curve never reaches 90 % of
     max;
   - a 50–100 % slider, "takes back control below N lx";
-  - a vertical `ChartMarker` at the effective threshold.
+  - and Curve & Brightness keeps a vertical `ChartMarker` at the effective threshold.
+- **Flash** on each landed hand-off and hand-back, as AAB's two tasks; Pause and Disable stay
+  silent (DD-076).
 - **Notification:** "Android is controlling brightness · N lx".
 - **Dashboard pill, widget and tile:** "Android".
 - **Live Debug:** a "Hand-off" metric. All strings go through `stringResource`, so

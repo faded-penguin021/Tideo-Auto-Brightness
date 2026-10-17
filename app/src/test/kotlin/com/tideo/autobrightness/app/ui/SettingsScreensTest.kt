@@ -35,6 +35,7 @@ import com.tideo.autobrightness.app.ui.screens.SuperDimmingContent
 import com.tideo.autobrightness.app.ui.screens.ContextsContent
 import com.tideo.autobrightness.app.ui.components.FlashPill
 import com.tideo.autobrightness.app.ui.screens.CurveBrightnessContent
+import com.tideo.autobrightness.app.ui.screens.HandoffContent
 import com.tideo.autobrightness.app.runtime.OverrideDiagnostic
 import com.tideo.autobrightness.app.runtime.OverrideDisposition
 import com.tideo.autobrightness.app.runtime.OverrideSource
@@ -333,7 +334,7 @@ class SettingsScreensTest {
             .assertTextContains("33", substring = true)
     }
 
-    private fun curveWithHandoff(draft: AabSettings, live: PipelineState = PipelineState()) {
+    private fun curve(draft: AabSettings, live: PipelineState = PipelineState()) {
         compose.setContent {
             MaterialTheme {
                 CurveBrightnessContent(
@@ -344,41 +345,57 @@ class SettingsScreensTest {
         }
     }
 
+    private fun handoff(draft: AabSettings) {
+        compose.setContent {
+            MaterialTheme {
+                HandoffContent(draft, draft, epoch = 0, dirty = false, onEdit = {}, onApply = {}, onDiscard = {}, onBack = {})
+            }
+        }
+    }
+
     private fun awaitText(text: String, substring: Boolean = false) = compose.waitUntil(10_000) {
         compose.onAllNodesWithText(text, substring = substring).fetchSemanticsNodes().isNotEmpty()
     }
 
     @Test
-    fun curveBrightness_handoffCard_namesTheMinimumAndTheExit() {
-        curveWithHandoff(AabSettings(handoffEnabled = true))
+    fun handoff_namesTheMinimumAndTheExit() {
+        handoff(AabSettings(handoffEnabled = true))
         awaitText("Lowest valid for this curve: 25132 lx")
         compose.onNodeWithText("Takes back control below 20105 lx").performScrollTo().assertExists()
     }
 
     @Test
-    fun curveBrightness_handoffCard_saysWhenTheThresholdIsRaised() {
-        curveWithHandoff(AabSettings(handoffEnabled = true, handoffLux = 1_000, handoffHysteresis = 0.5))
+    fun handoff_saysWhenTheThresholdIsRaised() {
+        handoff(AabSettings(handoffEnabled = true, handoffLux = 1_000, handoffHysteresis = 0.5))
         awaitText("Hands off at 25132 lx instead", substring = true)
         compose.onNodeWithText("Takes back control below 12566 lx").performScrollTo().assertExists()
     }
 
     @Test
-    fun curveBrightness_handoffCard_saysWhenTheCurveNeverQualifies() {
-        curveWithHandoff(AabSettings(handoffEnabled = true, form2B = -2f))
+    fun handoff_saysWhenTheCurveNeverQualifies() {
+        handoff(AabSettings(handoffEnabled = true, form2B = -2f))
         awaitText("so it never hands off", substring = true)
         compose.onNodeWithText("Takes back control", substring = true).assertDoesNotExist()
     }
 
     @Test
-    fun curveBrightness_handoffCard_offDisablesTheFields() {
-        curveWithHandoff(AabSettings())
+    fun handoff_offDisablesTheFields() {
+        handoff(AabSettings())
+        compose.onNodeWithText("Hand-off Behavior").assertExists()
         compose.onNodeWithTag("field_handoffLux").performScrollTo().assertIsNotEnabled()
         compose.onNodeWithText("Lowest valid", substring = true).assertDoesNotExist()
     }
 
     @Test
+    fun curveBrightness_hasNoHandoffCard_DD076() {
+        curve(AabSettings(handoffEnabled = true))
+        compose.onNodeWithTag("brightness_curve_chart").assertExists()
+        compose.onNodeWithTag("switch_handoffEnabled").assertDoesNotExist()
+    }
+
+    @Test
     fun curveBrightness_liveReadout_blanksWhileHandedOff() {
-        curveWithHandoff(AabSettings(), PipelineState(serviceOn = true, handedOff = true, smoothedLux = 30_000.0, targetBrightness = 200))
+        curve(AabSettings(), PipelineState(serviceOn = true, handedOff = true, smoothedLux = 30_000.0, targetBrightness = 200))
         compose.onNodeWithTag("diag_curve_current_bright").performScrollTo().assertTextContains("—", substring = true)
     }
 

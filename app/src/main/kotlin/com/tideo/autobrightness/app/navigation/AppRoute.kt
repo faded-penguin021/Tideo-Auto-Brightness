@@ -14,6 +14,8 @@ enum class AppRoute(
     Dashboard("dashboard", "Dashboard", R.string.title_dashboard, "S11"),
     Onboarding("onboarding", "Setup & Permissions", R.string.onboarding_title, "S11"),
     CurveBrightness("curve_brightness", "Curve & Brightness", R.string.title_curve_brightness, "S12"),
+    // DD-076: AAB's hand-off scene is its own page.
+    Handoff("handoff", "Hand-off Behavior", R.string.title_handoff, "#136"),
     Reactivity("reactivity", "Reactivity", R.string.title_reactivity, "S12"),
     // S12.6a rename (G2R-F3): the screen owns super dimming + PWM after S12.5b, so its name follows.
     SuperDimming("super_dimming", "Super Dimming", R.string.title_super_dimming, "S12.6a"),
@@ -37,7 +39,7 @@ enum class AppRoute(
 
         /** Tunable parameter screens (Menu "Settings" group). */
         val settingsDestinations: List<AppRoute> = listOf(
-            CurveBrightness, Reactivity, SuperDimming, Circadian, Misc,
+            CurveBrightness, Handoff, Reactivity, SuperDimming, Circadian, Misc,
         )
 
         /** Tools + Live Debug + reference content (Menu "Info & Help" group). */

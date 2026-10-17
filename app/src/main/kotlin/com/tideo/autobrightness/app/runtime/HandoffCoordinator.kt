@@ -7,11 +7,20 @@ import com.tideo.autobrightness.domain.brightness.HandoffRules
 import com.tideo.autobrightness.domain.brightness.HandoffRules.Decision
 import com.tideo.autobrightness.platform.brightness.ScreenBrightnessController
 
+fun interface HandoffSink {
+    fun onHandoff(toAndroid: Boolean)
+}
+
+object NoOpHandoffSink : HandoffSink {
+    override fun onHandoff(toAndroid: Boolean) = Unit
+}
+
 internal class HandoffCoordinator(
     private val ctx: PipelineRuntimeContext,
     private val brightness: ScreenBrightnessController,
     private val dimming: DimmingCoordinator,
     private val clock: () -> Long,
+    private val sink: HandoffSink = NoOpHandoffSink,
 ) {
     private var minimumByCurve: Pair<BrightnessCurveConfig, Int?>? = null
 
@@ -42,8 +51,9 @@ internal class HandoffCoordinator(
         if (!settings.handoffEnabled || effectiveThreshold(settings) == null) exit()
     }
 
+    // DD-076: Pause reclaims silently.
     fun release() {
-        if (ctx.stateValue.handedOff) exit()
+        if (ctx.stateValue.handedOff) exit(flash = false)
     }
 
     // Tasker: "_Hand-offToAdaptive" (AAB hand-off export, DD-070).
@@ -55,15 +65,17 @@ internal class HandoffCoordinator(
         val landed = brightness.handOffToSystem()
         armSettle()
         ctx.update { if (landed) it.copy(lastAppliedBrightness = null) else it.copy(handedOff = false) }
+        if (landed) sink.onHandoff(toAndroid = true)
         landed
     }
 
     // Tasker: "_HandBackToAAB" (AAB hand-off export, DD-070).
-    private fun exit(): Boolean {
+    private fun exit(flash: Boolean = true): Boolean {
         armSettle()
         if (!brightness.reclaimFromSystem()) return false
         armSettle()
         ctx.update { it.copy(handedOff = false) }
+        if (flash) sink.onHandoff(toAndroid = false)
         return true
     }
 

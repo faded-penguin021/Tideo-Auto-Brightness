@@ -811,3 +811,20 @@
   Chinese translation (DD-026). The tile's subtitles stay hardcoded English, as they were (Sol
   review, 2026-10-17, for the floor and the taper marker; glue review, for the colour and the
   thread).
+  Corrected by DD-076.
+- DD-076 [cited]: **The bright-light hand-off has its own Menu screen, Hand-off Behavior, and each
+  hand-off and hand-back flashes, as in AAB (owner, 2026-10-17, after a device test of 1.15.0-debug
+  vc30 in 14 000 lx).** AAB's settings are their own scene, "Hand-off Behavior", reached from its
+  menu, and `_Hand-offToAdaptive` A8 and `_HandBackToAAB` A5 each Flash that Adaptive Brightness
+  went on or off and who now controls brightness; DD-075's card on Curve & Brightness and its
+  notification text alone did not match. The screen
+  sits after Curve & Brightness in the Menu's Settings card, with its own draft, Apply, Discard and
+  a Reset of the three fields (DD-071) only; Curve & Brightness keeps the graph marker. Its minimum
+  is the applied curve's, not the draft's, since the curve is edited elsewhere and a context swap
+  while it is open changes the applied one (Sol review, 2026-10-17). The coordinator flashes
+  through `AabFlash` only after a landed entry or reclaim, never for a refused one; Pause hands back
+  silently, because Tideo then pauses rather than takes control (Sol review), and `stop()` restores
+  the user's mode without a reclaim, so disabling Tideo does not claim it is back in control, where
+  AAB's disable runs `_HandBackToAAB` and flashes. Its three source pointers raise the app comment
+  budget through a new reviewed `RAISED_app=3`, under the owner's pre-approval for unit 5
+  (2026-10-16), kept apart from `MEASURED_app` so that stays a measurement (rule review).

@@ -54,7 +54,8 @@ COMMENT_BLOCK_MAX_LINES=12
 
 # Per-module comment-line ceilings, and the margin that sets them.
 #
-# Each is the measured post-consolidation count for the module plus COMMENT_BUDGET_MARGIN_PCT, so
+# Each is the measured post-consolidation count for the module plus COMMENT_BUDGET_MARGIN_PCT
+# (plus any reviewed RAISED_* for that module, below), so
 # the headroom is a stated policy rather than an accident of where the tree happened to land. The
 # margin exists because a module that is exactly at its measured size has a budget of zero for the
 # next honest KDoc, and a guard whose only possible repair is deleting documentation is one that
@@ -77,7 +78,7 @@ COMMENT_BLOCK_MAX_LINES=12
 # 2288/436/291, i.e. 4.90%, 5.50% and 6.53% — while the sentence above called them "the measured
 # count plus COMMENT_BUDGET_MARGIN_PCT", and nothing in the tree read the constant at all. A stated
 # policy that nothing computes and no number obeys is an accident with a name on it. Re-baseline by
-# updating MEASURED_* from a guard run; the ceilings follow.
+# updating MEASURED_* from a guard run and resetting RAISED_* to 0; the ceilings follow.
 #
 # Re-baselined 2026-08-23 (DB-074…DB-078): app 2288 → 2417, platform 291 → 314. Read the delta
 # honestly, because MEASURED_* is the count at the last re-baseline and NOT what the tree held when
@@ -101,10 +102,16 @@ COMMENT_BUDGET_MARGIN_PCT=5
 MEASURED_app=2417
 MEASURED_domain=436
 MEASURED_platform=314
+# Reviewed raises past the margin, kept apart so MEASURED_* stays a measurement; a re-baseline
+# absorbs them and resets these to 0. app +3: three `// DD-076:` pointers (owner pre-approval
+# for hand-off unit 5, 2026-10-16; restating comments in that change were deleted instead).
+RAISED_app=3
+RAISED_domain=0
+RAISED_platform=0
 for _m in app domain platform; do
 	eval "_meas=\$MEASURED_$_m"
 	# Integer ceiling: (x*pct + 99) / 100.
-	eval "BUDGET_$_m=\$(( _meas + (_meas * COMMENT_BUDGET_MARGIN_PCT + 99) / 100 ))"
+	eval "BUDGET_$_m=\$(( _meas + (_meas * COMMENT_BUDGET_MARGIN_PCT + 99) / 100 + RAISED_$_m ))"
 done
 unset _m _meas
 

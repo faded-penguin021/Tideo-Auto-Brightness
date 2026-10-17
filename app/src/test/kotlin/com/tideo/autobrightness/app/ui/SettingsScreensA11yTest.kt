@@ -6,6 +6,7 @@ import com.tideo.autobrightness.app.settings.AabSettings
 import com.tideo.autobrightness.app.settings.FieldError
 import com.tideo.autobrightness.app.ui.screens.CircadianContent
 import com.tideo.autobrightness.app.ui.screens.CurveBrightnessContent
+import com.tideo.autobrightness.app.ui.screens.HandoffContent
 import com.tideo.autobrightness.app.ui.screens.ReactivityContent
 import com.tideo.autobrightness.app.ui.screens.SuperDimmingContent
 import com.tideo.autobrightness.platform.privilege.Tier
@@ -34,6 +35,20 @@ class SettingsScreensA11yTest {
             }
         }
         compose.assertAllInteractiveNodesAreLabeled()
+    }
+
+    @Test
+    fun handoff_allInteractiveNodesAreLabeled_andItsHeaderIsAHeading() {
+        compose.setContent {
+            MaterialTheme {
+                HandoffContent(
+                    AabSettings(handoffEnabled = true), AabSettings(handoffEnabled = true),
+                    epoch = 0, dirty = false, onEdit = {}, onApply = {}, onDiscard = {}, onBack = {}, onReset = {},
+                )
+            }
+        }
+        compose.assertAllInteractiveNodesAreLabeled()
+        compose.assertHeadingExists("Bright-light hand-off")
     }
 
     @Test

@@ -113,6 +113,7 @@ class HandoffPipelineTest {
         val observer = Observer()
         val brightness = ModeBrightness(log)
         val dimming = Dimming(log)
+        val flashes = mutableListOf<Boolean>()
         var settings = initial
         var settingsReadMs = 0L
         var nowMs = 1_000L
@@ -125,6 +126,7 @@ class HandoffPipelineTest {
             scope = scope,
             clock = { nowMs + test.testScheduler.currentTime },
             dimming = dimming,
+            handoffSink = { flashes += it },
         )
         val state: PipelineState get() = controller.state.value
 
@@ -182,6 +184,32 @@ class HandoffPipelineTest {
         assertEquals(1, rig.brightness.reclaims)
         assertTrue(rig.brightness.writes.size > writes, "the hand-back writes in the same cycle")
         assertEquals(dimmed + 1, rig.dimming.applied.size)
+        rig.close()
+    }
+
+    @Test
+    fun aLandedEntryAndExitFlash_aRefusedOneAndStopDoNot_DD076() = runTest {
+        val rig = Rig(this)
+        rig.brightness.handOffLands = false
+        rig.controller.start()
+        rig.reading(30_000.0)
+        assertEquals(emptyList(), rig.flashes, "a refused entry hands nothing to Android")
+
+        rig.brightness.handOffLands = true
+        rig.seeded(30_000.0)
+        assertEquals(listOf(true), rig.flashes)
+
+        rig.brightness.reclaimLands = false
+        rig.seeded(1_000.0)
+        assertEquals(listOf(true), rig.flashes, "a refused reclaim leaves Android in charge")
+
+        rig.brightness.reclaimLands = true
+        rig.seeded(1_000.0)
+        assertEquals(listOf(true, false), rig.flashes)
+
+        rig.seeded(30_000.0)
+        rig.controller.stop()
+        assertEquals(listOf(true, false, true), rig.flashes, "stop() restores the user's mode; Tideo is not back in control")
         rig.close()
     }
 
@@ -398,6 +426,7 @@ class HandoffPipelineTest {
         assertFalse(rig.state.handedOff)
         assertEquals(1, rig.brightness.reclaims)
         assertEquals(writes, rig.brightness.writes.size, "Pause writes nothing")
+        assertEquals(listOf(true), rig.flashes, "Pause hands back silently: Tideo pauses, it does not take control (DD-076)")
         rig.close()
     }
 

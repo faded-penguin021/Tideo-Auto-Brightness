@@ -108,6 +108,10 @@ proposing work; changing it is legislation under RUNBOOK's rule-review protocol.
 
 Newest first; ledger rows are the durable detail.
 
+- 2026-10-17 — **Owner's device test of unit 5: the hand-off settings move to their own Menu
+  screen, Hand-off Behavior, as AAB's scene, and each hand-off and hand-back flashes AAB's message
+  (Pause and Disable stay silent) (DD-076).**
+
 - 2026-10-17 — **Hand-off unit 5: a hand-off card on Curve & Brightness (switch, lux with the
   curve's minimum, 50–100 % hand-back slider) and a graph marker at the effective threshold; the
   notification, pill, widget, tile and Live Debug say "Android", and brightness readouts blank

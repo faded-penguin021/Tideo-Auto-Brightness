@@ -15,6 +15,7 @@ import com.tideo.autobrightness.app.runtime.OverridePointSink
 import com.tideo.autobrightness.app.runtime.SuperDimmingCoordinator
 import com.tideo.autobrightness.app.runtime.ToastContextLoadSink
 import com.tideo.autobrightness.app.runtime.ToastDebugSink
+import com.tideo.autobrightness.app.runtime.ToastHandoffSink
 import com.tideo.autobrightness.app.runtime.CircadianScaleRefresh
 import com.tideo.autobrightness.app.runtime.CircadianWindowProvider
 import com.tideo.autobrightness.app.runtime.liveDynamicScale
@@ -132,6 +133,7 @@ class AppModule(context: Context) {
             proximitySource = AndroidProximitySensorSource(appContext),
             callbackLog = LiveRuntimeState.sensorCallbacks,
             scaleRefreshPeriodMs = CircadianScaleRefresh.PERIOD_MS,
+            handoffSink = ToastHandoffSink(appContext),
         )
         controllerHook.hook = controller
         // D-110: recompute when circadian location resolves late.

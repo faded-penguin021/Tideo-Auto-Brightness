@@ -632,12 +632,16 @@ cb_git_tree() { # <dir> <budget> [manifest-record...]
 	# these cases assert against. An earlier version sed'd `^BUDGET_app=`, a line that stopped
 	# existing when the budgets became computed — it matched nothing, every budget case silently ran
 	# against the real 2403-line ceiling, and three of them passed for the wrong reason.
+	# A reviewed RAISED_app would lift the ceiling past $2 the same way, so it is zeroed too.
 	sed -i.bak -e "s/^MEASURED_app=.*/MEASURED_app=$2/" \
 		-e "s/^COMMENT_BUDGET_MARGIN_PCT=.*/COMMENT_BUDGET_MARGIN_PCT=0/" \
+		-e "s/^RAISED_app=.*/RAISED_app=0/" \
 		"$d/scripts/guards/comment-budget.sh"
 	rm -f "$d/scripts/guards/comment-budget.sh.bak"
 	grep -q "^MEASURED_app=$2\$" "$d/scripts/guards/comment-budget.sh" ||
 		bad "cb_git_tree could not set MEASURED_app in the sandbox copy — the budget cases would run against the real ceiling and pass vacuously"
+	grep -q "^RAISED_app=0\$" "$d/scripts/guards/comment-budget.sh" ||
+		bad "cb_git_tree could not zero RAISED_app in the sandbox copy — the budget cases would run above \$2 and pass vacuously"
 	# Replace the shipped provenance manifest with the fixture's own records (tab-separated
 	# `count<TAB>path<TAB>coordinates`, passed as $3...), or with an empty one when none are given.
 	# Rewriting the whole heredoc rather than patching a number is the point: the manifest IS the

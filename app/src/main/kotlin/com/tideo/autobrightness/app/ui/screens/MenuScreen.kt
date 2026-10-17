@@ -20,6 +20,7 @@ import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
@@ -122,6 +123,7 @@ fun MenuContent(
             AabCard {
                 // G3-F10: "Create" icon for Curve & Brightness (edit action).
                 MenuNavRow(AppRoute.CurveBrightness, Icons.Filled.Create, onNavigate)
+                MenuNavRow(AppRoute.Handoff, Icons.Filled.Star, onNavigate)
                 MenuNavRow(AppRoute.Reactivity, Icons.Filled.Refresh, onNavigate)
                 MenuNavRow(AppRoute.SuperDimming, Icons.Filled.PlayArrow, onNavigate)
                 MenuNavRow(AppRoute.Circadian, Icons.Filled.DateRange, onNavigate)

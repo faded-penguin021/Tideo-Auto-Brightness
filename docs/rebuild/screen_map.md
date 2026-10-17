@@ -36,6 +36,7 @@ rects and `PropertiesElement` scene-chrome are dropped (replaced by the M3 Scaff
 | **Menu** (home hub) | AAB Menu scene (banner + grouped nav + Profiles/Contexts hero cards) | — |
 | **Dashboard** (live status) | Misc Settings (service switch), live pipeline readout | — |
 | **Curve & Brightness** | Brightness Settings (curve coefficients), Brightness Graph | BrightnessCurveChart |
+| **Hand-off Behavior** | AAB Hand-off Scene (bright-light hand-off switch, lux, hysteresis; not in the V3.3 XML, DD-076) | — |
 | **Reactivity** | Reactivity Settings, Reactivity Graph, Alpha Graph | ReactivityChart |
 | **Super Dimming** | Superdimming Settings, Color Filter, Dimming/Circadian Graphs | DimmingChart, CircadianChart |
 | **Circadian** | Experiment Settings, Experiment Graph, Taper Graph | ExperimentChart, TaperChart |
