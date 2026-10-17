@@ -78,16 +78,6 @@ stays closed (DB-051…DB-060), and Scorecard.dev is a run-once local input.
    `grep -rc 'ubuntu-24.04' .github/workflows/` prints 0 for every file, or a STATE changelog line
    records (b).
 
-4. **[2026-10-17] Run the bright-light hand-off checks, `docs/rebuild/DEVICE_TEST_SCRIPT.md`
-   §18 steps 58–60, on 1.15.0-debug vc30.** Your sunlight test already passed step 61, the
-   calibration and HBM readout (DD-081). Not yet seen on the phone: entry and exit at the two lux
-   levels, no override pause while Android is in control, and Disable putting back the mode you
-   had. Install the debug build over adb, then follow §18 in sunlight or with a strong torch. It
-   worked when `adb shell settings get system screen_brightness_mode` reads 1 above the hand-off
-   lux and 0 below the hand-off lux × the hand-back level, no override heads-up appears while handed
-   off, and after Disable it reads what it read before you started. Settles it: your report of
-   the three steps, which a ledger row then records (DD-070…DD-081).
-
 **The tree declares `1.15.0` / vc30, this train's ONE bump**, made by the hand-off plan's unit 0
 after v1.14.1 was seen tagged on 2026-10-16 (`git ls-remote --tags --refs origin 'refs/tags/v*'`).
 `changelogs/30.txt` (500-character cap) carries only the hand-off, since the low-lux jitter fix
@@ -102,6 +92,11 @@ proposing work; changing it is legislation under RUNBOOK's rule-review protocol.
 ## Changelog
 
 Newest first; ledger rows are the durable detail.
+
+- 2026-10-17 — **Owner's cursory pass of DEVICE_TEST_SCRIPT §18 on the phone found it all fine;
+  Owner queue item 4 is closed and the train goes to its PR (DD-084). Astra's ship check said
+  HOLD on an interrupted calibration, left to the owner's merge call, and a data-keeping
+  downgrade, which the owner dismissed (DD-085).**
 
 - 2026-10-17 — **Hand-off unit 6 closes the #136 plan: `30.txt` final, parity gap dev-03,
   DEVICE_TEST_SCRIPT §18 steps 58–61 with their e2e rows, the settings schema and the DataStore

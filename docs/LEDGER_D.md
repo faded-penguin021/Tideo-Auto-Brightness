@@ -917,3 +917,19 @@
   `mCachedBrightnessInfo.hbmTransitionPoint=Infinity`, and the display reported
   `mScreenBrightnessNormalMaximum=4095.0` and `mScreenBrightnessRangeMaximum=4674.0`. No reading
   above 4095 was taken that day, which was cloudy; DD-081 took one in sunlight.
+- DD-084: **The owner ran a cursory pass of DEVICE_TEST_SCRIPT §18 (steps 58–61, the
+  bright-light hand-off) on the phone and found it all fine (owner, 2026-10-17), closing the
+  Owner-queue item that asked for steps 58–60.** The report gives no per-step readings, so this
+  row records a cursory owner pass, not measured band edges; step 61's measured readings are
+  DD-081.
+- DD-085: **Astra's ship check of the 1.15.0 train (2026-10-17, owner-requested, `-e low`) said
+  HOLD on two residuals; neither is fixed in the train, the first is left to the owner's merge
+  decision and the owner dismissed the second as a scenario no user meets.** A
+  process death mid-calibration skips the sweep's in-memory restore (`DisplayCalibrationRun`,
+  DD-079), leaving brightness at a sweep level as low as 1 until something writes it: an OS
+  restart of the sticky service runs Set Initial Brightness and writes the curve (DA-030), so it
+  strands only after a force-stop, or a Disable before that restart, since `restoreMode()` returns
+  the mode and never a level (D-134); AAB's sweep restores from memory too (DD-078). A downgrade to
+  1.14.1 that keeps app data while handed off makes 1.14.1's `forceManualMode()` save Tideo's
+  AUTOMATIC over the user's mode, which the `handed_off` marker (DD-073) cannot prevent there;
+  Android keeps data across a downgrade only for a debuggable build or with root.
