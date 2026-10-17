@@ -41,10 +41,10 @@ class BrightnessTileService : TileService() {
             combine(
                 enabledFlow,
                 LiveRuntimeState.serviceRunning,
-                LiveRuntimeState.pipeline.map { it.paused }.distinctUntilChanged(),
-            ) { enabled, running, paused -> Triple(enabled, running, paused) }
+                LiveRuntimeState.pipeline.map { it.paused to it.handedOff }.distinctUntilChanged(),
+            ) { enabled, running, (paused, handedOff) -> TileState(enabled, running, paused, handedOff) }
                 .distinctUntilChanged()
-                .collect { (enabled, running, paused) -> renderTile(enabled, running, paused) }
+                .collect(::renderTile)
         }
     }
 
@@ -62,15 +62,18 @@ class BrightnessTileService : TileService() {
                 it.copy(serviceEnabled = !it.serviceEnabled)
             }.serviceEnabled
             AutoBrightnessRuntime.onSettingChanged(applicationContext, newEnabled)
-            renderTile(newEnabled, LiveRuntimeState.serviceRunning.value, LiveRuntimeState.pipeline.value.paused)
+            val p = LiveRuntimeState.pipeline.value
+            renderTile(TileState(newEnabled, LiveRuntimeState.serviceRunning.value, p.paused, p.handedOff))
         }
     }
 
-    private fun renderTile(enabled: Boolean, running: Boolean, paused: Boolean) {
+    private data class TileState(val enabled: Boolean, val running: Boolean, val paused: Boolean, val handedOff: Boolean)
+
+    private fun renderTile(s: TileState) {
         qsTile?.apply {
-            state = if (enabled) Tile.STATE_ACTIVE else Tile.STATE_INACTIVE
+            state = if (s.enabled) Tile.STATE_ACTIVE else Tile.STATE_INACTIVE
             label = TILE_LABEL
-            subtitle = tileSubtitle(enabled, running, paused)
+            subtitle = tileSubtitle(s.enabled, s.running, s.paused, s.handedOff)
             updateTile()
         }
     }
@@ -84,12 +87,13 @@ class BrightnessTileService : TileService() {
         const val TILE_LABEL = "Auto Brightness"
 
         /**
-         * Pure (enabled, running, paused) → subtitle mapping (G2-F17/G2R-F63). Extracted so the live
-         * state mapping is unit-testable without binding a real QS tile (Robolectric cannot).
+         * Pure live-state → subtitle mapping (G2-F17/G2R-F63, DD-075). Extracted so it is
+         * unit-testable without binding a real QS tile (Robolectric cannot).
          */
-        fun tileSubtitle(enabled: Boolean, running: Boolean, paused: Boolean): String = when {
+        fun tileSubtitle(enabled: Boolean, running: Boolean, paused: Boolean, handedOff: Boolean = false): String = when {
             !enabled -> "Off"
             running && paused -> "Paused"
+            running && handedOff -> "Android"
             running -> "Active"
             else -> "Starting…"
         }

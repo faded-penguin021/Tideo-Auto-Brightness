@@ -39,7 +39,7 @@ stays closed (DB-051…DB-060), and Scorecard.dev is a run-once local input.
   - [x] 2 settings
   - [x] 3 platform (glue review)
   - [x] 4 runtime (glue review)
-  - [ ] 5 UI (glue review)
+  - [x] 5 UI (glue review)
   - [ ] 6 close-out
   - [ ] 7 HBM readout, only if Open question 1 says so
 - **Low-lux settling jitter** — `docs/plans/LOW_LUX_SETTLING_JITTER.md`, spec only; its
@@ -107,6 +107,11 @@ proposing work; changing it is legislation under RUNBOOK's rule-review protocol.
 ## Changelog
 
 Newest first; ledger rows are the durable detail.
+
+- 2026-10-17 — **Hand-off unit 5: a hand-off card on Curve & Brightness (switch, lux with the
+  curve's minimum, 50–100 % hand-back slider) and a graph marker at the effective threshold; the
+  notification, pill, widget, tile and Live Debug say "Android", and brightness readouts blank
+  while handed off; help in tooltips and guide section 10 (DD-075).**
 
 - 2026-10-16 — **Hand-off unit 4: a runtime `HandoffCoordinator` hands Android AUTOMATIC above the
   effective threshold and takes it back below the exit, with no write, dimming or override while

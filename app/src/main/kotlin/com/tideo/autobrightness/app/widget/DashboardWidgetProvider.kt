@@ -60,7 +60,8 @@ class DashboardWidgetProvider : AppWidgetProvider() {
                 enabled = enabled,
                 running = LiveRuntimeState.serviceRunning.value,
                 paused = p.paused,
-                brightness = p.targetBrightness ?: p.lastAppliedBrightness,
+                handedOff = p.handedOff,
+                brightness = p.shownBrightness,
                 lux = p.smoothedLux,
                 profile = LiveRuntimeState.activeProfile.value,
                 context = LiveRuntimeState.activeContext.value,
@@ -127,6 +128,7 @@ class DashboardWidgetProvider : AppWidgetProvider() {
         internal fun statusLabelRes(model: WidgetModel): Int = when {
             !model.enabled -> R.string.widget_status_off
             model.running && model.paused -> R.string.widget_status_paused
+            model.running && model.handedOff -> R.string.widget_status_android
             model.running -> R.string.widget_status_active
             else -> R.string.widget_status_starting
         }
@@ -140,6 +142,7 @@ data class WidgetModel(
     val running: Boolean,
     val paused: Boolean,
     val brightness: Int?,
+    val handedOff: Boolean = false,
     val lux: Double?,
     val profile: String?,
     val context: String?,

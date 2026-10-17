@@ -498,6 +498,7 @@ class AmbientMonitoringService : Service() {
         val activeContext: String? = null,
         val pausedByOverride: Boolean = false,
         val canDiscard: Boolean = false,
+        val handedOff: Boolean = false,
     )
 
     internal fun foregroundNotification(state: PipelineState, activeContext: String?): Notification =
@@ -511,6 +512,7 @@ class AmbientMonitoringService : Service() {
         activeContext,
         state.pausedByOverride,
         state.paused && state.discardableOverride != null,
+        state.handedOff,
     )
 
     private fun buildNotification(model: NotificationModel): Notification {
@@ -525,6 +527,9 @@ class AmbientMonitoringService : Service() {
         val text = when {
             !canWrite -> languageContext.getString(R.string.notif_text_grant_write)
             model.paused -> languageContext.getString(R.string.notif_text_paused)
+            model.handedOff && model.smoothedLux != null ->
+                languageContext.getString(R.string.notif_text_handed_off_lux, model.smoothedLux.toInt())
+            model.handedOff -> languageContext.getString(R.string.notif_text_handed_off)
             model.smoothedLux != null && model.targetBrightness != null ->
                 languageContext.getString(R.string.notif_text_lux_brightness, model.smoothedLux.toInt(), model.targetBrightness)
             else -> languageContext.getString(R.string.notif_text_monitoring)

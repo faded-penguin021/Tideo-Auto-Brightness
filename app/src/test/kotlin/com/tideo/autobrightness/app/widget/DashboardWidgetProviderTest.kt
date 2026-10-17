@@ -10,8 +10,13 @@ import org.junit.Test
  */
 class DashboardWidgetProviderTest {
 
-    private fun model(enabled: Boolean, running: Boolean, paused: Boolean) =
-        WidgetModel(enabled, running, paused, brightness = null, lux = null, profile = null, context = null)
+    private fun model(enabled: Boolean, running: Boolean, paused: Boolean, handedOff: Boolean = false) =
+        WidgetModel(enabled, running, paused, brightness = null, lux = null, profile = null, context = null, handedOff = handedOff)
+
+    @Test fun android_whenHandedOff() {
+        assertEquals(R.string.widget_status_android, DashboardWidgetProvider.statusLabelRes(model(true, true, false, handedOff = true)))
+        assertEquals(R.string.widget_status_paused, DashboardWidgetProvider.statusLabelRes(model(true, true, true, handedOff = true)))
+    }
 
     @Test fun off_whenDisabled() {
         assertEquals(R.string.widget_status_off, DashboardWidgetProvider.statusLabelRes(model(false, true, false)))

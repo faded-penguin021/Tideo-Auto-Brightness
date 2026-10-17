@@ -157,6 +157,7 @@ private fun StatusPill(state: DashboardUiState) {
         !state.serviceRunning -> stringResource(R.string.dashboard_pill_starting) to MaterialTheme.colorScheme.secondary
         state.pausedByOverride -> stringResource(R.string.dashboard_pill_override) to MaterialTheme.colorScheme.secondary
         state.paused -> stringResource(R.string.dashboard_pill_paused) to MaterialTheme.colorScheme.secondary
+        state.handedOff -> stringResource(R.string.dashboard_pill_android) to MaterialTheme.colorScheme.primary
         else -> stringResource(R.string.dashboard_pill_active) to MaterialTheme.colorScheme.tertiary
     }
     Row(

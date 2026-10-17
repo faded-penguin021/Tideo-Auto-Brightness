@@ -264,6 +264,17 @@ class AmbientMonitoringServiceTest {
         assertEquals(listOf("Discard", "Resume", "Disable"), alert.actions.orEmpty().map { it.title.toString() })
     }
 
+    @Test
+    fun handedOff_notificationNamesAndroid_andAPauseStillWins() {
+        val service = Robolectric.buildService(AmbientMonitoringService::class.java).create().get()
+        fun textFor(state: PipelineState) = textOf(service.foregroundNotification(state, null))
+
+        val owned = PipelineState(serviceOn = true, handedOff = true, smoothedLux = 30_123.6, targetBrightness = 200)
+        assertEquals(service.getString(R.string.notif_text_handed_off_lux, 30_123), textFor(owned))
+        assertEquals(service.getString(R.string.notif_text_handed_off), textFor(PipelineState(serviceOn = true, handedOff = true)))
+        assertEquals(service.getString(R.string.notif_text_paused), textFor(owned.copy(paused = true)))
+    }
+
     // D-140: PAUSE/REAPPLY on fresh instance (created by startForegroundService) must stop, not zombie.
     @Test
     fun pause_whenPipelineNotRunning_stopsSelfInsteadOfZombieing() {

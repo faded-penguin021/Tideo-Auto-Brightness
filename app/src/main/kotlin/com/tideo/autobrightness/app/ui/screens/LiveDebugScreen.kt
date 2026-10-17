@@ -141,6 +141,11 @@ fun LiveDebugContent(
                     stringResource(if (p.paused) R.string.dashboard_status_paused else R.string.debug_override_no),
                     "debug_override",
                 )
+                Metric(
+                    stringResource(R.string.debug_handoff),
+                    stringResource(if (p.handedOff) R.string.debug_handoff_android else R.string.debug_override_no),
+                    "debug_handoff",
+                )
                 Metric(stringResource(R.string.debug_active_rule), state.activeContext ?: stringResource(R.string.debug_active_rule_none), "debug_active_rule")
             }
 

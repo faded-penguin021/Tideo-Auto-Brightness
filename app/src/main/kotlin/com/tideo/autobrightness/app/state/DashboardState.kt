@@ -11,6 +11,7 @@ data class DashboardUiState(
     val paused: Boolean = false,
     // prof755/task567: Manual override detected; drives Resume card (G2R-F79).
     val pausedByOverride: Boolean = false,
+    val handedOff: Boolean = false,
     val rawLux: Double? = null,
     val smoothedLux: Double? = null,
     val currentBrightness: Int? = null,

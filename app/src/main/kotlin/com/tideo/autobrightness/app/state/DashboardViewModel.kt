@@ -58,6 +58,7 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
         val running: Boolean,
         val paused: Boolean,
         val pausedByOverride: Boolean,
+        val handedOff: Boolean,
         val rawLux: Double?,
         val smoothedLux: Double?,
         val current: Int?,
@@ -79,8 +80,9 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
         LiveRuntimeState.activeProfile,
     ) { p, ctx, running, staleness, profile ->
         Live(
-            running, p.paused, p.pausedByOverride, p.lastRawLux, p.smoothedLux,
-            p.lastAppliedBrightness, p.targetBrightness, p.scaleDynamicCompress, p.dimmingCurrent,
+            running, p.paused, p.pausedByOverride, p.handedOff, p.lastRawLux, p.smoothedLux,
+            p.lastAppliedBrightness.takeUnless { p.handedOff }, p.targetBrightness.takeUnless { p.handedOff },
+            p.scaleDynamicCompress, p.dimmingCurrent,
             p.throttleMs, ctx, profile, p.lastSampleMs, staleness == Staleness.STALE,
         )
     }
@@ -107,6 +109,7 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
             serviceRunning = live.running,
             paused = live.paused,
             pausedByOverride = live.pausedByOverride,
+            handedOff = live.handedOff,
             rawLux = live.rawLux,
             smoothedLux = live.smoothedLux,
             currentBrightness = live.current,

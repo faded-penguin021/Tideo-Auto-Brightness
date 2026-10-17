@@ -794,3 +794,20 @@
   re-decides. The flag survives hibernate, start reads it from `reconcileHandoff()` before any
   observer or cycle, `stop()` clears it, and the coordinator keeps the curve's minimum per curve
   config because finding it scans up to 100 000 points.
+- DD-075 [cited]: **While a bright-light hand-off (DD-074) runs, every surface names Android and
+  none shows a brightness: Tideo does not know what Android chose, and the target it keeps
+  publishing is only its own curve's value.** The notification reads "Android is controlling
+  brightness · N lx" on smoothed lux, the dashboard pill, widget and Quick Settings tile read
+  "Android", and Live Debug gains a Hand-off metric while keeping the raw target as a diagnostic;
+  the dashboard hero, the widget, the Curve & Brightness readout and crosshair and the Circadian
+  taper marker go blank. Off, an override and a pause still win over Android, since a Pause whose
+  reclaim is refused keeps both flags and Resume is then the user's move. The Curve & Brightness
+  card edits the three per-profile fields (DD-071) and notes the draft curve's minimum, that the
+  stored lux is raised to it, or that the curve never qualifies; it shows the exit floored, because
+  the exit comparison is strict, and the graph marks the effective threshold in the neutral outline
+  colour, since gold is the reference curve's; it finds the minimum off the main thread, as the
+  scan runs on every curve edit. Help is the
+  fields' tooltips plus a new user-guide section 10, a new string so that `guide_s7_body` keeps its
+  Chinese translation (DD-026). The tile's subtitles stay hardcoded English, as they were (Sol
+  review, 2026-10-17, for the floor and the taper marker; glue review, for the colour and the
+  thread).

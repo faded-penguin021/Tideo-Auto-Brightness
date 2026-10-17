@@ -71,6 +71,12 @@ object TaskerHelp {
     /** task750 — %AAB_Zone2End. */
     @StringRes val ZONE_2_END = R.string.help_zone_2_end
 
+    @StringRes val HANDOFF_ENABLED = R.string.help_handoff_enabled
+
+    @StringRes val HANDOFF_LUX = R.string.help_handoff_lux
+
+    @StringRes val HANDOFF_HYSTERESIS = R.string.help_handoff_hysteresis
+
     // --- Superdimming scene (extraction/scenes/superdimming_settings.md) --------------------------
     /** task465 — %AAB_DimmingStrength. */
     @StringRes val DIMMING_STRENGTH = R.string.help_dimming_strength

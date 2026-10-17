@@ -24,6 +24,8 @@
     <string name="notif_text_paused">Manual override active — tap Resume to continue</string>
     <string name="notif_text_lux_brightness">Lux %1$d → brightness %2$d</string>
     <string name="notif_text_monitoring">Monitoring ambient light</string>
+    <string name="notif_text_handed_off_lux">Android is controlling brightness · %1$d lx</string>
+    <string name="notif_text_handed_off">Android is controlling brightness</string>
     <string name="notif_subtext_context">Context: %1$s</string>
     <string name="notif_override_title">Manual override detected</string>
     <string name="notif_override_text">Auto Brightness paused — Resume keeps this adjustment as a curve point, Discard forgets it</string>
@@ -131,6 +133,7 @@
     <string name="dashboard_pill_override">Override</string>
     <string name="dashboard_pill_paused">Paused</string>
     <string name="dashboard_pill_active">Active</string>
+    <string name="dashboard_pill_android">Android</string>
     <string name="dashboard_active_profile">Profile</string>
     <string name="dashboard_context_none">No context active</string>
     <string name="dashboard_auto_brightness">Auto brightness</string>
@@ -164,6 +167,7 @@
     <string name="widget_status_active">Active</string>
     <string name="widget_status_paused">Paused</string>
     <string name="widget_status_starting">Starting…</string>
+    <string name="widget_status_android">Android</string>
     <string name="widget_caption_brightness">BRIGHTNESS</string>
     <string name="widget_caption_lux">LUX</string>
     <string name="widget_caption_profile">PROFILE</string>
@@ -209,6 +213,8 @@
     <string name="guide_s8_body">• **Brightness graph:** teal line = your curve, blue dots = manual override points, gold line = reference.\n• **Reactivity graph:** the stability curve and the light change required to trigger an update.\n• **Other graphs:** Circadian and Super Dimming visualize behaviour over time and brightness.\n• **Power Draw calibration (Tools):** an experimental tool that steps through brightness levels and measures current to build a power curve.</string>
     <string name="guide_s9_title">9. Saving Your Work</string>
     <string name="guide_s9_body">• **Apply:** makes changes active immediately, but not written to disk — lost on a profile load or app restart.\n• **Save (Profiles screen):** writes current settings to the selected profile — the only way to make changes permanent.\n• **Reset:** reverts the current tab to defaults.\n[TIP] After editing multiple tabs, save to your active profile; if using the context engine, overwrite the relevant profile or your changes are replaced when a rule fires.</string>
+    <string name="guide_s10_title">10. Bright Sunlight (Hand-off)</string>
+    <string name="guide_s10_body">Many phones boost the screen past its normal maximum in direct sunlight, but only under Android\'s own Adaptive Brightness.\n• **Hand-off (Curve &amp; Brightness):** above a lux you choose, Tideo hands brightness to Android and writes nothing; the dashboard, notification, widget and tile say \"Android\" meanwhile, and a brightness change then is not an override.\n• **Taking back:** once light falls below the hand-back level, Tideo turns Adaptive Brightness off and follows its curve again.\n• **Per profile:** each profile keeps its own hand-off settings, so a context rule can turn it on outdoors only.\n[TIP] The hand-off lux must sit where your curve already reaches 90 percent of max brightness; the card shows the lowest valid value and uses it when yours is lower.\n• **Disable:** turning Tideo off restores the brightness mode you had before it started.</string>
     <string name="guide_outro">Enjoy your new intelligent auto brightness!</string>
     <string name="guide_done">Got it</string>
 
@@ -236,6 +242,7 @@
     <string name="chart_reference">Reference</string>
     <string name="chart_curve">Curve</string>
     <string name="chart_now">Now</string>
+    <string name="chart_handoff">Hand-off</string>
     <string name="chart_lux">Lux</string>
     <string name="chart_brightness">Brightness</string>
     <string name="chart_threshold_pct">Threshold %</string>
@@ -416,6 +423,12 @@
     <string name="curve_form2c">Zone 2 offset (form2C)</string>
     <string name="curve_zone2_end">Zone 2 end (lux)</string>
     <string name="curve_derived_header">Derived (continuity)</string>
+    <string name="curve_handoff_header">Bright-light hand-off</string>
+    <string name="curve_handoff_hysteresis_pct">Hand-back level (percent of hand-off lux)</string>
+    <string name="curve_handoff_minimum">Lowest valid for this curve: %1$d lx</string>
+    <string name="curve_handoff_raised">Hands off at %1$d lx instead, the lowest at which this curve reaches 90 %% of max brightness</string>
+    <string name="curve_handoff_unreachable">This curve is below 90 percent of max brightness at 100 000 lx, so it never hands off</string>
+    <string name="curve_handoff_exit">Takes back control below %1$d lx</string>
     <string name="curve_form2a">Zone 2 alignment (form2A)</string>
     <string name="curve_form3a">Zone 3 alignment (form3A)</string>
     <string name="curve_delete_point_title">Delete override point?</string>
@@ -515,6 +528,8 @@
     <string name="debug_service_stopped">Stopped</string>
     <string name="debug_override">Manual override</string>
     <string name="debug_override_no">No</string>
+    <string name="debug_handoff">Hand-off</string>
+    <string name="debug_handoff_android">Android</string>
     <string name="debug_active_rule">Active rule</string>
     <string name="debug_active_rule_none">None</string>
     <string name="debug_performance_title">Performance &amp; Timings</string>
@@ -673,6 +688,9 @@
     <string name="help_form_2b">Higher values give a major boost in medium light. Recommended: 3 to 10</string>
     <string name="help_form_2c">Subtle but powerful \"offset\" for the midrange curve. Lower values make the transition from dark to dim light more gradual and smooth. Recommended: -300 to zone 1 end.</string>
     <string name="help_zone_2_end">Sets the lux level where \'indoor light\' ends and \'bright outdoor light\' begins. Affects the transition when going outside.</string>
+    <string name="help_handoff_enabled">Above the hand-off lux, Tideo stops writing brightness and turns on Android\'s Adaptive Brightness, so the phone\'s own sunlight boost can go brighter than any app can set. Tideo keeps measuring light, treats no brightness change as an override meanwhile, and takes control back when it gets darker.</string>
+    <string name="help_handoff_lux">Smoothed lux above which Android takes over. It must sit where your curve gives at least 90 percent of max brightness: a lower value is raised to that point while the curve needs it, and your own value returns if the curve changes back.</string>
+    <string name="help_handoff_hysteresis">Tideo takes control back once smoothed lux falls below this share of the hand-off lux. A lower level waits for more darkness and avoids flipping back and forth near the threshold; 100 hands back as soon as lux drops below the hand-off lux.</string>
     <string name="help_dimming_strength">Controls the maximum super dimming strength. Value shows what happens without circadian effects.</string>
     <string name="help_dim_spread">Controls how wide the scale shifts over the day. Only active when circadian scaling is enabled!</string>
     <string name="help_dimming_exponent">Controls how gradual the super dimming kicks in and how it behaves as brightness approaches min brightness. &lt;1: hard transition, not recommended. 1: linear transition. &gt;1 soft(er) transition.</string>

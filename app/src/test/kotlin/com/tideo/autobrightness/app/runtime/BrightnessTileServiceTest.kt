@@ -20,4 +20,11 @@ class BrightnessTileServiceTest {
         assertEquals("Active", BrightnessTileService.tileSubtitle(enabled = true, running = true, paused = false))
         assertEquals("Paused", BrightnessTileService.tileSubtitle(enabled = true, running = true, paused = true))
     }
+
+    @Test
+    fun tileSubtitle_handedOff_saysAndroid() {
+        assertEquals("Android", BrightnessTileService.tileSubtitle(enabled = true, running = true, paused = false, handedOff = true))
+        assertEquals("Paused", BrightnessTileService.tileSubtitle(enabled = true, running = true, paused = true, handedOff = true))
+        assertEquals("Off", BrightnessTileService.tileSubtitle(enabled = false, running = true, paused = false, handedOff = true))
+    }
 }

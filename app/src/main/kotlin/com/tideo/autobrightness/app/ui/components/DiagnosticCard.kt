@@ -190,7 +190,7 @@ fun CurveBrightnessDiagnosticCardContent(state: PipelineState, minBrightness: In
         // D-117: PERCEIVED brightness (un-floored target); falls back to applied when equal.
         DiagnosticLine(
             R.string.diag_curve_current_bright, "diag_curve_current_bright",
-            minBrightness.toString(), maxBrightness.toString(), fmtInt(state.targetBrightness ?: state.lastAppliedBrightness),
+            minBrightness.toString(), maxBrightness.toString(), fmtInt(state.shownBrightness),
         )
     }
 }

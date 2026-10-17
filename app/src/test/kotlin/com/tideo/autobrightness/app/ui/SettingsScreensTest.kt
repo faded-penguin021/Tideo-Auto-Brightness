@@ -10,6 +10,7 @@ import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
@@ -330,6 +331,81 @@ class SettingsScreensTest {
         }
         compose.onNodeWithTag("diag_curve_current_bright").performScrollTo()
             .assertTextContains("33", substring = true)
+    }
+
+    private fun curveWithHandoff(draft: AabSettings, live: PipelineState = PipelineState()) {
+        compose.setContent {
+            MaterialTheme {
+                CurveBrightnessContent(
+                    draft, draft, emptyList(), epoch = 0, dirty = false,
+                    onEdit = {}, onApply = {}, onDiscard = {}, onBack = {}, live = live,
+                )
+            }
+        }
+    }
+
+    private fun awaitText(text: String, substring: Boolean = false) = compose.waitUntil(10_000) {
+        compose.onAllNodesWithText(text, substring = substring).fetchSemanticsNodes().isNotEmpty()
+    }
+
+    @Test
+    fun curveBrightness_handoffCard_namesTheMinimumAndTheExit() {
+        curveWithHandoff(AabSettings(handoffEnabled = true))
+        awaitText("Lowest valid for this curve: 25132 lx")
+        compose.onNodeWithText("Takes back control below 20105 lx").performScrollTo().assertExists()
+    }
+
+    @Test
+    fun curveBrightness_handoffCard_saysWhenTheThresholdIsRaised() {
+        curveWithHandoff(AabSettings(handoffEnabled = true, handoffLux = 1_000, handoffHysteresis = 0.5))
+        awaitText("Hands off at 25132 lx instead", substring = true)
+        compose.onNodeWithText("Takes back control below 12566 lx").performScrollTo().assertExists()
+    }
+
+    @Test
+    fun curveBrightness_handoffCard_saysWhenTheCurveNeverQualifies() {
+        curveWithHandoff(AabSettings(handoffEnabled = true, form2B = -2f))
+        awaitText("so it never hands off", substring = true)
+        compose.onNodeWithText("Takes back control", substring = true).assertDoesNotExist()
+    }
+
+    @Test
+    fun curveBrightness_handoffCard_offDisablesTheFields() {
+        curveWithHandoff(AabSettings())
+        compose.onNodeWithTag("field_handoffLux").performScrollTo().assertIsNotEnabled()
+        compose.onNodeWithText("Lowest valid", substring = true).assertDoesNotExist()
+    }
+
+    @Test
+    fun curveBrightness_liveReadout_blanksWhileHandedOff() {
+        curveWithHandoff(AabSettings(), PipelineState(serviceOn = true, handedOff = true, smoothedLux = 30_000.0, targetBrightness = 200))
+        compose.onNodeWithTag("diag_curve_current_bright").performScrollTo().assertTextContains("—", substring = true)
+    }
+
+    @Test
+    fun liveDebug_handoffMetric_namesAndroid() {
+        compose.setContent {
+            MaterialTheme {
+                LiveDebugContent(
+                    state = LiveDebugUiState(pipeline = PipelineState(handedOff = true), serviceRunning = true),
+                    onSelectDebug = {}, onBack = {},
+                )
+            }
+        }
+        compose.onNodeWithTag("debug_handoff").performScrollTo().assertTextContains("Android", substring = true)
+    }
+
+    @Test
+    fun dashboardPill_handedOff_saysAndroid() {
+        compose.setContent {
+            MaterialTheme {
+                com.tideo.autobrightness.app.ui.components.BrightnessInstrument(
+                    state = com.tideo.autobrightness.app.state.DashboardUiState(serviceEnabled = true, serviceRunning = true, handedOff = true),
+                    onToggleService = {},
+                )
+            }
+        }
+        compose.onNodeWithText("Android").assertExists()
     }
 
     @Test

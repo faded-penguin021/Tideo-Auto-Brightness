@@ -22,6 +22,7 @@ fun BrightnessCurveChart(
     modifier: Modifier = Modifier,
     currentLux: Double? = null,
     currentBrightness: Int? = null,
+    handoffLux: Int? = null,
     overridePoints: List<Offset> = emptyList(),
     referenceCurve: BrightnessCurveConfig? = null,
     onDeleteOverridePoint: ((Offset) -> Unit)? = null,
@@ -61,6 +62,9 @@ fun BrightnessCurveChart(
         if (currentLux != null && currentBrightness != null) {
             add(ChartMarker(color = MaterialTheme.colorScheme.error, x = currentLux.toFloat()))
             add(ChartMarker(color = MaterialTheme.colorScheme.error, y = currentBrightness.toFloat()))
+        }
+        handoffLux?.let {
+            add(ChartMarker(color = MaterialTheme.colorScheme.outline, x = it.toFloat().coerceIn(minLux, maxLux), label = stringResource(R.string.chart_handoff)))
         }
     }
 

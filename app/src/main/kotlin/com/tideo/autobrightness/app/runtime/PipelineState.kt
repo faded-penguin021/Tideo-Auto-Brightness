@@ -83,6 +83,9 @@ data class PipelineState(
             return (smoothedLux ?: return false) !in BrightnessEngine.settledRange(band, lastRawLux ?: return false)
         }
 
+    val shownBrightness: Int?
+        get() = if (handedOff) null else targetBrightness ?: lastAppliedBrightness
+
     fun unchanged(lux: Double): Boolean {
         val low = threshAbsLow ?: return false
         val high = threshAbsHigh ?: return false

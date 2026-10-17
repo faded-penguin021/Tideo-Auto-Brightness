@@ -46,6 +46,7 @@ private val GUIDE_SECTIONS = listOf(
     R.string.guide_s7_title to R.string.guide_s7_body,
     R.string.guide_s8_title to R.string.guide_s8_body,
     R.string.guide_s9_title to R.string.guide_s9_body,
+    R.string.guide_s10_title to R.string.guide_s10_body,
 )
 
 @Composable

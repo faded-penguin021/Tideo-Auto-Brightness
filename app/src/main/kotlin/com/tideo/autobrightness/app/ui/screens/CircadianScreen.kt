@@ -170,7 +170,7 @@ fun CircadianContent(
                             // Live "Now" line at the current brightness, only while circadian scaling
                             // is actually shifting the curve (scaleDynamic ≠ 1).
                             currentBrightness = live.targetBrightness?.takeIf {
-                                live.serviceOn && live.scalingUse &&
+                                live.serviceOn && !live.handedOff && live.scalingUse &&
                                     kotlin.math.abs((live.scaleDynamic ?: 1.0) - 1.0) > 0.001
                             },
                         )
