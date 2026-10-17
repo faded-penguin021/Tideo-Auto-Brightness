@@ -77,6 +77,8 @@ object TaskerHelp {
 
     @StringRes val HANDOFF_HYSTERESIS = R.string.help_handoff_hysteresis
 
+    @StringRes val HANDOFF_CALIBRATION = R.string.help_handoff_calibration
+
     // --- Superdimming scene (extraction/scenes/superdimming_settings.md) --------------------------
     /** task465 — %AAB_DimmingStrength. */
     @StringRes val DIMMING_STRENGTH = R.string.help_dimming_strength

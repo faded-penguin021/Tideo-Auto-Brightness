@@ -3,6 +3,7 @@ package com.tideo.autobrightness.app.runtime
 import android.content.Context
 import android.os.Handler
 import android.os.Looper
+import androidx.annotation.StringRes
 import com.tideo.autobrightness.R
 
 /**
@@ -39,8 +40,12 @@ class ToastHandoffSink(context: Context) : HandoffSink {
     private val appContext = context.applicationContext
     private val mainHandler = Handler(Looper.getMainLooper())
 
-    override fun onHandoff(toAndroid: Boolean) {
-        val res = if (toAndroid) R.string.flash_handoff_to_android else R.string.flash_handoff_back
+    override fun onHandoff(toAndroid: Boolean) =
+        flash(if (toAndroid) R.string.flash_handoff_to_android else R.string.flash_handoff_back)
+
+    override fun onHighBrightness(active: Boolean) = flash(if (active) R.string.flash_hbm_on else R.string.flash_hbm_off)
+
+    fun flash(@StringRes res: Int) {
         mainHandler.post {
             AabFlash.show(appContext, AmbientMonitoringService.notificationLanguageContext(appContext).getString(res))
         }

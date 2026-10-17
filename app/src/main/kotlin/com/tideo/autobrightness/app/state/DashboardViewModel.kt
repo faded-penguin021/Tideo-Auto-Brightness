@@ -81,7 +81,7 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
     ) { p, ctx, running, staleness, profile ->
         Live(
             running, p.paused, p.pausedByOverride, p.handedOff, p.lastRawLux, p.smoothedLux,
-            p.lastAppliedBrightness.takeUnless { p.handedOff }, p.targetBrightness.takeUnless { p.handedOff },
+            p.currentBrightness, p.targetBrightness.takeUnless { p.handedOff },
             p.scaleDynamicCompress, p.dimmingCurrent,
             p.throttleMs, ctx, profile, p.lastSampleMs, staleness == Staleness.STALE,
         )

@@ -2,6 +2,7 @@ package com.tideo.autobrightness.app.runtime
 
 import com.tideo.autobrightness.app.settings.AabSettings
 import com.tideo.autobrightness.domain.brightness.BrightnessEngine
+import com.tideo.autobrightness.platform.brightness.DisplayBrightnessReader
 import com.tideo.autobrightness.platform.brightness.ScreenBrightnessController
 import com.tideo.autobrightness.platform.observe.BrightnessObserver
 import com.tideo.autobrightness.platform.sensor.LightSensorSource
@@ -43,6 +44,8 @@ class BrightnessPipelineController(
     private val callbackLog: SensorCallbackLog = SensorCallbackLog(),
     private val scaleRefreshPeriodMs: Long = 0L,
     handoffSink: HandoffSink = NoOpHandoffSink,
+    displayReader: DisplayBrightnessReader = NoDisplayBrightnessReader,
+    calibrationSink: DisplayCalibrationSink = NoOpDisplayCalibrationSink,
 ) : ControllerHook, PipelineRuntimeContext {
 
     private val engine = BrightnessEngine()
@@ -64,6 +67,7 @@ class BrightnessPipelineController(
     private val debugEmitter = PipelineDebugEmitter(debugSink)
     private val panicHandler = PanicHandler(brightness, dimming)
     private val handoff = HandoffCoordinator(this, brightness, dimming, clock, handoffSink)
+    private val calibration = DisplayCalibrationRun(this, brightness, dimming, handoff, displayReader, calibrationSink, clock)
     private val cycleRunner = PipelineCycleRunner(
         ctx = this,
         engine = engine,
@@ -92,7 +96,7 @@ class BrightnessPipelineController(
             paused = s.paused,
             initializing = s.initializing,
             detectOverrides = cachedSettings?.detectOverrides ?: false,
-            suppressed = clock() < suppressOverrideUntilMs,
+            suppressed = clock() < suppressOverrideUntilMs || calibration.active,
             handedOff = s.handedOff,
         )
     }
@@ -167,6 +171,7 @@ class BrightnessPipelineController(
     fun pause() { postControl(PipelineEvent.Pause) }
     fun resume() { postControl(PipelineEvent.Resume) }
     fun discardOverride() { postControl(PipelineEvent.DiscardOverride) }
+    fun calibrateDisplay() { postControl(PipelineEvent.CalibrateDisplay) }
 
     /** A context override swapped the active profile: re-apply the initial brightness (task43 act21). */
     override fun onContextChanged() { postControl(PipelineEvent.ContextChanged) }
@@ -234,7 +239,15 @@ class BrightnessPipelineController(
                 cycleRunner.handleOverride(event.observedBrightness, event.source)
             PipelineEvent.ContextChanged -> cycleRunner.reapplyProfile()
             PipelineEvent.ScaleTick -> scaleRefresh.refresh()
+            PipelineEvent.CalibrateDisplay -> calibrateDisplayInternal()
         }
+    }
+
+    /** `_CalibrateDisplayRange` toggles AAB off and on; Tideo re-runs Set Initial Brightness instead (DD-077). */
+    private suspend fun calibrateDisplayInternal() {
+        calibration.run()
+        val settings = settingsProvider().also { cachedSettings = it }
+        if (!_state.value.paused && !_state.value.hibernated) cycleRunner.setInitialBrightness(settings)
     }
 
     private fun pauseInternal() {

@@ -62,6 +62,8 @@ class AmbientMonitoringService : Service() {
     // Tier cache, refreshed at resume points to avoid per-cycle permission checks (G1-F5).
     private lateinit var privilegeManager: com.tideo.autobrightness.platform.privilege.PrivilegeManager
     private var notificationJob: Job? = null
+    private lateinit var highBrightness: HighBrightnessUpdates
+    private var highBrightnessJob: Job? = null
     // DC-065: a start command posts the live model; the lock orders it against the updater's posts.
     private val notificationLock = Any()
     private var panicJob: Job? = null
@@ -133,6 +135,7 @@ class AmbientMonitoringService : Service() {
         displayToggles = runtime.displayToggles
         panicSensor = runtime.panicSensor
         privilegeManager = runtime.privilegeManager
+        highBrightness = runtime.highBrightness
 
         registerReceiver(
             screenReceiver,
@@ -198,6 +201,11 @@ class AmbientMonitoringService : Service() {
                     contextEngine.resumeContextAutomation()
                     controller.reapply()
                 }
+            }
+            ACTION_CALIBRATE_DISPLAY -> {
+                // DD-077: the sweep runs in the pipeline, so a stopped service is not started for it.
+                if (!controller.state.value.serviceOn) return stopNotRunning(startId)
+                controller.calibrateDisplay()
             }
             ACTION_PANIC -> {
                 // task528: full stop (not pausable), restore brightness, tear down service.
@@ -274,12 +282,16 @@ class AmbientMonitoringService : Service() {
         startPanicDetector()
         startStateEventPublisher()
         startForceDarkReapply()
+        if (highBrightnessJob?.isActive != true) highBrightnessJob = highBrightness.start(scope, controller.state)
         if (notificationJob?.isActive == true) return
         val manualOverrideFlow = applicationContext.settingsDataStore.data
             .map { it.contextOverride }
             .distinctUntilChanged()
         notificationJob = scope.launch {
-            combine(controller.state, contextEngine.activeContext, manualOverrideFlow) { state, ctx, manualOverride ->
+            combine(
+                controller.state, highBrightness.readout, contextEngine.activeContext, manualOverrideFlow,
+            ) { pipeline, system, ctx, manualOverride ->
+                val state = pipeline.copy(systemBrightness = system)
                 // Republish for Dashboard/Menu; separate override lock from active context rule (F46).
                 LiveRuntimeState.publish(this@AmbientMonitoringService, state, ctx, manualOverride)
                 notificationModel(state, ctx)
@@ -499,6 +511,8 @@ class AmbientMonitoringService : Service() {
         val pausedByOverride: Boolean = false,
         val canDiscard: Boolean = false,
         val handedOff: Boolean = false,
+        // DD-077: not shown here, but the widget refresh is deduplicated on this model.
+        val systemBrightness: Int? = null,
     )
 
     internal fun foregroundNotification(state: PipelineState, activeContext: String?): Notification =
@@ -513,6 +527,7 @@ class AmbientMonitoringService : Service() {
         state.pausedByOverride,
         state.paused && state.discardableOverride != null,
         state.handedOff,
+        state.systemBrightness,
     )
 
     private fun buildNotification(model: NotificationModel): Notification {
@@ -651,6 +666,7 @@ class AmbientMonitoringService : Service() {
         const val ACTION_DISCARD_OVERRIDE = "com.tideo.autobrightness.runtime.action.DISCARD_OVERRIDE"
         const val ACTION_DISABLE = "com.tideo.autobrightness.runtime.action.DISABLE"
         const val ACTION_PANIC = "com.tideo.autobrightness.runtime.action.PANIC"
+        const val ACTION_CALIBRATE_DISPLAY = "com.tideo.autobrightness.runtime.action.CALIBRATE_DISPLAY"
         const val ACTION_REAPPLY = "com.tideo.autobrightness.runtime.action.REAPPLY"
         // DA-018: resume context automation (genuine eval, not republish-only).
         const val ACTION_RESUME_CONTEXT = "com.tideo.autobrightness.runtime.action.RESUME_CONTEXT"

@@ -2,9 +2,10 @@
 
 ## Status
 
-Units 0–5 are done (domain `HandoffRules`, DD-070…DD-072; the per-profile settings; the
+Units 0–5 and 7 are done (domain `HandoffRules`, DD-070…DD-072; the per-profile settings; the
 controller's ownership marker, DD-073; the runtime coordinator, DD-074; the UI, DD-075, given its
-own screen and AAB's hand-off flashes after the owner's device test, DD-076); the rest is spec. The owner has
+own screen and AAB's hand-off flashes after the owner's device test, DD-076; the HBM readout and
+display calibration, DD-077); unit 6 is spec. The owner has
 built the feature in AAB (handed over 2026-10-15). That build is now the reference for this port, and this plan was rewritten against it.
 The export is force-added under `dist/aab-bright-light-handoff/`. It is temporary: unit 6 removes
 it, and unit 1 copies every fact the port depends on into the ledger first. The owner fixed five
@@ -167,7 +168,8 @@ switched off by hand during a hand-off. Where it deviates, the reason is given.
    bisection is not, because DD-012 allows non-monotone curves. If
    none exists, the result is null and the feature never enters. AAB stores a decimal; Tideo
    stores whole lux and imports AAB's value rounded up.
-4. **HBM readout is out of the core units** (Open question 1).
+4. **HBM readout is unit 7** (Open question 1, answered 2026-10-17); AAB's reference and the port's deviations
+   are DD-078…DD-080.
 
 ### Validation (domain, pure)
 
@@ -392,22 +394,17 @@ commit → `scripts/ladder.sh --guards-only` → push.
    - Add a STATE changelog line, plus an Owner-queue item "run §18 on 1.15.0-debug".
    - **`git rm -r dist/aab-bright-light-handoff`**, then remove its STATE pointer.
    - Delete this file. By then its content lives in DD-070…DD-072 and the changelog lines.
-7. **HBM readout (optional, only if Open question 1 says so).**
-   - Prefer a direct HBM fact from `dumpsys display` (`mHbmMode`, the brightness float against the
-     normal maximum) over AAB's 13-point calibration. That needs no screen stepping and no
-     fingerprint invalidation.
-   - Read in-process with the DUMP grant Tideo already declares (D-130), never through Shizuku.
-     Shizuku stays at the three uses AGENTS.md anchors.
-   - Read once per admitted reading while handed off and only while a surface shows it. There is
-     no 2 s ticker.
-   - Put a timeout on the dumpsys process.
-   - If calibration is still needed: run it with the pipeline paused and through the controller,
-     persist the dumpsys field it locked, and parse exponent floats.
+7. **HBM readout and display calibration (done, DD-077…DD-080).** The owner chose AAB's design: the
+   `High Brightness Updates` 2 s loop running `_ReadBrightness`, and `_CalibrateDisplayRange` on
+   the Hand-off Behavior screen, reading `dumpsys display` through the DUMP grant, root, then
+   Shizuku (a fourth Shizuku use). This supersedes the earlier recommendations here: no
+   calibration, DUMP only, and no ticker.
 
 ## Open questions
 
-1. **[2026-10-15] HBM readout: port it, and how?** AAB shows the real brightness, above 255 in HBM,
-   while handed off. Options:
+1. **[2026-10-15] HBM readout: port it, and how?** **Answered 2026-10-17 (owner): (c), AAB's
+   calibration, with the dumpsys read through DUMP, root or Shizuku; done as unit 7 (DD-077).**
+   AAB shows the real brightness, above 255 in HBM, while handed off. Options were:
    - (a) No readout. The surfaces say "Android" and show lux.
    - (b) Unit 7 from a direct `dumpsys display` HBM field, DUMP grant only.
    - (c) Unit 7 with AAB's calibration.

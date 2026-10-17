@@ -41,6 +41,8 @@ object AutoBrightnessRuntime {
     // D-157: full-stop panic from external command.
     fun panic(context: Context) = sendServiceAction(context, AmbientMonitoringService.ACTION_PANIC)
 
+    fun calibrateDisplay(context: Context) = sendServiceAction(context, AmbientMonitoringService.ACTION_CALIBRATE_DISPLAY)
+
     private fun sendServiceAction(context: Context, action: String) {
         val appContext = context.applicationContext
         val intent = Intent(appContext, AmbientMonitoringService::class.java).setAction(action)

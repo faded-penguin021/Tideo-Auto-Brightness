@@ -12,6 +12,8 @@ import androidx.navigation.NavHostController
 import com.tideo.autobrightness.R
 import com.tideo.autobrightness.app.settings.AabSettings
 import com.tideo.autobrightness.app.settings.toBrightnessCurveConfig
+import com.tideo.autobrightness.app.state.DisplayCalibrationUi
+import com.tideo.autobrightness.app.state.DisplayCalibrationViewModel
 import com.tideo.autobrightness.app.state.DraftSettingsViewModel
 import com.tideo.autobrightness.app.ui.components.AabCard
 import com.tideo.autobrightness.app.ui.components.DraftSettingsScaffold
@@ -29,12 +31,17 @@ import kotlin.math.floor
 import kotlin.math.roundToInt
 
 @Composable
-fun HandoffScreen(navController: NavHostController, vm: DraftSettingsViewModel = viewModel()) {
+fun HandoffScreen(
+    navController: NavHostController,
+    vm: DraftSettingsViewModel = viewModel(),
+    calibrationVm: DisplayCalibrationViewModel = viewModel(),
+) {
     val draft by vm.draft.collectAsStateWithLifecycle()
     val committed by vm.committed.collectAsStateWithLifecycle()
     val dirty by vm.dirty.collectAsStateWithLifecycle()
     val epoch by vm.epoch.collectAsStateWithLifecycle()
     val criticalError by vm.hasCriticalError.collectAsStateWithLifecycle()
+    val calibration by calibrationVm.state.collectAsStateWithLifecycle()
     val toast = rememberToaster()
 
     HandoffContent(
@@ -49,6 +56,8 @@ fun HandoffScreen(navController: NavHostController, vm: DraftSettingsViewModel =
             }
             toast(R.string.toast_reset_defaults)
         },
+        calibration = calibration,
+        onCalibrate = calibrationVm::calibrate,
     )
 }
 
@@ -64,6 +73,8 @@ fun HandoffContent(
     onBack: () -> Unit,
     criticalError: Boolean = false,
     onReset: (() -> Unit)? = null,
+    calibration: DisplayCalibrationUi? = null,
+    onCalibrate: () -> Unit = {},
 ) {
     DraftSettingsScaffold(stringResource(R.string.title_handoff), dirty, onApply, onDiscard, onBack, criticalError, onReset) { padding ->
         SettingsColumn(padding) {
@@ -74,6 +85,7 @@ fun HandoffContent(
                 value = withContext(Dispatchers.Default) { handoffPreview(draft, curveConfig) }
             }
             HandoffCard(draft, committed, epoch, preview, onEdit)
+            if (calibration != null) DisplayCalibrationCard(calibration, onCalibrate)
         }
     }
 }

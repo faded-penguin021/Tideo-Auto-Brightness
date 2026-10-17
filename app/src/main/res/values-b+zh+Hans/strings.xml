@@ -73,7 +73,6 @@
     <string name="ssid_help_options">如果应用能直接读取网络名称，就无需满足定位要求：\n\n•  Shizuku 或 root — 应用运行 “cmd wifi status”（root 同样适用）。\n•  或者，通过 ADB 授予 DUMP 权限，应用便可读取 “dumpsys wifi”：</string>
     <string name="ssid_help_copy_dump">复制 ADB 命令</string>
     <string name="ssid_help_copied">已复制 ADB 命令</string>
-    <string name="ssid_help_dump_security">DUMP 是一项范围较广的系统诊断权限，需要你通过 ADB 手动授予。Tideo 仅将其用于只读的“dumpsys wifi”命令，且绝不存储命令输出。你可以随时通过 ADB 撤销此权限；卸载应用也会撤销它。</string>
     <string name="ssid_help_regex_caveat">如果你的 SSID 中包含 “SSID”，就会出问题。抱歉啦，不过这就没办法了。</string>
     <string name="rule_priority_over_max">超出 1–100 的范围 — 将保存为 100。</string>
     <string name="confirm_delete">删除</string>

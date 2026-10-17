@@ -50,6 +50,13 @@ object LiveRuntimeState {
     private val _serviceRunning = MutableStateFlow(false)
     val serviceRunning: StateFlow<Boolean> = _serviceRunning.asStateFlow()
 
+    private val _calibrating = MutableStateFlow(false)
+    val calibrating: StateFlow<Boolean> = _calibrating.asStateFlow()
+
+    fun setCalibrating(running: Boolean) {
+        _calibrating.value = running
+    }
+
     @Synchronized fun publish(
         instance: Any,
         state: PipelineState,
@@ -106,5 +113,6 @@ object LiveRuntimeState {
         _manualOverride.value = false
         _serviceRunning.value = false
         _activeProfile.value = null
+        _calibrating.value = false
     }
 }

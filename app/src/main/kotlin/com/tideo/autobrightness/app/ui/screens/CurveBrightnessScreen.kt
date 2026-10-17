@@ -128,7 +128,8 @@ fun CurveBrightnessContent(
                 // the crosshair should sit where the user actually sees the screen, not at the floor.
                 // Falls back to the applied value when they're equal (PWM-sensitive off → target==applied).
                 currentLux = live.smoothedLux?.takeIf { live.serviceOn },
-                currentBrightness = live.shownBrightness?.takeIf { live.serviceOn },
+                // DD-077: Android's reading can pass 255, off this chart's axis.
+                currentBrightness = live.shownBrightness?.takeIf { live.serviceOn && !live.handedOff },
                 handoffLux = handoff?.effective,
                 overridePoints = overlay,
                 referenceCurve = referenceConfig,

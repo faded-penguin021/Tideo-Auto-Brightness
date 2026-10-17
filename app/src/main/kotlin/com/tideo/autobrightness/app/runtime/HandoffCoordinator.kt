@@ -9,6 +9,9 @@ import com.tideo.autobrightness.platform.brightness.ScreenBrightnessController
 
 fun interface HandoffSink {
     fun onHandoff(toAndroid: Boolean)
+
+    // DD-077: `_ReadBrightness`'s HBM flashes.
+    fun onHighBrightness(active: Boolean) = Unit
 }
 
 object NoOpHandoffSink : HandoffSink {

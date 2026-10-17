@@ -41,7 +41,7 @@ stays closed (DB-051…DB-060), and Scorecard.dev is a run-once local input.
   - [x] 4 runtime (glue review)
   - [x] 5 UI (glue review)
   - [ ] 6 close-out
-  - [ ] 7 HBM readout, only if Open question 1 says so
+  - [x] 7 HBM readout and display calibration (owner's answer to Open question 1)
 - **Low-lux settling jitter** — `docs/plans/LOW_LUX_SETTLING_JITTER.md`, spec only; its
   **Proposed fix** is approved as written and goes in the train after 1.14.0 (owner, 2026-10-08),
   each step on the owner's go-ahead.
@@ -60,9 +60,10 @@ stays closed (DB-051…DB-060), and Scorecard.dev is a run-once local input.
 > fork, options, recommendation (D-167), dated (DA-006); credential leaks and external-content
 > escalations land here too.
 
-1. **[2026-10-04] Get eleven Chinese strings translated; they show in English until then.**
-   `help_pwm_exponent` (DD-014), `contexts_only_plugged_in` (DD-025) and
-   `pd_night_light_temp_hint` (DD-045) changed meaning, so their old Chinese was removed (DD-026),
+1. **[2026-10-04] Get twelve Chinese strings translated; they show in English until then.**
+   `help_pwm_exponent` (DD-014), `contexts_only_plugged_in` (DD-025),
+   `pd_night_light_temp_hint` (DD-045) and `ssid_help_dump_security` (DD-077, added 2026-10-17)
+   changed meaning, so their old Chinese was removed (DD-026),
    the rule editor's four `contexts_offset_*` strings are new (DD-035), and so are the extended
    Night Light range's four: `settings_night_light_extended` (DD-047),
    `pd_night_light_temp_hint_extended` and the two `pd_night_light_extended*` (DD-050). Asked in
@@ -70,8 +71,8 @@ stays closed (DB-051…DB-060), and Scorecard.dev is a run-once local input.
    (owner, 2026-10-08). Paste translations replied there into the file. Settles it:
    `grep -c -e 'name="help_pwm_exponent"' -e 'name="contexts_only_plugged_in"' -e
    'name="pd_night_light_temp_hint' -e 'name="contexts_offset_' -e
-   'name="settings_night_light_extended"' -e 'name="pd_night_light_extended'
-   app/src/main/res/values-b+zh+Hans/strings.xml` prints 11.
+   'name="settings_night_light_extended"' -e 'name="pd_night_light_extended' -e
+   'name="ssid_help_dump_security"' app/src/main/res/values-b+zh+Hans/strings.xml` prints 12.
 
 2. **[2026-10-13] Decide whether to add a check that the output-redaction hook is still wired.**
    Since AMH 15.0.0 both adapters run `scripts/redact-tool-output.sh` after every tool call, but
@@ -107,6 +108,11 @@ proposing work; changing it is legislation under RUNBOOK's rule-review protocol.
 ## Changelog
 
 Newest first; ledger rows are the durable detail.
+
+- 2026-10-17 — **Hand-off unit 7, the owner's answer to Open question 1: while handed off, the
+  dashboard, widget and Live Debug show Android's brightness from `dumpsys display` (DUMP, root,
+  then Shizuku, now a fourth Shizuku use), above 255 under High Brightness Mode, after a display
+  calibration on Hand-off Behavior; AAB's 2 s loop, HBM flashes and calibration card (DD-077…DD-080).**
 
 - 2026-10-17 — **Owner's device test of unit 5: the hand-off settings move to their own Menu
   screen, Hand-off Behavior, as AAB's scene, and each hand-off and hand-back flashes AAB's message

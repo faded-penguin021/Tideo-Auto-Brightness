@@ -22,6 +22,8 @@ import com.tideo.autobrightness.app.settings.ExperimentDateLocation
 import com.tideo.autobrightness.app.settings.SavedProfile
 import com.tideo.autobrightness.app.settings.SettingsValidator
 import com.tideo.autobrightness.app.state.AppEntry
+import com.tideo.autobrightness.app.state.CalibrationBadge
+import com.tideo.autobrightness.app.state.DisplayCalibrationUi
 import com.tideo.autobrightness.app.state.LiveDebugUiState
 import com.tideo.autobrightness.app.ui.components.ChartPager
 import com.tideo.autobrightness.app.ui.components.ChartSlot
@@ -345,12 +347,49 @@ class SettingsScreensTest {
         }
     }
 
-    private fun handoff(draft: AabSettings) {
+    private fun handoff(draft: AabSettings, calibration: DisplayCalibrationUi? = null, onCalibrate: () -> Unit = {}) {
         compose.setContent {
             MaterialTheme {
-                HandoffContent(draft, draft, epoch = 0, dirty = false, onEdit = {}, onApply = {}, onDiscard = {}, onBack = {})
+                HandoffContent(
+                    draft, draft, epoch = 0, dirty = false, onEdit = {}, onApply = {}, onDiscard = {}, onBack = {},
+                    calibration = calibration, onCalibrate = onCalibrate,
+                )
             }
         }
+    }
+
+    @Test
+    fun handoff_calibration_uncalibrated_explainsTheCap_andCalibratesAtOnce_DD077() {
+        var calls = 0
+        handoff(AabSettings(), DisplayCalibrationUi(CalibrationBadge.UNCALIBRATED, serviceRunning = true)) { calls++ }
+        compose.onNodeWithTag("calibration_badge").performScrollTo().assertTextContains("Not calibrated")
+        compose.onNodeWithTag("calibration_note").assertTextContains("stops at 255", substring = true)
+        compose.onNodeWithTag("calibration_button").performScrollTo().assertTextContains("Calibrate display").performClick()
+        assertEquals(1, calls)
+    }
+
+    @Test
+    fun handoff_calibration_recalibrating_asksFirst_DD077() {
+        var calls = 0
+        handoff(AabSettings(), DisplayCalibrationUi(CalibrationBadge.CALIBRATED, serviceRunning = true)) { calls++ }
+        compose.onNodeWithTag("calibration_button").performScrollTo().assertTextContains("Recalibrate display").performClick()
+        assertEquals(0, calls)
+        compose.onNodeWithTag("calibration_confirm").performClick()
+        assertEquals(1, calls)
+    }
+
+    @Test
+    fun handoff_calibration_needsTheService_andBlocksWhileRunning_DD077() {
+        handoff(AabSettings(), DisplayCalibrationUi(CalibrationBadge.FAILED, serviceRunning = false))
+        compose.onNodeWithTag("calibration_error").performScrollTo().assertExists()
+        compose.onNodeWithTag("calibration_service_off").assertExists()
+        compose.onNodeWithTag("calibration_button").assertTextContains("Retry calibration").assertIsNotEnabled()
+    }
+
+    @Test
+    fun handoff_calibration_runningDisablesTheButton_DD077() {
+        handoff(AabSettings(), DisplayCalibrationUi(CalibrationBadge.RUNNING, serviceRunning = true))
+        compose.onNodeWithTag("calibration_button").performScrollTo().assertIsNotEnabled()
     }
 
     private fun awaitText(text: String, substring: Boolean = false) = compose.waitUntil(10_000) {
@@ -394,9 +433,32 @@ class SettingsScreensTest {
     }
 
     @Test
+    fun curveBrightness_liveReadout_showsAndroidsReadingWhileHandedOff_DD077() {
+        curve(AabSettings(), PipelineState(serviceOn = true, handedOff = true, smoothedLux = 30_000.0, targetBrightness = 200, systemBrightness = 291))
+        compose.onNodeWithTag("diag_curve_current_bright").performScrollTo().assertTextContains("291", substring = true)
+    }
+
+    @Test
     fun curveBrightness_liveReadout_blanksWhileHandedOff() {
         curve(AabSettings(), PipelineState(serviceOn = true, handedOff = true, smoothedLux = 30_000.0, targetBrightness = 200))
         compose.onNodeWithTag("diag_curve_current_bright").performScrollTo().assertTextContains("—", substring = true)
+    }
+
+    @Test
+    fun handedOff_readoutsShowAndroidsBrightness_unclamped_DD077() {
+        compose.setContent {
+            MaterialTheme {
+                LiveDebugContent(
+                    state = LiveDebugUiState(
+                        pipeline = PipelineState(handedOff = true, lastAppliedBrightness = 120, systemBrightness = 291),
+                        serviceRunning = true,
+                    ),
+                    onSelectDebug = {}, onBack = {},
+                )
+            }
+        }
+        compose.onNodeWithTag("debug_current_bright").performScrollTo().assertTextContains("291", substring = true)
+        assertEquals(291, PipelineState(handedOff = true, targetBrightness = 200, systemBrightness = 291).shownBrightness)
     }
 
     @Test

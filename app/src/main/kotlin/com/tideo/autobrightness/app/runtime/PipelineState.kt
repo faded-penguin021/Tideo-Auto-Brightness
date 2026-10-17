@@ -65,6 +65,8 @@ data class PipelineState(
     val lastAppliedBrightness: Int? = null,
     // D-109: perceived brightness (un-floored); darkened by secure layer if needed.
     val targetBrightness: Int? = null,
+    // DD-077: Android's brightness while handed off; only the service's published copy carries it.
+    val systemBrightness: Int? = null,
     // DC-007: continuous, so it is readable on a device that never fires an override.
     val lastBrightnessWrite: BrightnessWriteResult? = null,
     // DC-007: event-scoped, written where an override is detected OR dismissed.
@@ -84,7 +86,10 @@ data class PipelineState(
         }
 
     val shownBrightness: Int?
-        get() = if (handedOff) null else targetBrightness ?: lastAppliedBrightness
+        get() = if (handedOff) systemBrightness else targetBrightness ?: lastAppliedBrightness
+
+    val currentBrightness: Int?
+        get() = if (handedOff) systemBrightness else lastAppliedBrightness
 
     fun unchanged(lux: Double): Boolean {
         val low = threshAbsLow ?: return false
@@ -119,4 +124,6 @@ sealed interface PipelineEvent {
     data object ContextChanged : PipelineEvent
 
     data object ScaleTick : PipelineEvent
+
+    data object CalibrateDisplay : PipelineEvent
 }

@@ -153,12 +153,13 @@ The app has two privilege tiers:
   root. It adds super dimming and the Privileged Display toggles. After the grant, secure writes go
   directly through `Settings.Secure` or `Settings.Global`; they do not use a binder.
 
-Shizuku is also an optional runtime dependency in exactly three places: the Wi-Fi SSID strategy that
-does not require Location, the force-dark toggle, and the Night Light temperature write through
+Shizuku is also an optional runtime dependency in exactly four places: the Wi-Fi SSID strategy that
+does not require Location, the force-dark toggle, the Night Light temperature write through
 the display service (DC-057) — the one secure-settings write that can also go through a binder: on
 a build observed ignoring the Kelvin key, while a profile's extended range of 686–7308 K is on, and
-after an out-of-range write until one lands through it (DD-048, DD-051). It is not only a grant
-mechanism. The count
+after an out-of-range write until one lands through it (DD-048, DD-051) — and the `dumpsys display`
+brightness read during a bright-light hand-off and a display calibration, first tried after the DUMP
+grant and root, then reused while it answers (DD-077). It is not only a grant mechanism. The count
 is anchored in `scripts/guards/doc-facts.sh`; if it changes, update both the claim and the constant.
 
 ## Conventions

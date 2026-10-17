@@ -32,6 +32,12 @@
     <string name="flash_manual_override">Manual override — auto brightness paused</string>
     <string name="flash_handoff_to_android">Adaptive Brightness on — Tideo handed control to Android</string>
     <string name="flash_handoff_back">Adaptive Brightness off — Tideo is back in control</string>
+    <!-- DD-077: _ReadBrightness and _CalibrateDisplayRange flashes. -->
+    <string name="flash_hbm_on">High Brightness Mode activated</string>
+    <string name="flash_hbm_off">High Brightness Mode disabled</string>
+    <string name="flash_calibration_start">Starting display calibration. Don\'t touch the screen…</string>
+    <string name="flash_calibration_ok">Display calibrated. While Android is in control, brightness can now read above 255 when High Brightness Mode engages.</string>
+    <string name="flash_calibration_failed">Calibration failed: Tideo couldn\'t read \"dumpsys display\". Grant the DUMP permission over ADB, or allow root or Shizuku.</string>
     <!-- DB-035: why an external control command did nothing (debug level 8 only) -->
     <string name="flash_control_gate_off">Control command ignored — external control is off (Tools → Automation control)</string>
     <string name="flash_control_name_missing">LOAD_PROFILE ignored — no \"name\" extra</string>
@@ -91,7 +97,7 @@
     <string name="ssid_help_options">You can skip the Location requirement if the app can read the name directly:\n\n•  Shizuku or root — the app runs \"cmd wifi status\" (works with root too).\n•  Otherwise, grant DUMP over ADB and the app reads \"dumpsys wifi\":</string>
     <string name="ssid_help_copy_dump">Copy ADB command</string>
     <string name="ssid_help_copied">ADB command copied</string>
-    <string name="ssid_help_dump_security">DUMP is a broad system-diagnostics permission you grant manually over ADB. Tideo uses it only for the read-only “dumpsys wifi” command and never stores the command output. You can revoke it over ADB at any time; uninstalling also revokes it.</string>
+    <string name="ssid_help_dump_security">DUMP is a broad system-diagnostics permission you grant manually over ADB. Tideo uses it only for the read-only “dumpsys wifi” and “dumpsys display” commands and never stores their output, only the brightness numbers a display calibration measures. You can revoke it over ADB at any time; uninstalling also revokes it.</string>
     <string name="ssid_help_regex_caveat">If your SSID contains \"SSID\", this will cause problems. Sorry, not sorry.</string>
     <string name="rule_priority_over_max">Above the 1–100 range — this will be saved as 100.</string>
     <!-- D-114: Tasker-style confirmations for destructive profile/rule actions. -->
@@ -218,7 +224,7 @@
     <string name="guide_s9_title">9. Saving Your Work</string>
     <string name="guide_s9_body">• **Apply:** makes changes active immediately, but not written to disk — lost on a profile load or app restart.\n• **Save (Profiles screen):** writes current settings to the selected profile — the only way to make changes permanent.\n• **Reset:** reverts the current tab to defaults.\n[TIP] After editing multiple tabs, save to your active profile; if using the context engine, overwrite the relevant profile or your changes are replaced when a rule fires.</string>
     <string name="guide_s10_title">10. Bright Sunlight (Hand-off)</string>
-    <string name="guide_s10_body">Many phones boost the screen past its normal maximum in direct sunlight, but only under Android\'s own Adaptive Brightness.\n• **Hand-off (Menu → Hand-off Behavior):** above a lux you choose, Tideo hands brightness to Android and writes nothing; a message says so, the dashboard, notification, widget and tile say \"Android\" meanwhile, and a brightness change then is not an override.\n• **Taking back:** once light falls below the hand-back level, Tideo turns Adaptive Brightness off, says so and follows its curve again.\n• **Per profile:** each profile keeps its own hand-off settings, so a context rule can turn it on outdoors only.\n[TIP] The hand-off lux must sit where your curve already reaches 90 percent of max brightness; the card shows the lowest valid value and uses it when yours is lower.\n• **Disable:** turning Tideo off restores the brightness mode you had before it started.</string>
+    <string name="guide_s10_body">Many phones boost the screen past its normal maximum in direct sunlight, but only under Android\'s own Adaptive Brightness.\n• **Hand-off (Menu → Hand-off Behavior):** above a lux you choose, Tideo hands brightness to Android and writes nothing; a message says so, the dashboard, notification, widget and tile say \"Android\" meanwhile, and a brightness change then is not an override.\n• **Calibrate display (same screen):** steps the screen through 13 levels to learn your panel\'s scale. Afterwards the dashboard, widget and Live Debug show the brightness Android chose while it is in control, and a number above 255 means High Brightness Mode is on. It needs the DUMP permission granted over ADB, root, or Shizuku; calibrate again after a system update.\n• **Taking back:** once light falls below the hand-back level, Tideo turns Adaptive Brightness off, says so and follows its curve again.\n• **Per profile:** each profile keeps its own hand-off settings, so a context rule can turn it on outdoors only.\n[TIP] The hand-off lux must sit where your curve already reaches 90 percent of max brightness; the card shows the lowest valid value and uses it when yours is lower.\n• **Disable:** turning Tideo off restores the brightness mode you had before it started.</string>
     <string name="guide_outro">Enjoy your new intelligent auto brightness!</string>
     <string name="guide_done">Got it</string>
 
@@ -694,6 +700,7 @@
     <string name="help_zone_2_end">Sets the lux level where \'indoor light\' ends and \'bright outdoor light\' begins. Affects the transition when going outside.</string>
     <string name="help_handoff_enabled">Above the hand-off lux, Tideo stops writing brightness and turns on Android\'s Adaptive Brightness, so the phone\'s own sunlight boost can go brighter than any app can set. Tideo keeps measuring light, treats no brightness change as an override meanwhile, and takes control back when it gets darker.</string>
     <string name="help_handoff_lux">Smoothed lux above which Android takes over. It must sit where your curve gives at least 90 percent of max brightness: a lower value is raised to that point while the curve needs it, and your own value returns if the curve changes back.</string>
+    <string name="help_handoff_calibration">Steps the screen through 13 brightness levels for a few seconds and reads, through \"dumpsys display\", where the panel lands for each. Tideo can then show the brightness Android sets while it is in control, including values above 255 when the phone\'s High Brightness Mode boosts it in sunlight. Needs the DUMP permission granted over ADB, root, or Shizuku. Calibrate again after a system update.</string>
     <string name="help_handoff_hysteresis">Tideo takes control back once smoothed lux falls below this share of the hand-off lux. A lower level waits for more darkness and avoids flipping back and forth near the threshold; 100 hands back as soon as lux drops below the hand-off lux.</string>
     <string name="help_dimming_strength">Controls the maximum super dimming strength. Value shows what happens without circadian effects.</string>
     <string name="help_dim_spread">Controls how wide the scale shifts over the day. Only active when circadian scaling is enabled!</string>
@@ -750,6 +757,28 @@
     <string name="settings_handoff_enabled">Hand off to Adaptive Brightness</string>
     <string name="settings_handoff_lux">Hand-off lux</string>
     <string name="settings_handoff_hysteresis">Hand-off hysteresis</string>
+    <string name="handoff_calibration_header">Display range calibration</string>
+    <string name="handoff_calibration_label">Hardware brightness curve</string>
+    <string name="handoff_calibration_checking">Checking…</string>
+    <string name="handoff_calibration_running">Calibrating…</string>
+    <string name="handoff_calibration_calibrated">Calibrated</string>
+    <string name="handoff_calibration_failed">Failed</string>
+    <string name="handoff_calibration_needed">Update needed</string>
+    <string name="handoff_calibration_uncalibrated">Not calibrated</string>
+    <string name="handoff_calibration_note_checking">Reading calibration status…</string>
+    <string name="handoff_calibration_note_running">Screen brightness steps are being tested. Please wait…</string>
+    <string name="handoff_calibration_note_calibrated">Hardware brightness curve verified. While Android is in control, a reading above 255 means High Brightness Mode is on.</string>
+    <string name="handoff_calibration_note_failed">The last calibration failed: Tideo could not read \"dumpsys display\".</string>
+    <string name="handoff_calibration_note_needed">The system was updated since the last calibration. Calibrate again.</string>
+    <string name="handoff_calibration_note_uncalibrated">Not calibrated: while Android is in control, Tideo shows Android\'s brightness setting, which stops at 255.</string>
+    <string name="handoff_calibration_failed_banner">Grant Tideo the DUMP permission over ADB, or allow root or Shizuku access, then retry.</string>
+    <string name="handoff_calibration_service_off">Turn Tideo on to calibrate.</string>
+    <string name="handoff_calibrate_display">Calibrate display</string>
+    <string name="handoff_recalibrate_display">Recalibrate display</string>
+    <string name="handoff_calibrate_retry">Retry calibration</string>
+    <string name="handoff_recalibrate_title">Recalibrate display?</string>
+    <string name="handoff_recalibrate_message">The display is already calibrated. Recalibrating steps your screen brightness through several levels for a few seconds.</string>
+    <string name="handoff_recalibrate">Recalibrate</string>
     <string name="settings_form1a">Zone 1 scaling</string>
     <string name="settings_form2b">Zone 2 scaling</string>
     <string name="settings_form2c">Zone 2 offset</string>

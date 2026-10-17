@@ -812,6 +812,7 @@
   review, 2026-10-17, for the floor and the taper marker; glue review, for the colour and the
   thread).
   Corrected by DD-076.
+  Its "none shows a brightness" is superseded by DD-077.
 - DD-076 [cited]: **The bright-light hand-off has its own Menu screen, Hand-off Behavior, and each
   hand-off and hand-back flashes, as in AAB (owner, 2026-10-17, after a device test of 1.15.0-debug
   vc30 in 14 000 lx).** AAB's settings are their own scene, "Hand-off Behavior", reached from its
@@ -828,3 +829,56 @@
   AAB's disable runs `_HandBackToAAB` and flashes. Its three source pointers raise the app comment
   budget through a new reviewed `RAISED_app=3`, under the owner's pre-approval for unit 5
   (2026-10-16), kept apart from `MEASURED_app` so that stays a measurement (rule review).
+- DD-077 [cited]: **While a bright-light hand-off runs, Tideo shows the brightness Android chose,
+  read from `dumpsys display` and mapped through a per-build display calibration, so a reading
+  above 255 means the OEM's High Brightness Mode is on (owner, 2026-10-17, answering the hand-off
+  plan's Open question 1 with AAB's own design, read through the DUMP grant, root or Shizuku; Tideo
+  has no ADB Wi-Fi).** A 2 s loop outside the pipeline reads it while handed off, on, unpaused and
+  awake, and flashes "High Brightness Mode activated" or "disabled" when it crosses 255; a sweep
+  started from the Hand-off Behavior screen's Display Range Calibration card runs as one pipeline
+  event, so no cycle, animation or control event interleaves (Astra advice, 2026-10-17, for
+  in-service over a screen-run sweep). The readout lives only in the service's published copy of
+  the state (`systemBrightness`), never the pipeline's, and feeds the dashboard hero, widget, Live
+  Debug's current brightness and the Curve & Brightness readout, while the curve crosshair stays
+  blank because the value can leave its axis. The calibration is a device fact in `display_prefs`,
+  stamped with `Build.FINGERPRINT` like the Night Light verdict (DD-048), outside every profile, and
+  Shizuku's runtime uses become four. AAB's reference is DD-078, and the port's deviations from it
+  are DD-079 and DD-080.
+- DD-078: **AAB's HBM readout and display calibration, as handed over in the hand-off export
+  (`dist/aab-bright-light-handoff/`, removed by the plan's unit 6).** Profile `High Brightness
+  Updates` (Tick 2000 ms while `%AAB_AdaptiveHandoff` is 1, `%AAB_Service` is On,
+  `%AAB_Manual_Override` is not true and the display is on) runs `_ReadBrightness`: without a
+  `%AAB_BrightCal` other than `error` whose `%AAB_BrightCalFP` equals `Build.FINGERPRINT` it does
+  nothing (a mismatch sets `%AAB_NeedsCal`); otherwise it runs `dumpsys display` through
+  `%AAB_SecondaryPrivilege` (Root, ADB WiFi, Shizuku, else the DUMP grant; 5 s), takes the first
+  `(mScreenBrightness|mDisplayBrightness|mCurrentScreenBrightness)=` decimal, clamps below the
+  first point, interpolates between points, extrapolates past the last with the last segment's
+  slope computed first, and rounds with `Math.round`. It stops if the value is unchanged, and
+  otherwise flashes "High Brightness Mode activated" above 255 or "disabled" at or below whenever
+  that changes `%AAB_HBMFlag`, which `_HandBackToAAB` sets to 0 after reading once more.
+  `_CalibrateDisplayRange` toggles the service off, forces MANUAL, writes `screen_brightness` 1, 5,
+  10, 25, 50, 75, 100, 128, 150, 175, 200, 225 and 255, waits 800 ms after the first, polls every
+  150 ms for up to 3 s until two equal readings differ from the previous point, locks to the first
+  field found, requires rising readings, and restores brightness and mode. It stores `value:raw,…`
+  with the fingerprint, or `error` on any failure including the restore, replacing an older
+  calibration, flashes, and toggles the service back. The scene's card shows Calibrating,
+  Calibrated, Failed, Update Needed or Not Calibrated ("capped at standard 255") and asks before a
+  recalibration.
+- DD-079: **Tideo's display calibration departs from AAB's (DD-078) in four ways (Sol glue review,
+  2026-10-17, for the second and third).** Its 13 points go through Tideo's 0–255 conversion, since
+  AAB's literal writes put its "255" at 255 of 4095 on the owner's panel, against the owner's
+  reading of 4095 at 255. It is one pipeline event, not a service toggle: it hands back silently as
+  Pause does, holds override detection off on a flag of its own because a screen-on re-arms the
+  settle window, restores the level read before it through the same conversion, and re-runs Set
+  Initial Brightness, which may hand off again. It never writes the mode and fails instead when the
+  mode is not MANUAL (a pause under Adaptive Brightness switched on by hand), so no mode write can
+  land after Disable's `restoreMode()`; it needs the service running, and Disable or panic
+  mid-sweep records a failure. A point whose last read ends past the 3 s window still counts, as in
+  AAB's loop, and the field the sweep locked is stored and read thereafter.
+- DD-080: **Tideo's HBM readout departs from AAB's (DD-078) in four ways (Sol review, 2026-10-17,
+  for the fourth).** It tries one chain, the DUMP grant, then root, then Shizuku, and keeps using
+  whichever answered. Uncalibrated, it shows the brightness setting through Tideo's conversion, at
+  most 255, rather than AAB's last target. The HBM flag starts at 0, so a first reading at or below
+  255 does not flash "disabled"; a hand-back does not read again, and a screen-off keeps the flag as
+  it keeps the hand-off. Exponent floats parse, only brightness lines leave the shell process, each
+  line is bounded, and Shizuku calls serialize, the display read allowed bind time plus its 5 s.

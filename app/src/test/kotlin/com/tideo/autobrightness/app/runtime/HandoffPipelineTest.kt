@@ -1,6 +1,10 @@
 package com.tideo.autobrightness.app.runtime
 
 import com.tideo.autobrightness.app.settings.AabSettings
+import com.tideo.autobrightness.domain.brightness.DisplayCalibration
+import com.tideo.autobrightness.domain.brightness.DisplayCalibration.Point
+import com.tideo.autobrightness.platform.brightness.DisplayBrightnessReader
+import com.tideo.autobrightness.platform.brightness.DisplayBrightnessSample
 import com.tideo.autobrightness.platform.brightness.BrightnessWriteResult
 import com.tideo.autobrightness.platform.brightness.ScreenBrightnessController
 import com.tideo.autobrightness.platform.observe.BrightnessObserver
@@ -19,6 +23,7 @@ import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.concurrent.thread
@@ -93,6 +98,21 @@ class HandoffPipelineTest {
         override fun clearSelfWriteMarker() { lastWrite = null }
     }
 
+    /** A panel whose dumpsys value is 16 x the level; [answers] false models no DUMP, root or Shizuku. */
+    private class Display(private val brightness: ModeBrightness) : DisplayBrightnessReader {
+        var answers = true
+        var raw: (Int) -> Double = { it * 16.0 }
+        override suspend fun read(field: String?): DisplayBrightnessSample? =
+            if (answers) DisplayBrightnessSample("mScreenBrightness", raw(brightness.current)) else null
+    }
+
+    private class Calibrations : DisplayCalibrationSink {
+        var started = 0
+        val finished = mutableListOf<DisplayCalibrationRecord?>()
+        override suspend fun started() { started++ }
+        override suspend fun finished(record: DisplayCalibrationRecord?) { finished += record }
+    }
+
     private class Dimming(private val log: MutableList<String>) : DimmingCoordinator {
         val applied = mutableListOf<Int>()
         override fun apply(targetBrightness: Int, settings: AabSettings, scaleDynamic: Double) { applied += targetBrightness }
@@ -114,6 +134,8 @@ class HandoffPipelineTest {
         val brightness = ModeBrightness(log)
         val dimming = Dimming(log)
         val flashes = mutableListOf<Boolean>()
+        val display = Display(brightness)
+        val calibrations = Calibrations()
         var settings = initial
         var settingsReadMs = 0L
         var nowMs = 1_000L
@@ -127,6 +149,8 @@ class HandoffPipelineTest {
             clock = { nowMs + test.testScheduler.currentTime },
             dimming = dimming,
             handoffSink = { flashes += it },
+            displayReader = display,
+            calibrationSink = calibrations,
         )
         val state: PipelineState get() = controller.state.value
 
@@ -153,6 +177,88 @@ class HandoffPipelineTest {
             assertEquals(0, brightness.writesWhileAutomatic, "nothing may be written while Android owns the mode")
             scope.cancel()
         }
+    }
+
+    @Test
+    fun calibration_sweepsThirteenLevels_restores_andReappliesTheCurve_DD077() = runTest {
+        val rig = Rig(this)
+        rig.controller.start()
+        rig.reading(500.0)
+        val applied = rig.brightness.current
+        val before = rig.brightness.writes.size
+
+        rig.controller.calibrateDisplay()
+        advanceUntilIdle()
+
+        val record = assertNotNull(rig.calibrations.finished.single())
+        assertEquals(1, rig.calibrations.started)
+        assertEquals("mScreenBrightness", record.field)
+        assertEquals(DisplayCalibration.LEVELS.map { Point(it, it * 16.0) }, record.calibration.points)
+        val writes = rig.brightness.writes.drop(before)
+        assertEquals(DisplayCalibration.LEVELS + applied, writes.take(14), "13 levels, then the level found")
+        assertEquals(applied, rig.brightness.current, "Set Initial Brightness runs again afterwards")
+        assertFalse(rig.state.paused)
+        rig.close()
+    }
+
+    @Test
+    fun calibration_whileHandedOff_handsBackSilently_andTheCurveHandsOffAgain_DD077() = runTest {
+        val rig = Rig(this)
+        rig.handedOffAt(30_000.0)
+        assertEquals(listOf(true), rig.flashes)
+
+        rig.controller.calibrateDisplay()
+        advanceUntilIdle()
+
+        assertNotNull(rig.calibrations.finished.single())
+        assertEquals(1, rig.brightness.reclaims)
+        assertTrue(rig.state.handedOff, "30 000 lx is still above the threshold")
+        assertEquals(listOf(true, true), rig.flashes, "the hand-back is silent, as Pause's")
+        rig.close()
+    }
+
+    @Test
+    fun calibration_refusesWhenPausedUnderAdaptiveBrightness_andWritesNothing_DD077() = runTest {
+        val rig = Rig(this)
+        rig.controller.start()
+        rig.reading(500.0)
+        rig.controller.pause()
+        advanceUntilIdle()
+        rig.brightness.automatic = true
+        val writes = rig.brightness.writes.size
+        val forced = rig.brightness.manualForced
+
+        rig.controller.calibrateDisplay()
+        advanceUntilIdle()
+
+        assertEquals(listOf<DisplayCalibrationRecord?>(null), rig.calibrations.finished)
+        assertEquals(writes, rig.brightness.writes.size)
+        assertEquals(forced, rig.brightness.manualForced, "never forces MANUAL")
+        assertTrue(rig.brightness.automatic)
+        rig.brightness.automatic = false
+        rig.close()
+    }
+
+    @Test
+    fun calibration_fails_withoutAReadableDisplay_orOnAFlatPanel_andStillRestores_DD077() = runTest {
+        val rig = Rig(this)
+        rig.controller.start()
+        rig.reading(500.0)
+        val applied = rig.brightness.current
+
+        rig.display.answers = false
+        rig.controller.calibrateDisplay()
+        advanceUntilIdle()
+        assertEquals(listOf<DisplayCalibrationRecord?>(null), rig.calibrations.finished)
+        assertEquals(applied, rig.brightness.current)
+
+        rig.display.answers = true
+        rig.display.raw = { minOf(it, 100) * 16.0 }
+        rig.controller.calibrateDisplay()
+        advanceUntilIdle()
+        assertEquals(listOf<DisplayCalibrationRecord?>(null, null), rig.calibrations.finished, "raw must keep rising")
+        assertEquals(applied, rig.brightness.current)
+        rig.close()
     }
 
     @Test

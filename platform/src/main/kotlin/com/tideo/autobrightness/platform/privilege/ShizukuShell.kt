@@ -5,15 +5,21 @@ import android.content.Context
 import android.content.ServiceConnection
 import android.content.pm.PackageManager
 import android.os.IBinder
+import com.tideo.autobrightness.platform.brightness.DisplayBrightnessDump
 import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withTimeoutOrNull
 import rikka.shizuku.Shizuku
 import kotlin.concurrent.thread
 import kotlin.coroutines.resume
 
-/** Privileged operations via Shizuku (S12.7d, G2R-F41). Wi-Fi status, force-dark or Night Light Kelvin only; null on failure. */
+/** Privileged operations via Shizuku (S12.7d, G2R-F41). Wi-Fi status, force-dark, Night Light Kelvin or display brightness only; null on failure. */
 object ShizukuShell {
     private const val BIND_TIMEOUT_MS = 4_000L
+
+    // DD-077: one service identity, and each call unbinds it with remove = true, so calls never overlap.
+    private val serial = Mutex()
 
     private fun isUsable(): Boolean = try {
         Shizuku.pingBinder() && Shizuku.checkSelfPermission() == PackageManager.PERMISSION_GRANTED
@@ -21,12 +27,13 @@ object ShizukuShell {
         false
     }
 
-    enum class ReadOperation { WIFI_STATUS, FORCE_DARK }
+    enum class ReadOperation { WIFI_STATUS, FORCE_DARK, DISPLAY_BRIGHTNESS }
 
-    suspend fun read(context: Context, operation: ReadOperation): String? = call(context) { service ->
+    suspend fun read(context: Context, operation: ReadOperation): String? = call(context, timeoutFor(operation)) { service ->
         when (operation) {
             ReadOperation.WIFI_STATUS -> service.wifiStatus()
             ReadOperation.FORCE_DARK -> service.readForceDark()
+            ReadOperation.DISPLAY_BRIGHTNESS -> service.displayBrightnessLines()
         }
     }
 
@@ -42,7 +49,16 @@ object ShizukuShell {
         it.setNightDisplayTemperature(kelvin).takeIf { result -> result > 0 }
     }
 
-    private suspend fun <T : Any> call(context: Context, operation: (IShizukuUserService) -> T?): T? {
+    private fun timeoutFor(operation: ReadOperation): Long =
+        if (operation == ReadOperation.DISPLAY_BRIGHTNESS) BIND_TIMEOUT_MS + DisplayBrightnessDump.TIMEOUT_SECONDS * 1000 else BIND_TIMEOUT_MS
+
+    private suspend fun <T : Any> call(
+        context: Context,
+        timeoutMs: Long = BIND_TIMEOUT_MS,
+        operation: (IShizukuUserService) -> T?,
+    ): T? = serial.withLock { callExclusive(context, timeoutMs, operation) }
+
+    private suspend fun <T : Any> callExclusive(context: Context, timeoutMs: Long, operation: (IShizukuUserService) -> T?): T? {
         if (!isUsable()) return null
         val appContext = context.applicationContext
         val args = Shizuku.UserServiceArgs(
@@ -50,9 +66,9 @@ object ShizukuShell {
         )
             .processNameSuffix("aab_shell")
             .debuggable(false)
-            .version(3)
+            .version(4)
 
-        return withTimeoutOrNull(BIND_TIMEOUT_MS) {
+        return withTimeoutOrNull(timeoutMs) {
             suspendCancellableCoroutine { cont ->
                 val connection = object : ServiceConnection {
                     override fun onServiceConnected(name: ComponentName?, binder: IBinder?) {
@@ -75,7 +91,7 @@ object ShizukuShell {
 
                     override fun onServiceDisconnected(name: ComponentName?) {}
                 }
-                // Unbind on the 4 s timeout too (D-145): a bind that never connects would otherwise stay
+                // Unbind on the timeout too (D-145): a bind that never connects would otherwise stay
                 // registered forever. Idempotent vs the onServiceConnected finally-unbind (runCatching).
                 cont.invokeOnCancellation { runCatching { Shizuku.unbindUserService(args, connection, true) } }
                 try {

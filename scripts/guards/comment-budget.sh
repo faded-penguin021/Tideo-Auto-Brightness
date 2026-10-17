@@ -105,9 +105,11 @@ MEASURED_platform=314
 # Reviewed raises past the margin, kept apart so MEASURED_* stays a measurement; a re-baseline
 # absorbs them and resets these to 0. app +3: three `// DD-076:` pointers (owner pre-approval
 # for hand-off unit 5, 2026-10-16; restating comments in that change were deleted instead).
-RAISED_app=3
-RAISED_domain=0
-RAISED_platform=0
+# DD-077 (hand-off unit 7): app +23, domain +5, platform +8, its Tasker markers, %AAB_ provenance
+# and the rationale its reviews asked for; its restating comments were deleted instead.
+RAISED_app=26
+RAISED_domain=5
+RAISED_platform=8
 for _m in app domain platform; do
 	eval "_meas=\$MEASURED_$_m"
 	# Integer ceiling: (x*pct + 99) / 100.

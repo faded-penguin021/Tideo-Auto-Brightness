@@ -73,7 +73,7 @@ private fun sameNumber(a: Number, b: Number, isInt: Boolean): Boolean =
 
 /** The "ⓘ" affordance that reveals a control's Tasker long-press help (G2R-F19/F20/F21). Tap = long-tap. D-156: bare glyph with per-field contentDescription. */
 @Composable
-private fun HelpInfoButton(tag: String, label: String, onClick: () -> Unit) {
+internal fun HelpInfoButton(tag: String, label: String, onClick: () -> Unit) {
     val description = stringResource(R.string.a11y_help_for, label)
     IconButton(
         onClick = onClick,

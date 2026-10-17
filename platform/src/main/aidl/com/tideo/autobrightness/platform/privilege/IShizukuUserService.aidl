@@ -23,4 +23,7 @@ interface IShizukuUserService {
     int readNightDisplayTemperature() = 5;
 
     int setNightDisplayTemperature(int kelvin) = 6;
+
+    // DD-077: only the brightness lines of `dumpsys display`, never the whole dump.
+    String displayBrightnessLines() = 7;
 }
