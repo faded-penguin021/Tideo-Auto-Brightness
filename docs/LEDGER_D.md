@@ -882,3 +882,15 @@
   255 does not flash "disabled"; a hand-back does not read again, and a screen-off keeps the flag as
   it keeps the hand-off. Exponent floats parse, only brightness lines leave the shell process, each
   line is bounded, and Shizuku calls serialize, the display read allowed bind time plus its 5 s.
+- DD-081: **The bright-light hand-off's HBM readout (DD-077) passed the owner's sunlight test on
+  1.15.0-debug vc30 (2026-10-17, OnePlus CPH2653).** The build went in over adb, because Play
+  Protect blocked the file-manager install (its scan opened `PlayProtectDialogsActivity` as the
+  installer failed with "App not installed"), and DUMP was granted over adb; the calibration stored
+  a straight line from `1:16.0` to `255:4095.0` on `mScreenBrightness`, so Tideo's 255 lands on the
+  panel's normal maximum, as the owner reported for AAB. Handed off at 92 048 lx smoothed,
+  `screen_brightness_mode` read 1 and `mScreenBrightness` 4171 against
+  `mScreenBrightnessNormalMaximum` 4095, which the calibration maps to 260. The owner saw the
+  dashboard show the reading and the "High Brightness Mode activated" flash, and Live Debug showed
+  258 at 73 601 lx in partial shade. This phone gives apps a 0–255 brightness scale (Settings API
+  max 255) that it maps to its own 0–4095, which is why the sweep, written through Tideo's
+  conversion, reaches 4095 at 255 (DD-079).

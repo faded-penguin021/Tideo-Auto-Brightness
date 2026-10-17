@@ -109,6 +109,10 @@ proposing work; changing it is legislation under RUNBOOK's rule-review protocol.
 
 Newest first; ledger rows are the durable detail.
 
+- 2026-10-17 — **Owner's sunlight test of unit 7 passed on 1.15.0-debug vc30: calibrated 255 →
+  4095, handed off at 92 048 lx, 4171 raw shown as 260 and 258, the HBM flash seen; Play Protect
+  blocks a file-manager install, so debug builds go on over adb (DD-081).**
+
 - 2026-10-17 — **Hand-off unit 7, the owner's answer to Open question 1: while handed off, the
   dashboard, widget and Live Debug show Android's brightness from `dumpsys display` (DUMP, root,
   then Shizuku, now a fourth Shizuku use), above 255 under High Brightness Mode, after a display

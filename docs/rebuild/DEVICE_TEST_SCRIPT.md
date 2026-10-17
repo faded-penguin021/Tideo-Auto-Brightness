@@ -12,7 +12,8 @@ Run this end-to-end on a real device (no emulator — the SoC has no KVM here, a
 battery sensors, OEM brightness range, Shizuku binder, and doze are only exercisable on hardware). Tick
 each step's **Expected**; log any miss in `../STATE.md` → "Owner queue". Build + install the debug APK
 with `./gradlew :app:assembleDebug` → `app/build/outputs/apk/debug/app-debug.apk` (or grab a published
-build from Releases).
+build from Releases). Install it over adb (`adb install` or `e2e/run.sh --install`): Play Protect
+blocks a debug build opened from a file manager with "App not installed" (DD-081).
 
 Legend: **[BASIC]** needs only WRITE_SETTINGS · **[ELEVATED]** needs WRITE_SECURE_SETTINGS · **[opt]**
 optional.
