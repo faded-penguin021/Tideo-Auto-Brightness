@@ -44,19 +44,20 @@ stays closed (DB-051…DB-060), and Scorecard.dev is a run-once local input.
 > fork, options, recommendation (D-167), dated (DA-006); credential leaks and external-content
 > escalations land here too.
 
-1. **[2026-10-04] Get twelve Chinese strings translated; they show in English until then.**
+1. **[2026-10-04] Get 65 Chinese strings translated; they show in English until then.**
    `help_pwm_exponent` (DD-014), `contexts_only_plugged_in` (DD-025),
    `pd_night_light_temp_hint` (DD-045) and `ssid_help_dump_security` (DD-077, added 2026-10-17)
    changed meaning, so their old Chinese was removed (DD-026),
    the rule editor's four `contexts_offset_*` strings are new (DD-035), and so are the extended
    Night Light range's four: `settings_night_light_extended` (DD-047),
-   `pd_night_light_temp_hint_extended` and the two `pd_night_light_extended*` (DD-050). Asked in
-   #143 (2026-10-08); it does not block the release, since missing keys fall back to English
-   (owner, 2026-10-08). Paste translations replied there into the file. Settles it:
-   `grep -c -e 'name="help_pwm_exponent"' -e 'name="contexts_only_plugged_in"' -e
-   'name="pd_night_light_temp_hint' -e 'name="contexts_offset_' -e
-   'name="settings_night_light_extended"' -e 'name="pd_night_light_extended' -e
-   'name="ssid_help_dump_security"' app/src/main/res/values-b+zh+Hans/strings.xml` prints 12.
+   `pd_night_light_temp_hint_extended` and the two `pd_night_light_extended*` (DD-050), and the
+   bright-light hand-off's 53 (`*handoff*`, `*handed_off*`, `flash_hbm_*`, `flash_calibration_*`,
+   `guide_s10_*`, the two `*_android` labels; DD-071…DD-077). All 65 are asked in #143 (first
+   2026-10-08, its body rewritten 2026-10-18); it does not block a release, since missing keys
+   fall back to English (owner, 2026-10-08). Paste translations replied there into the file.
+   Settles it: `comm -23 <(grep -v 'translatable="false"' app/src/main/res/values/strings.xml |
+   grep -o 'name="[^"]*"' | sort) <(grep -o 'name="[^"]*"'
+   app/src/main/res/values-b+zh+Hans/strings.xml | sort) | wc -l` prints 0 (65 on 2026-10-18).
 
 2. **[2026-10-13] Decide whether to add a check that the output-redaction hook is still wired.**
    Since AMH 15.0.0 both adapters run `scripts/redact-tool-output.sh` after every tool call, but
@@ -92,6 +93,10 @@ proposing work; changing it is legislation under RUNBOOK's rule-review protocol.
 ## Changelog
 
 Newest first; ledger rows are the durable detail.
+
+- 2026-10-18 — **#143 now asks for all 65 untranslated Chinese strings, not 1.14.0's 11: 1.15.0
+  shipped `ssid_help_dump_security` changed and 53 hand-off strings new; Owner queue item 1
+  counts every missing key.**
 
 - 2026-10-17 — **E2E suite on 1.15.0-debug vc30: 17 of 20 auto rows pass, 3 skip on their own
   preconditions, journal empty, after one harness-timing teardown miss that `--recover` fixed
