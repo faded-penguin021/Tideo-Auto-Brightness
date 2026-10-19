@@ -93,10 +93,11 @@ stays closed (DB-051…DB-060), and Scorecard.dev is a run-once local input.
    holds stops at 0.2–1 lx) never fires, and the 0 ↔ 1.04 switch is what writes brightness.
    Options, detailed in the jitter plan's **Options after the device findings**: (a) a ~1.5 lx
    absolute dead band below ~2 lx, once settled, replacing the approved rule; (b) act on a
-   0 ↔ non-zero switch only after it lasts ~2–3 s, a concurrency-model change; (c) (a) with a
-   per-device step. Recommendation (a): smallest change, covers tenths-reporting sensors too,
-   costs a few steps at the dimmest end. Unverified until you answer; settles it: the plan's
-   Status names the chosen option.
+   0 ↔ non-zero switch only after it lasts ~2–3 s, a concurrency-model change; (c) your
+   proposal: (a), but the step is learned in memory from the smallest non-zero reading seen
+   (~1.5 × it, at most 1.5 lx). Recommendation (c): stops your jitter like (a), keeps full
+   resolution on sensors that report tenths, and needs no setting, storage or strings. Unverified
+   until you answer; settles it: the plan's Status names the chosen option.
 
 **The tree declares `1.15.0` / vc30, this train's ONE bump**, made by the hand-off plan's unit 0
 after v1.14.1 was seen tagged on 2026-10-16 (`git ls-remote --tags --refs origin 'refs/tags/v*'`).
@@ -115,7 +116,8 @@ Newest first; ledger rows are the durable detail.
 
 - 2026-10-19 — **Low-lux jitter plan reopened on the owner's dark-room readings: the sensor
   reports 0 or ≥ 1.04 lx (Tideo does not round it; Live Debug shows 1 dp), so the approved rule
-  never fires. Three options and a recommendation are in the plan; Owner queue item 4 asks.**
+  never fires. Three options are in the plan, the owner's learned-step proposal (C) now the
+  recommendation; Owner queue item 4 asks.**
 
 - 2026-10-19 — **The plan for faster Shizuku paths and Android 17's public brightness API is
   committed as `docs/plans/PRIVILEGED_FAST_PATHS.md`, spec only (Unit 0). Past the owner's Astra

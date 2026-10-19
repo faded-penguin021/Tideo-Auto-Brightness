@@ -226,22 +226,40 @@ only once readings stay on the new side for `T` seconds (about 2–3 s, 8–12 c
 - Does not cover the tenths flicker unless that is also treated as a switch, so the approved
   rule would stay as well.
 
-### Option C: Option A with a per-device first step
+### Option C: Option A with the step learned from the sensor (owner's proposal, 2026-10-19)
 
-Same as A, but `S` comes from this device: either a setting, or learned as the smallest non-zero
-reading seen (here 1.04 lx), plus a margin.
+Same gate as A, but `S` follows this sensor's own first step instead of a fixed 1.5 lx. The owner
+proposed it as "ignore steps under 1.5 lx below 2 lx until a raw value between 0.1 and 0.9 is
+seen". It is refined below so that a sensor with a coarser cutoff (say 0 or ≥ 0.5 lx) is covered
+too.
 
-- Exact on every sensor, so phones that report tenths keep their full low-lux resolution.
-- Cost: a learned value needs persisting and resetting, and a setting needs UI, help text, a
-  schema entry and new strings, which adds to the untranslated Chinese strings in Owner queue
-  item 1.
+- **Learn the floor, not a flag.** Keep `minNonZero`, the smallest non-zero raw reading seen.
+  It starts unknown, and `S` is the fixed default (about 1.5 lx) until a reading sets it. Then
+  `S = min(K × minNonZero, 1.5)`, with `K` a named margin (about 1.5). On the owner's phone that
+  is about 1.5 lx. On a sensor that reports 0.1 lx it is about 0.15 lx, which is effectively off.
+- **Update before gating.** `LightAdmission.onSample` updates `minNonZero` before
+  `gateRejection` runs, so the first fine reading (for example 0.3) is itself judged by the
+  smaller `S` and is never lost to the default band.
+- **In memory only.** The gate matters only in the dark, and a sensor that reports tenths shows
+  one within seconds of the light going down, so learning again on each sensor session costs
+  nothing. Not persisting it means no schema entry, no setting, no strings, and no learned value
+  carried to another phone by Android backup (`allowBackup="true"`).
+- **Battery:** one `min()` and one comparison per callback (about 4 a second in the dark), on a
+  path that already runs for every reading. No extra sensor, timer, wakelock or write.
+- **A single glitch would relax the gate for the session.** One stray 0.4 lx reading on the
+  owner's phone would shrink `S` until the sensor session ends. Not observed so far. If it shows
+  up, require a value to appear two or three times before it counts.
+- **Sensors that report tenths lose the cover A gave them** against the original 0 ↔ tenths
+  flicker. That flicker has not been observed on any phone: the original report was this phone's
+  smoothed lux. If it is ever seen, the approved rule can run alongside C for those sensors.
 
 ### Recommendation
 
-**Option A, replacing the approved rule.** It is the smallest change, it stops the jitter on this
-phone and on tenths-reporting sensors, and it leaves the concurrency model alone. Its cost is a
-few brightness steps at the very dimmest end, which is the trade-off a dead band exists to make.
-C can follow later if a fixed `S` proves too coarse on some phone.
+**Option C as refined above, replacing the approved rule** (revised 2026-10-19 from A). It stops
+the jitter on the owner's phone exactly as A does. It keeps full low-lux resolution on sensors
+that report tenths, and it costs no setting, storage or translations. Like A, it leaves the
+concurrency model and the engine alone. A is the fallback if the learned step proves fragile on
+some phone.
 
 ### Side fix, independent of the choice
 
