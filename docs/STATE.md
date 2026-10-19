@@ -27,8 +27,9 @@ stays closed (DB-051…DB-060), and Scorecard.dev is a run-once local input.
 ## Active work
 
 - **Low-lux settling jitter** — `docs/plans/LOW_LUX_SETTLING_JITTER.md`, spec only; its
-  **Proposed fix** is approved as written (owner, 2026-10-08) and deferred to the train after
-  1.15.0 (owner, 2026-10-17), each step on the owner's go-ahead.
+  **Proposed fix** was approved as written (owner, 2026-10-08) and deferred to the train after
+  1.15.0 (owner, 2026-10-17), but is on hold since the owner's device findings (2026-10-19):
+  nothing is built until Owner queue item 4 picks an option.
 - **Faster Shizuku paths and Android 17 display APIs** — `docs/plans/PRIVILEGED_FAST_PATHS.md`,
   spec only (owner, 2026-10-19). Unit 1 is the owner's Astra review. Units 2–13 wait until the
   owner's OnePlus 13 runs ColorOS 17, and each unit runs on the owner's go-ahead.
@@ -87,6 +88,16 @@ stays closed (DB-051…DB-060), and Scorecard.dev is a run-once local input.
    `grep -rc 'ubuntu-24.04' .github/workflows/` prints 0 for every file, or a STATE changelog line
    records (b).
 
+4. **[2026-10-19] Pick how to stop the dark-room jitter; the approved rule does not reach your
+   phone.** Your sensor reports 0 or ≥ 1.04 lx and nothing between, so the approved rule (it
+   holds stops at 0.2–1 lx) never fires, and the 0 ↔ 1.04 switch is what writes brightness.
+   Options, detailed in the jitter plan's **Options after the device findings**: (a) a ~1.5 lx
+   absolute dead band below ~2 lx, once settled, replacing the approved rule; (b) act on a
+   0 ↔ non-zero switch only after it lasts ~2–3 s, a concurrency-model change; (c) (a) with a
+   per-device step. Recommendation (a): smallest change, covers tenths-reporting sensors too,
+   costs a few steps at the dimmest end. Unverified until you answer; settles it: the plan's
+   Status names the chosen option.
+
 **The tree declares `1.15.0` / vc30, this train's ONE bump**, made by the hand-off plan's unit 0
 after v1.14.1 was seen tagged on 2026-10-16 (`git ls-remote --tags --refs origin 'refs/tags/v*'`).
 `changelogs/30.txt` (500-character cap) carries only the hand-off, since the low-lux jitter fix
@@ -101,6 +112,10 @@ proposing work; changing it is legislation under RUNBOOK's rule-review protocol.
 ## Changelog
 
 Newest first; ledger rows are the durable detail.
+
+- 2026-10-19 — **Low-lux jitter plan reopened on the owner's dark-room readings: the sensor
+  reports 0 or ≥ 1.04 lx (Tideo does not round it; Live Debug shows 1 dp), so the approved rule
+  never fires. Three options and a recommendation are in the plan; Owner queue item 4 asks.**
 
 - 2026-10-19 — **The plan for faster Shizuku paths and Android 17's public brightness API is
   committed as `docs/plans/PRIVILEGED_FAST_PATHS.md`, spec only (Unit 0). Past the owner's Astra
