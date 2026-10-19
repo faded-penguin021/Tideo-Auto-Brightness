@@ -29,6 +29,14 @@ stays closed (DB-051…DB-060), and Scorecard.dev is a run-once local input.
 - **Low-lux settling jitter** — `docs/plans/LOW_LUX_SETTLING_JITTER.md`, spec only; its
   **Proposed fix** is approved as written (owner, 2026-10-08) and deferred to the train after
   1.15.0 (owner, 2026-10-17), each step on the owner's go-ahead.
+- **Faster Shizuku paths and Android 17 display APIs** — `docs/plans/PRIVILEGED_FAST_PATHS.md`,
+  spec only (owner, 2026-10-19). Unit 1 is the owner's Astra review. Units 2–13 wait until the
+  owner's OnePlus 13 runs ColorOS 17, and each unit runs on the owner's go-ahead.
+  [x] 0 plan committed · [ ] 1 Astra review · [ ] 2 ColorOS 17 baseline and facts · [ ] 3 split
+  `SHIZUKU_USAGE.md` · [ ] 4 helper metrics and version bump · [ ] 5 one-tap Shizuku grants ·
+  [ ] 6 resident helper · [ ] 7 BrightnessInfo readout · [ ] 8 compileSdk 36.1 · [ ] 9
+  event-driven readout · [ ] 10 push foreground app · [ ] 11 live HDR · [ ] 12 finer steps
+  (optional) · [ ] 13 close-out.
 
 ## Owner queue
 
@@ -93,6 +101,10 @@ proposing work; changing it is legislation under RUNBOOK's rule-review protocol.
 ## Changelog
 
 Newest first; ledger rows are the durable detail.
+
+- 2026-10-19 — **The plan for faster Shizuku paths and Android 17's public brightness API is
+  committed as `docs/plans/PRIVILEGED_FAST_PATHS.md`, spec only (Unit 0). Past the owner's Astra
+  review it waits for ColorOS 17 on the owner's OnePlus 13.**
 
 - 2026-10-18 — **#143 now asks for all 65 untranslated Chinese strings, not 1.14.0's 11: 1.15.0
   shipped `ssid_help_dump_security` changed and 53 hand-off strings new; Owner queue item 1
