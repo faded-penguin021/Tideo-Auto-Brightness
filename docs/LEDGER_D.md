@@ -953,3 +953,25 @@
   (owner). A Pixel 9 Pro on crDroid (Android 16) cannot calibrate and has no such option; the owner
   asked for `dumpsys display` at high lux under Adaptive Brightness, and calibration only feeds the
   readout, never the hand-off.
+- DD-088: **The owner's CPH2653 light sensor reports 0 or ≥ 1.04 lx and nothing between, which
+  is what made the dark-room 2 ↔ 3 jitter reported 2026-09-27 (owner's readings, 2026-10-19).**
+  Tasker's `%as_values1` showed `1.0417844` and `1.0856172`, then 0.1 lx steps, at about 4
+  callbacks a second in the dark; Tideo passes `event.values[0]` through unrounded, and only Live
+  Debug's Light Sensor card rounds it to 1 dp (`fmt`), so 1.04 shows as `1,0`. The 1.0–1.2 lx
+  wobble is a ~10 % dead-band stop, while the 0 ↔ ≥ 1.04 switch is a ≥ 35 % change both ways that
+  smooths, settles and moves the target. Below ~1 lx the two dead bands disagree (the relative
+  stop's `+1` spans about ±0.35 lx; the stored band `raw × (1 ± d)` is 0 – 0 at raw 0 once par1 ≥
+  0.2), so DC-070 can place smoothed lux on a narrow re-centred edge, a nudge of hundredths on this
+  sensor. The rule approved 2026-10-08 held only a first-cycle `DEAD_BAND_STOP` at 0.2 ≤ raw < 1
+  lx, so it never fires here; its premise of raw tenths was smoothed lux read as raw, and it is
+  withdrawn unbuilt (owner).
+- DD-089: **The dark-room jitter is fixed by curve settings, not code (owner, 2026-10-19): per
+  profile, MinBright ≥ `round(form1A × √1.2 × scale)` (+ offset) makes 0 lx and the 1.04–1.2 lx
+  readings (DD-088) clamp to one target.** The owner's night profile uses 5 (form1A 5.833,
+  circadian scale 0.85); a drop that ends on a 1.2 reading can still leave smoothed lux at ≥ 1.23
+  lx, one step up, until the next 0 reading. Under PWM-sensitive mode the jitter was Extra Dim's
+  level, not the hardware (floored at the threshold), so a fixed target fixes it too; the owner
+  raised `%AAB_PWMExp` 0.8 → 1.4 to keep the floor as dark (Extra Dim 50.6 at target 5 against
+  51.4 at 0). If another sensor shows the jitter under default settings, the option weighed was a
+  dead band below ~2 lx of `min(1.5 × smallest non-zero reading seen, 1.5 lx)`, learned in memory
+  per sensor session and applied only to fresh readings once settled, never mid-settling (#132).
