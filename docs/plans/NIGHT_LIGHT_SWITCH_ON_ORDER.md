@@ -6,9 +6,9 @@
   the session branch `math-explained`. That authorised **Unit 0 only**: committing this file.
   Every later unit needs the owner's separate go-ahead.
 - No unit opens a PR, replies on an issue, tags or releases.
-- One open fork waits on the owner (below). Unit 1 can start with either answer.
-- The owner pre-approved Unit 1's `app` comment-budget raise (2026-10-20), up to +5 lines. The
-  rule review still runs.
+- The screen's Apply gets the same fix, as its own Unit 2 (owner, 2026-10-20).
+- The owner pre-approved an `app` comment-budget raise for Units 1 and 2 (2026-10-20), up to +5
+  lines between them. The rule review still runs.
 
 ## The bug (owner report, 2026-10-20)
 
@@ -101,15 +101,15 @@ off and shows it on the next switch-on.
 - AOSP's behaviour is recalled, not measured: a Kelvin change while off updates the service's
   matrix, and switching on animates to it.
 
-## Open fork (owner)
+## The screen's Apply (Unit 2; owner, 2026-10-20)
 
-The Privileged Display screen's own Apply has the same order. It applies while the service is
-off, and its static temperature write comes after `setNightLight` (`DisplayTogglesViewModel`, the
-device-write block).
-- **(a)** Swap the two writes there too, in Unit 1, with any test that pins their order.
-- **(b)** Leave it. It never runs on a context switch, and the service's next apply corrects it.
-
-Recommendation **(a)**: the same rule, the same flash, and a two-block swap.
+The Privileged Display screen's own Apply has the same order. It applies while the service is off.
+In `DisplayTogglesViewModel`'s device-write block, the `setNightLight` write comes before the
+static temperature write. So turning Night Light on there with a new setpoint briefly shows the
+old one.
+- It never runs on a context switch, which is why it is a separate unit.
+- The fix swaps those two blocks.
+- The owner chose to fix it, as Unit 2, after the coordinator fix.
 
 ## Execution rules
 
@@ -121,15 +121,16 @@ Recommendation **(a)**: the same rule, the same flash, and a two-block swap.
   - `--guards-only` again;
   - a push to the session branch.
 - **Reviews.**
-  - Unit 1 touches runtime glue, so it gets a blocking fresh-context glue review.
-  - Unit 1's comment-budget raise gets a rule review: fresh context, strongest tier, no
+  - Units 1 and 2 write device settings, so each gets a blocking fresh-context glue review.
+  - Each unit's comment-budget raise gets a rule review: fresh context, strongest tier, no
     self-review fallback. If no fresh context can be spawned, the raise waits in the Owner queue,
-    and the fix waits with it.
+    and that unit's fix waits with it.
 - **Version.** 1.15.0 / vc30 is tagged, so Unit 1 is the train's one bump: a patch, 1.15.1 /
   vc31, with `fastlane/metadata/android/en-US/changelogs/31.txt` (under 500 characters).
   - The faster-Shizuku plan's version line names vc31 for its own first code unit. Unit 1
     rewords that line to "the next free versionCode", since vc31 is then spent.
   - If that plan's bump has already happened in this train, this fix rides it instead.
+  - Unit 2 rides Unit 1's bump. It never bumps again.
 - **Records.** Code cites DD rows, never this plan, and ledger rows never cite its path.
 
 ## Units (sequential)
@@ -151,11 +152,11 @@ Recommendation **(a)**: the same rule, the same flash, and a two-block swap.
 - **Fix.** Move the line as above and cite DD-090 in a one-line pointer.
 - **Comment budget (owner pre-approval, 2026-10-20).** The `app` budget was full on 2026-10-20:
   `comment-budget.sh` read 2564/2564.
-  - The owner pre-approves raising `RAISED_app` in `scripts/guards/comment-budget.sh` for this
-    unit, as DD-076 did for the hand-off's unit 5.
+  - The owner pre-approves raising `RAISED_app` in `scripts/guards/comment-budget.sh` for Units 1
+    and 2, as DD-076 did for the hand-off's unit 5.
   - First cut any comment the change makes restating. Then raise the budget by exactly the
-    comment lines Unit 1 still adds, in main and test sources, as the guard counts them. That is
-    expected to be +1 to +3, capped at **+5**.
+    comment lines the unit still adds, in main and test sources, as the guard counts them. That is
+    expected to be +1 to +3 here, with **+5** the cap for Units 1 and 2 together.
   - Extend the `RAISED_*` note with a line naming DD-090.
   - It is still a rule change. `scripts/guards` is in `RULE_FILES`, so the rule review below
     applies, and DD-090 records the raise.
@@ -173,7 +174,6 @@ Recommendation **(a)**: the same rule, the same flash, and a two-block swap.
   - `theNextStart_switchesNightLightBackOn_afterStopHandedItBack_DD060`
 
   No other assertion should move. If one does, stop and report it.
-- **Fork (a), if the owner chose it.** Swap the screen Apply's two writes and their test.
 - **Version.** 1.15.1 / vc31, `31.txt`, and the faster-Shizuku plan's version line (above).
 - **Ledger.**
   - New row **DD-090 [cited]**: the cause, the move, the owner's confirmation, the trade-off and
@@ -194,8 +194,29 @@ Recommendation **(a)**: the same rule, the same flash, and a two-block swap.
 - **Gates.** Run `scripts/ladder.sh` green, then the glue review and the rule review.
 - **Commit body.** Says what ran and that the panel was not checked on a device.
 
-**2. Owner device check, and close-out.**
-- The owner runs steps 38a and 38b on 1.15.1-debug vc31.
+**2. The screen's Apply (one commit; owner, 2026-10-20).**
+- **Test first.** In `DisplayTogglesViewModelTest`, use the existing `beforeNightLightWrite` hook.
+  - Set up: service off, Night Light off, the key holding a different Kelvin.
+  - Action: `applyNow` with Night Light on and a setpoint.
+  - Assert: when `setNightLight(true)` is called, the Kelvin key already holds that setpoint.
+  - See it **fail** on today's code.
+  - No existing screen test pins the order today (2026-10-20).
+- **Fix.** In `DisplayTogglesViewModel`'s device-write block, move the Night Light block after
+  the temperature block, citing DD-091 in a one-line pointer. The order of the other writes is
+  unchanged.
+- **Comment budget.** Any raise comes from the shared +5 cap above, rule-reviewed again.
+- **Ledger.** New row **DD-091 [cited]**: the same rule applied to the service-off Apply.
+- **Device step.** Add the service-off Apply case to step 38b, and refresh the `s11_38b` row in
+  the same commit.
+  - Service off; Night Light off at one Kelvin.
+  - On the screen, turn Night Light on with a visibly different setpoint, then Apply.
+  - Expected: no frame at the old Kelvin.
+- **Records.** If the user-facing note in `31.txt` needs it, extend it, still under 500
+  characters.
+- **Gates.** Run `scripts/ladder.sh` green, then the glue review and any rule review.
+
+**3. Owner device check, and close-out.**
+- The owner runs steps 38a and 38b on 1.15.1-debug vc31, built from Unit 2's commit.
 - Agent: record the result in a new DD row (verified, or the finding).
 - Delete this plan file, and remove its Active work item. Its content then lives in DD-090, the
   new row and the STATE Changelog.

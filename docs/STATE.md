@@ -36,10 +36,10 @@ stays closed (DB-051…DB-060), and Scorecard.dev is a run-once local input.
   (optional) · [ ] 13 close-out.
 - **Night Light switch-on order** — `docs/plans/NIGHT_LIGHT_SWITCH_ON_ORDER.md`, spec only (owner,
   2026-10-20): a switch-on from a Night-Light-off profile flashes the held Kelvin (red) before the
-  circadian one lands. Each unit runs on the owner's go-ahead; one fork (the screen's Apply) is
-  open, and Unit 1's `app` comment-budget raise is pre-approved up to +5, rule review still owed.
-  [x] 0 plan committed · [ ] 1 fix, tests, DD-090, 1.15.1 / vc31 · [ ] 2 owner device check and
-  close-out.
+  circadian one lands. Each unit runs on the owner's go-ahead; an `app` comment-budget raise is
+  pre-approved for Units 1–2, up to +5 between them, rule review still owed.
+  [x] 0 plan committed · [ ] 1 coordinator fix, tests, DD-090, 1.15.1 / vc31 · [ ] 2 the screen's
+  Apply, DD-091 · [ ] 3 owner device check and close-out.
 
 ## Owner queue
 
@@ -108,7 +108,8 @@ Newest first; ledger rows are the durable detail.
 - 2026-10-20 — **The red flash on a switch to a circadian profile is validated as write order:
   Night Light is switched on before the Kelvin is written, so the panel shows what the service
   still held (DD-065's warmer tint). The fix plan is committed as
-  `docs/plans/NIGHT_LIGHT_SWITCH_ON_ORDER.md`, spec only (Unit 0).**
+  `docs/plans/NIGHT_LIGHT_SWITCH_ON_ORDER.md`, spec only (Unit 0); the owner added the screen's
+  service-off Apply, which has the same order, as its own Unit 2.**
 
 - 2026-10-19 — **Dark-room jitter closed with curve settings, no code: the owner's sensor reports
   0 or ≥ 1.04 lx, so the rule approved 2026-10-08 never fires and is withdrawn unbuilt; a per-profile
