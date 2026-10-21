@@ -35,7 +35,8 @@ and a threshold of 40, Live Debug says 40 and the Dashboard says 5.
 | 3 | Dimming chart vs runtime formula | `DimmingChart` always plots ordinary dimming; runtime uses `finalDimLevel` in PWM mode | **Yes**: PWM mode | 3 |
 | 4 | Global fields kept across a profile swap | `mergeProfile`, `ProfileApplier`, `SettingsViewModel.resetDefaults`, `.replaceAll` | Latent; lists already differ (`setupTitle`, `schemaVersion`) | 4 |
 | 5 | Small pure formulas written twice | validator's 1000-lux curve and min-required MaxBright; wizard result → settings; effective hand-off lux; haversine | Latent | 5 |
-| 6 | Circadian dim multiplier | runtime rebuilds it from the rounded `scaleDynamic` (D-072); `DynamicScaleEngine` computes it directly, and the chart uses that | Small: up to 1 dim level at extreme spreads | 6 (optional) |
+| 6 | Circadian dim multiplier | runtime rebuilds it from the rounded `scaleDynamic` (D-072); `DynamicScaleEngine` computes it directly, and the chart uses that | Small: up to 1 dim level at extreme spreads | 6 |
+| 7 | Nothing stops the next copy | no "one source" rule; deliberate differences recorded only in this plan | Future drift | 7 |
 
 ### 1. Dimming: one calculation, one result, published everywhere
 
@@ -115,7 +116,7 @@ and a threshold of 40, Live Debug says 40 and the Dashboard says 5.
 - **Distance.** `ContextEngine`'s location debounce uses `ContextMatching`'s haversine and Earth
   radius.
 
-### 6. Optional: take the circadian dim multiplier from the engine
+### 6. Take the circadian dim multiplier from the engine (D5: yes)
 
 - **Change:**
   - `BrightnessEngine.dynamicScale` passes `dimSpreadPercent` and publishes `dimDynamic`.
@@ -127,6 +128,44 @@ and a threshold of 40, Live Debug says 40 and the Dashboard says 5.
   - At the defaults (15 / 100) the difference is ≤ 0.004.
 - **Needs the owner's decision.** It revisits D-072 and changes an output interface, so it needs a DD
   row.
+
+### 7. Keep it from coming back (owner, 2026-10-21)
+
+Units 1–6 fix today's copies. Nothing stops a fresh session from writing the next one, or from
+"fixing" a deliberate difference listed below. This unit closes both gaps in prose. It is
+legislation, so the rule-review protocol applies (see Execution rules).
+
+- **AGENTS.md → Conventions: a "one source" paragraph.** Draft, to be tightened in review:
+
+  > **One source for each calculation.** Before writing a formula, a derived value or a list of
+  > fields, search for an existing one. `:domain` holds the mathematics, and `:app` calls it instead
+  > of re-deriving it. A screen shows a runtime value through the one definition the runtime
+  > publishes; it never recomputes it or picks between raw fields itself. A chart that previews
+  > runtime behaviour samples the same function the runtime calls. A second copy is allowed only
+  > when it is deliberate, for example a separately transcribed Tasker preview or a different
+  > rounding contract. It then carries a one-line row citation, and the ones already decided are in
+  > Decided non-items: do not consolidate them. This rule is prose only; no guard detects
+  > duplication.
+
+  - The last sentence is required by the review's enforcement-asymmetry check.
+  - "Tasker semantics override coding taste" still wins: a quirk that only a second copy can
+    preserve is a deliberate copy.
+  - The paragraph cites the DD rows that Units 1–6 write, never this file.
+- **`docs/rebuild/DECIDED_NON_ITEMS.md`: one entry for the deliberate differences.** It moves the
+  durable part of "Deliberately left alone" below into a binding decline, with each item and its
+  reason in one line:
+  - the alpha chart and the curve chart's base curve (D4);
+  - the wizard's own evaluator;
+  - the brightness conversions;
+  - the override tolerances 2 vs 1;
+  - the rounding helpers;
+  - the separate Night Light state machines.
+
+  Without this entry the reasons die with this file at close-out, and a fresh session re-proposes
+  them.
+- **Why prose and no guard.** A duplication detector would be either noisy or easy to satisfy
+  without meeting its intent. That Goodhart risk is the one DA-004 records. The tests added in Units
+  1–5 pin agreement where two consumers must match; they are the enforcement that exists.
 
 ## Deliberately left alone
 
@@ -186,6 +225,13 @@ and a threshold of 40, Live Debug says 40 and the Dashboard says 5.
   - Code cites DD rows, never this file.
 - **Comment budget.** A comment-budget raise, if one is needed, is a rule change and is asked for
   first.
+- **Rule review for Unit 7.** Unit 7 edits `AGENTS.md` and Decided non-items, so it runs the
+  rule-review protocol (DA-005):
+  - a fresh-context reviewer at the strongest tier;
+  - no self-review fallback;
+  - the verdict goes in the commit body.
+
+  It runs after Units 1–6, so that the rows it cites exist.
 
 ## Units (sequential)
 
@@ -195,6 +241,7 @@ and a threshold of 40, Live Debug says 40 and the Dashboard says 5.
 3. PWM-aware dimming chart (finding 3, D3).
 4. `keepGlobalsFrom` (finding 4).
 5. Small pure-formula dedups (finding 5).
-6. Optional: engine-sourced `dimDynamic` (finding 6, D5).
-7. Owner device check of Units 1–3 in PWM mode, then close out: delete this file once its content
-   lives in STATE and the ledger.
+6. Engine-sourced `dimDynamic` (finding 6, D5).
+7. AGENTS.md "one source" paragraph and the Decided non-items entry (finding 7), under rule review.
+8. Owner device check of Units 1–3 in PWM mode, then close out: delete this file once its content
+   lives in STATE, the ledger and Decided non-items.
