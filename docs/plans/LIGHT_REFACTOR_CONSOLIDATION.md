@@ -132,40 +132,71 @@ and a threshold of 40, Live Debug says 40 and the Dashboard says 5.
 ### 7. Keep it from coming back (owner, 2026-10-21)
 
 Units 1–6 fix today's copies. Nothing stops a fresh session from writing the next one, or from
-"fixing" a deliberate difference listed below. This unit closes both gaps in prose. It is
-legislation, so the rule-review protocol applies (see Execution rules).
+"fixing" a deliberate difference listed below. This unit narrows both gaps in prose; it cannot
+close them, because nothing mechanical enforces either one. It is legislation, so the rule-review
+protocol applies (see Execution rules).
 
-- **AGENTS.md → Conventions: a "one source" paragraph.** Draft, to be tightened in review:
+The text below was revised after an Astra review of the first draft (2026-10-21). That review found
+four gaps:
+- no clause covered an entry point that skips the shared path;
+- searching first did not require reuse;
+- calling the same function did not mean using the same inputs;
+- "deliberate plus a citation" let a session exempt itself.
 
-  > **One source for each calculation.** Before writing a formula, a derived value or a list of
-  > fields, search for an existing one. `:domain` holds the mathematics, and `:app` calls it instead
-  > of re-deriving it. A screen shows a runtime value through the one definition the runtime
-  > publishes; it never recomputes it or picks between raw fields itself. A chart that previews
-  > runtime behaviour samples the same function the runtime calls. A second copy is allowed only
-  > when it is deliberate, for example a separately transcribed Tasker preview or a different
-  > rounding contract. It then carries a one-line row citation, and the ones already decided are in
-  > Decided non-items: do not consolidate them. This rule is prose only; no guard detects
-  > duplication.
+It also found three over-reaches:
+- the wording could pull presentation choices into `:domain`;
+- the wording could sweep in golden fixtures;
+- it could turn scope deferrals into permanent declines.
 
-  - The last sentence is required by the review's enforcement-asymmetry check.
-  - "Tasker semantics override coding taste" still wins: a quirk that only a second copy can
-    preserve is a deliberate copy.
-  - The paragraph cites the DD rows that Units 1–6 write, never this file.
-- **`docs/rebuild/DECIDED_NON_ITEMS.md`: one entry for the deliberate differences.** It moves the
-  durable part of "Deliberately left alone" below into a binding decline, with each item and its
-  reason in one line:
-  - the alpha chart and the curve chart's base curve (D4);
-  - the wizard's own evaluator;
-  - the brightness conversions;
-  - the override tolerances 2 vs 1;
-  - the rounding helpers;
-  - the separate Night Light state machines.
+- **AGENTS.md → Conventions: a "one source" paragraph.** It carries its own Tasker precedence, so
+  nothing in it depends on this file. The rule review may trim it, but two clauses must survive:
+  the every-entry-point clause, and the same-inputs clause.
 
-  Without this entry the reasons die with this file at close-out, and a fresh session re-proposes
-  them.
-- **Why prose and no guard.** A duplication detector would be either noisy or easy to satisfy
-  without meeting its intent. That Goodhart risk is the one DA-004 records. The tests added in Units
-  1–5 pin agreement where two consumers must match; they are the enforcement that exists.
+  > **One source for each calculation and policy.** Before adding or changing production logic,
+  > find its existing owner and callers. Reuse one implementation for the same formula, readout
+  > selection or preserved-field policy; keep mathematics in `:domain` and presentation policy in
+  > its owning layer. Consumers use the shared definition matching what they claim to show.
+  > Runtime previews use the same calculation and applicable mode, inputs and rounding contract.
+  > Check every applicable entry point, including reapply and disengage, for shared application
+  > and publication. Preserve Tasker semantics and independent golden/reference fixtures. Distinct
+  > contracts may stay separate; record the reason in a ledger row and cite it at the
+  > implementation. Read `docs/rebuild/DECIDED_NON_ITEMS.md` before proposing consolidation; only
+  > the owner can reopen its declines. Prose only: no guard detects duplication or missing callers.
+
+  - **A citation must earn the exemption.** The cited row has to show that the two contracts
+    differ. A row cannot reopen an owner decline. The citation guard does not scan docs, so the
+    rule review checks every row this paragraph cites.
+  - **No conflict with AGENTS.md → Invariants.** The task663 plotting copy kept for
+    cross-validation is a distinct contract. It stays.
+- **`docs/rebuild/DECIDED_NON_ITEMS.md`: one entry, binding declines only.** Shape (the row
+  citations are filled in and verified when the unit lands):
+
+  > **Deliberate differences retained by the light-refactor decision (owner, 2026-10-21;
+  > `<DD-row>`).** Do not propose unifying these contracts unless the owner reopens them:
+  > - Alpha remains the transcribed Tasker preview; the brightness chart retains its labelled base
+  >   curve and final-output marker.
+  > - The wizard evaluator retains its distinct Tasker bounds, power handling and clamp.
+  > - Settings, calibration and window conversions retain their API contracts; the existing
+  >   conversion freeze remains in force.
+  > - Override tolerances 2 and 1 answer different questions.
+  > - `evaluate`/`calculatedBrightness` and `round3`/`bigScale3` retain their rounding contracts.
+  > - Per-screen lux precision and domain/app animation defaults retain their distinct uses.
+  > - Night Light retains separate service-on/off state machines; this does not bar the planned
+  >   fixes or a shared write-order helper.
+
+- **Scope deferrals are not declines.** These go in a ledger row as scope and evidence, never in
+  Decided non-items:
+  - the settings schema rewrite ("not light");
+  - the contract default-string audit (checked, all equal).
+
+  A later plan may take them up without reopening anything.
+- **Rows.** Only Units 1, 2, 3 and 6 write DD rows, and they cover what those units change. This
+  unit writes the row behind the Decided non-items entry, and any row a retained difference lacks.
+  It verifies every row it cites.
+- **Why prose and no guard.** A duplication or missing-caller detector would be either noisy or easy
+  to satisfy without meeting its intent; DA-004 records that Goodhart risk. The tests that Units 1–5
+  add are regression coverage for sampled behaviour, not enforcement of this rule. They add no
+  Graph Metrics wiring tests, which Decided non-items declines.
 
 ## Deliberately left alone
 
@@ -242,6 +273,9 @@ legislation, so the rule-review protocol applies (see Execution rules).
 4. `keepGlobalsFrom` (finding 4).
 5. Small pure-formula dedups (finding 5).
 6. Engine-sourced `dimDynamic` (finding 6, D5).
-7. AGENTS.md "one source" paragraph and the Decided non-items entry (finding 7), under rule review.
-8. Owner device check of Units 1–3 in PWM mode, then close out: delete this file once its content
-   lives in STATE, the ledger and Decided non-items.
+7. AGENTS.md "one source" paragraph, the Decided non-items entry and the scope-deferral row
+   (finding 7), under rule review.
+8. Owner device check of Units 1–3 in PWM mode, then close out:
+   - confirm that every item under "Deliberately left alone" has a lasting record: a Decided
+     non-items line, a ledger row, or a landed plan;
+   - then delete this file.
