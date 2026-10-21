@@ -40,6 +40,10 @@ stays closed (DB-051…DB-060), and Scorecard.dev is a run-once local input.
   pre-approved for Units 1–2, up to +5 between them, rule review still owed.
   [x] 0 plan committed · [ ] 1 coordinator fix, tests, DD-090, 1.15.1 / vc31 · [ ] 2 the screen's
   Apply, DD-091 · [ ] 3 owner device check and close-out.
+- **Light refactor of duplicated logic** — `docs/plans/LIGHT_REFACTOR_CONSOLIDATION.md`, spec only
+  (owner, 2026-10-21; D1–D5 decided). Each unit runs on the owner's go-ahead.
+  [x] 0 plan · [ ] 1 dimming readout · [ ] 2 brightness labels · [ ] 3 PWM dimming chart ·
+  [ ] 4 `keepGlobalsFrom` · [ ] 5 formula dedups · [ ] 6 engine `dimDynamic` · [ ] 7 close-out.
 
 ## Owner queue
 
@@ -104,6 +108,10 @@ proposing work; changing it is legislation under RUNBOOK's rule-review protocol.
 ## Changelog
 
 Newest first; ledger rows are the durable detail.
+
+- 2026-10-21 — **Duplicated logic audited; Live Debug and the Dashboard differ in PWM mode because
+  they show hardware vs perceived brightness (both kept, D-109). Six consolidations planned in
+  `docs/plans/LIGHT_REFACTOR_CONSOLIDATION.md`, spec only (Unit 0).**
 
 - 2026-10-20 — **The red flash on a switch to a circadian profile is validated as write order:
   Night Light is switched on before the Kelvin is written, so the panel shows what the service
