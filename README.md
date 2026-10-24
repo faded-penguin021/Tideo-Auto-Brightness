@@ -13,7 +13,7 @@
 
 **A glass-box replacement for Android's adaptive brightness.** You taught Android your brightness
 preferences and it is *still* wrong. Tideo replaces the opaque on-device machine learning with deterministic,
-inspectable math: a tunable lux-to-brightness curve you can see and shape, smooth animated transitions,
+inspectable math (more info, see [`MATH_EXPLAINED.md`](MATH_EXPLAINED.md)): a tunable lux-to-brightness curve you can see and shape, smooth animated transitions,
 circadian (time-of-day) scaling, per-context overrides, and an optional privileged super dimming
 mode that allows the screen to go below the system minimum.
 
@@ -124,7 +124,7 @@ adb shell pm grant com.tideo.autobrightness android.permission.WRITE_SECURE_SETT
 After the grant, Tideo writes the secure setting **directly** (no Shizuku binder needed for dimming).
 The grant is detected the next time the screen turns on or when the app is opened.
 
-To find out more about the use of Shizuku in this project, please read SHIZUKU_USAGE.md.
+To find out more about the use of Shizuku in this project, please read [`SHIZUKU_USAGE.md`](SHIZUKU_USAGE.md).
 
 ## Troubleshooting
 
