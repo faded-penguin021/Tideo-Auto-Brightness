@@ -985,6 +985,7 @@
   the 750 ms DC-057 probe when one is due, and a failed write still switches on as before. It
   assumes the service keeps a Kelvin written while off, which the owner's deep red supports and
   AOSP's behaviour is recalled, not measured; JVM-tested, on-device unverified.
+  Device-checked by DD-093.
 - DD-091 [cited]: **The Privileged Display screen's service-off Apply now writes the Kelvin between
   the two Night Light edges: a switch-off before it, a switch-on after it.** It switched on or off
   first, so turning Night Light on with a new setpoint showed the held Kelvin first (DD-090's rule,
@@ -996,3 +997,9 @@
   failure differently — stop, carry on, collect — so a helper needs inline lambdas with non-local
   returns, adds a file and a test, and shortens no call site. The service-on and service-off paths
   stay apart, as the light-refactor audit retained.
+- DD-093: **DD-090 is device-verified: on the owner's OnePlus 13, 1.15.1-debug vc31 (owner,
+  2026-10-25), a context-rule switch from a Night-Light-off profile to a time-based Night Light
+  profile showed no stale Kelvin and was fast.** Night Light switching on after the brightness
+  load is noticeable and accepted (DD-090's trade-off). A service stop put the device Kelvin back
+  and Night Light off (DD-059), and a start switched it on quickly (DD-060). Not run: step 38a,
+  38b's manual load and DD-091's screen Apply, which stays on-device unverified.

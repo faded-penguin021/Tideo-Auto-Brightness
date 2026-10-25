@@ -34,13 +34,6 @@ stays closed (DB-051…DB-060), and Scorecard.dev is a run-once local input.
   [ ] 6 resident helper · [ ] 7 BrightnessInfo readout · [ ] 8 compileSdk 36.1 · [ ] 9
   event-driven readout · [ ] 10 push foreground app · [ ] 11 live HDR · [ ] 12 finer steps
   (optional) · [ ] 13 close-out.
-- **Night Light switch-on order** — `docs/plans/NIGHT_LIGHT_SWITCH_ON_ORDER.md`, spec only (owner,
-  2026-10-20): a switch-on from a Night-Light-off profile flashes the held Kelvin (red) before the
-  circadian one lands. Each unit runs on the owner's go-ahead; an `app` comment-budget raise is
-  pre-approved for Units 1–2, up to +5 between them, rule review still owed.
-  [x] 0 plan committed · [x] 1 coordinator fix, tests, DD-090, 1.15.1 / vc31 · [x] 2 the screen's
-  Apply, DD-091 · [x] 3 shared write-order helper, not landed, DD-092 · [ ] 4 owner device check and
-  close-out.
 - **Light refactor of duplicated logic** — `docs/plans/LIGHT_REFACTOR_CONSOLIDATION.md`, spec only
   (owner, 2026-10-21; D1–D5 decided). Each unit runs on the owner's go-ahead.
   [x] 0 plan · [ ] 1 dimming readout · [ ] 2 brightness labels · [ ] 3 PWM dimming chart ·
@@ -103,6 +96,8 @@ proposing work; changing it is legislation under RUNBOOK's rule-review protocol.
 
 Newest first; ledger rows are the durable detail.
 
+- 2026-10-25 — **Night Light switch-on order closed: the owner passed the context-switch case on
+  1.15.1-debug vc31; the screen's Apply stays on-device unverified (DD-090…DD-093).**
 - 2026-10-25 — **The session banner now fetches and warns when HEAD can fast-forward to any branch,
   bot-only tips excluded, so a checkout behind a worktree's pushed work shows at start (owner).**
 - 2026-10-25 — **No shared Night Light write-order helper: each site's order stays two inline

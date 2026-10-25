@@ -9,8 +9,8 @@
 - Three independent audits fed it: Opus, Astra (`gpt-6-astra`, high effort) and an earlier ChatGPT
   review of v1.14.1. Every finding below was re-checked against `math-explained` at `20ad58b`. A
   finding that one model made and the code did not bear out was dropped.
-- It does not touch the Night Light write paths, which have their own plan
-  (`NIGHT_LIGHT_SWITCH_ON_ORDER.md`). The two plans share no files.
+- It does not touch the Night Light write paths, which had their own plan, now closed
+  (DD-090…DD-093). The two plans share no files.
 
 ## The motivating example
 
