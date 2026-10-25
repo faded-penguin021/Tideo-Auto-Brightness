@@ -75,13 +75,49 @@ else
 	fi
 fi
 
+# Fetch first, bounded like the tag probe, so the counts below are live rather than "as last
+# fetched" — a checkout left behind its own pushed work cost sessions their first turns.
+fetched='as last fetched'
+if [ "$probe_failed" = 0 ] && GIT_TERMINAL_PROMPT=0 timeout 20 git fetch --quiet origin >/dev/null 2>&1; then
+	fetched='fetched now'
+fi
+
 branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null)
 base=origin/$default_branch
 if [ -n "$branch" ] && git rev-parse --verify --quiet "$base" >/dev/null 2>&1; then
 	ahead=$(git rev-list --count "$base..HEAD" 2>/dev/null)
 	behind=$(git rev-list --count "HEAD..$base" 2>/dev/null)
 	if [ -n "$ahead" ] && [ -n "$behind" ]; then
-		say "· branch $branch: $ahead ahead / $behind behind $base (as last fetched; a shallow clone undercounts)"
+		say "· branch $branch: $ahead ahead / $behind behind $base ($fetched; a shallow clone undercounts)"
+	fi
+fi
+
+# Any branch HEAD can fast-forward to, whatever its name: work pushed from a worktree under a
+# different local branch is the case this exists for. Ranked by commit count, one ref per tip
+# (origin's name preferred). A tip whose extra commits are all bot-authored (Dependabot cuts from
+# main) is not work left behind. On the default branch only its origin counts, since every session
+# branch cut from it would otherwise qualify.
+head_sha=$(git rev-parse --verify --quiet HEAD 2>/dev/null)
+if [ -n "$head_sha" ]; then
+	refs='refs/remotes/origin refs/heads'
+	[ "$branch" = "$default_branch" ] && refs="refs/remotes/$base"
+	# shellcheck disable=SC2086 # $refs is a list of ref patterns
+	ff=$(git for-each-ref --contains HEAD --format='%(objectname) %(refname:short)' $refs 2>/dev/null |
+		while read -r sha ref; do
+			[ "$sha" = "$head_sha" ] && continue
+			case "$ref" in origin/HEAD | origin) continue ;; origin/*) prio=0 ;; *) prio=1 ;; esac
+			# shellcheck disable=SC2143 # under pipefail an early-exiting `grep -q` SIGPIPEs a long log
+			[ -n "$(git log --format=%ae "HEAD..$sha" 2>/dev/null | grep -vF '[bot]@')" ] || continue
+			printf '%s %s %s %s\n' "$(git rev-list --count "HEAD..$sha")" "$sha" "$prio" "$ref"
+		done | sort -k2,2 -k3,3n | awk '!seen[$2]++' | sort -k1,1nr | head -3)
+	if [ -n "$ff" ]; then
+		say "· ⚠ HEAD is BEHIND newer work — fast-forward before reading STATE or the plans:"
+		printf '%s\n' "$ff" | while read -r n _ prio ref; do
+			where=''
+			[ "$prio" = 1 ] && where=' (local only)'
+			# %q: a branch name is external data and may carry shell syntax.
+			say "    $ref$where is $n commit(s) ahead: git merge --ff-only $(printf '%q' "$ref")"
+		done
 	fi
 fi
 

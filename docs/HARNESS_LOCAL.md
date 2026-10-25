@@ -272,6 +272,14 @@ whoever resumes cold, so this script answers it live at every session start: the
 `versionName`/`versionCode` read straight from `app/build.gradle.kts`, the newest `v*` tag on
 `origin`, whether this version is released, and the branch's position against `origin/main`.
 
+It also fetches `origin` (bounded, and only once the tag probe reached it) and warns when HEAD can
+fast-forward to any branch, whatever its name, with the `git merge --ff-only` that settles it: a
+checkout left behind work a worktree session pushed under another branch name cost later sessions
+their first turns (owner, 2026-10-25). Two exclusions keep it quiet where nothing was left behind:
+a tip whose extra commits are all `[bot]`-authored (Dependabot), and, on the default branch, every
+ref but its own `origin` counterpart, since each session branch is cut from it. A local-only
+candidate is marked so, the suggested ref is shell-quoted, and it reports and never merges.
+
 The shipped banner already has a release line, driven by `VERSION_FILE` and `RELEASE_TAG_PREFIX`,
 and both are deliberately left empty: it reads the version from the **first line** of a file, and
 this project's version lives inside `app/build.gradle.kts`. Setting them would have meant creating
@@ -288,8 +296,9 @@ in review.
 
 Two limits stated rather than implied: "newest tag" ranks plain `vMAJOR.MINOR.PATCH` only, so a
 pre-release tag is ignored for ranking (the released/unreleased test for the current version is an
-exact ref match and handles any string); and the ahead/behind counts read the locally fetched
-`origin/main`, so a shallow clone undercounts them.
+exact ref match and handles any string); and the ahead/behind counts read `origin/main` as just
+fetched, or as last fetched when the fetch failed (the line says which), so a shallow clone
+undercounts them.
 
 **Only Claude Code runs it** — the hook is in `.claude/settings.json`, and Codex was not observed to
 fire any repository hook (see the adapter table above), so for Codex this paragraph is the whole

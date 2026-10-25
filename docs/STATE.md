@@ -103,6 +103,8 @@ proposing work; changing it is legislation under RUNBOOK's rule-review protocol.
 
 Newest first; ledger rows are the durable detail.
 
+- 2026-10-25 — **The session banner now fetches and warns when HEAD can fast-forward to any branch,
+  bot-only tips excluded, so a checkout behind a worktree's pushed work shows at start (owner).**
 - 2026-10-25 — **No shared Night Light write-order helper: each site's order stays two inline
   edges, since a helper came out longer (DD-092).**
 - 2026-10-25 — **The Privileged Display screen's service-off Apply now switches Night Light on
