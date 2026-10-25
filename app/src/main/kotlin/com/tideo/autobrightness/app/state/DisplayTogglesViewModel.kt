@@ -199,10 +199,10 @@ class DisplayTogglesViewModel @JvmOverloads constructor(
                     deviceDaltonizer != null -> deviceDaltonizer != daltonizerPick
                     else -> settings.daltonizerMode != unpickedDaltonizer
                 }
+                val switchNightLight = device == null ||
+                    (device.nightLight != null && device.nightLight != settings.nightLightEnabled)
                 val results = buildList {
-                    if (device == null || (device.nightLight != null && device.nightLight != settings.nightLightEnabled)) {
-                        add(display.setNightLight(settings.nightLightEnabled))
-                    }
+                    if (switchNightLight && !settings.nightLightEnabled) add(display.setNightLight(false))
                     settings.nightLightTemperature?.let {
                         val extended = settings.extendedNightLightEnabled
                         if (device == null || extended || keyIgnored ||
@@ -211,6 +211,7 @@ class DisplayTogglesViewModel @JvmOverloads constructor(
                             add(temperatureRoute.writeClamped(it, extended).map { })
                         }
                     }
+                    if (switchNightLight && settings.nightLightEnabled) add(display.setNightLight(true)) // DD-091
                     if (writeDaltonizer) add(display.setDaltonizer(daltonizerPick))
                     if (device == null || device.inversion != settings.inversionEnabled) {
                         add(display.setInversion(settings.inversionEnabled))

@@ -63,13 +63,16 @@ class DisplayTogglesViewModelTest {
         alwaysOnDisplayAvailable: Boolean = true,
         io: CoroutineDispatcher = dispatcher,
         rootProbe: () -> Boolean = { false },
+        wrap: (SecureDisplayController) -> SecureDisplayController = { it },
     ): DisplayTogglesViewModel {
         val privileges = AndroidPrivilegeManager(app)
-        val display = AndroidSecureDisplayController(
-            app, privileges,
-            nightLightAvailable = nightLightAvailable,
-            alwaysOnDisplayAvailable = alwaysOnDisplayAvailable,
-            nightLightRange = NightLightKelvinRange.AOSP,
+        val display = wrap(
+            AndroidSecureDisplayController(
+                app, privileges,
+                nightLightAvailable = nightLightAvailable,
+                alwaysOnDisplayAvailable = alwaysOnDisplayAvailable,
+                nightLightRange = NightLightKelvinRange.AOSP,
+            ),
         )
         return DisplayTogglesViewModel(
             app,
@@ -441,6 +444,49 @@ class DisplayTogglesViewModelTest {
         assertEquals(2_596, Settings.Secure.getInt(app.contentResolver, "night_display_color_temperature", -999))
         val snapshot = assertNotNull(vm.deviceSnapshot.value)
         assertEquals(1_000, stored.withDeviceSnapshot(snapshot).nightLightTemperature, "the stored number survives")
+    }
+
+    private fun kelvinAtSwitch(switches: MutableList<Pair<Boolean, Int>>) = { real: SecureDisplayController ->
+        object : SecureDisplayController by real {
+            override fun setNightLight(on: Boolean): Result<Unit> {
+                switches += on to Settings.Secure.getInt(app.contentResolver, "night_display_color_temperature", -999)
+                return real.setNightLight(on)
+            }
+        }
+    }
+
+    @Test
+    fun directApply_switchesNightLightOnOnlyAfterTheSetpointLands_DD091() {
+        grantElevated()
+        Settings.Secure.putInt(app.contentResolver, "night_display_activated", 0)
+        Settings.Secure.putInt(app.contentResolver, "night_display_color_temperature", 3_800)
+        val switches = mutableListOf<Pair<Boolean, Int>>()
+        val vm = vm(wrap = kelvinAtSwitch(switches))
+
+        vm.applyNow(AabSettings(nightLightEnabled = true, nightLightTemperature = 2_700))
+
+        assertEquals(listOf(true to 2_700), switches, "no frame at the held 3800 K")
+        assertFalse(vm.state.value.writeFailed)
+        val snapshot = assertNotNull(vm.deviceSnapshot.value)
+        assertEquals(true, snapshot.nightLight)
+        assertEquals(2_700, snapshot.temperatureK)
+    }
+
+    @Test
+    fun directApply_switchesNightLightOffBeforeTheNewSetpointLands_DD091() {
+        grantElevated()
+        Settings.Secure.putInt(app.contentResolver, "night_display_activated", 1)
+        Settings.Secure.putInt(app.contentResolver, "night_display_color_temperature", 3_800)
+        val switches = mutableListOf<Pair<Boolean, Int>>()
+        val vm = vm(wrap = kelvinAtSwitch(switches))
+
+        vm.applyNow(AabSettings(nightLightEnabled = false, nightLightTemperature = 2_700))
+
+        assertEquals(listOf(false to 3_800), switches, "no frame at 2700 K while still on")
+        assertFalse(vm.state.value.writeFailed)
+        val snapshot = assertNotNull(vm.deviceSnapshot.value)
+        assertEquals(false, snapshot.nightLight)
+        assertEquals(2_700, snapshot.temperatureK)
     }
 
     @Test

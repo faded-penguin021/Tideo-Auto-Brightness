@@ -2,9 +2,9 @@
 
 ## Status
 
-- **Spec only. No code has changed.** The owner asked on 2026-10-20 for this plan, docs only, on
-  the session branch `math-explained`. That authorised **Unit 0 only**: committing this file.
-  Every later unit needs the owner's separate go-ahead.
+- **Units 1 and 2 have landed (DD-090, DD-091); the cause and fix sections below describe the
+  code before them.** The owner asked on 2026-10-20 for this plan, docs only, on the session
+  branch `math-explained`. Every unit needs the owner's separate go-ahead.
 - No unit opens a PR, replies on an issue, tags or releases.
 - The screen's Apply gets the same fix, as its own Unit 2 (owner, 2026-10-20).
 - The owner pre-approved an `app` comment-budget raise for Units 1 and 2 (2026-10-20), up to +5
@@ -110,7 +110,7 @@ In `DisplayTogglesViewModel`'s device-write block, the `setNightLight` write com
 static temperature write. So turning Night Light on there with a new setpoint briefly shows the
 old one.
 - It never runs on a context switch, which is why it is a separate unit.
-- The fix swaps those two blocks.
+- The fix moves the switch-on after the temperature write and keeps the switch-off before it.
 - The owner chose to fix it, as Unit 2, after the coordinator fix.
 
 ## Execution rules
@@ -203,9 +203,9 @@ old one.
   - Assert: when `setNightLight(true)` is called, the Kelvin key already holds that setpoint.
   - See it **fail** on today's code.
   - No existing screen test pins the order today (2026-10-20).
-- **Fix.** In `DisplayTogglesViewModel`'s device-write block, move the Night Light block after
-  the temperature block, citing DD-091 in a one-line pointer. The order of the other writes is
-  unchanged.
+- **Fix.** In `DisplayTogglesViewModel`'s device-write block, move the Night Light switch-on after
+  the temperature block, citing DD-091 in a one-line pointer. The switch-off stays before it, as
+  in the coordinator (landed as a split, 2026-10-25). The order of the other writes is unchanged.
 - **Comment budget.** Any raise comes from the shared +5 cap above, rule-reviewed again.
 - **Ledger.** New row **DD-091 [cited]**: the same rule applied to the service-off Apply.
 - **Device step.** Add the service-off Apply case to step 38b, and refresh the `s11_38b` row in

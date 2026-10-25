@@ -356,7 +356,7 @@ reason = "needs Shizuku or root for Tideo and a visual panel check; the extended
 [[scenario]]
 id = "s11_38b"
 status = "manual"
-reason = "needs two stored profiles, Shizuku or root, daylight and a visual check for a single red frame"
+reason = "needs two stored profiles, Shizuku or root, daylight, a service-off Apply and a visual check for a single stale-Kelvin frame"
 
 [[scenario]]
 id = "s11_39"

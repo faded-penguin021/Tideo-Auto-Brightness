@@ -584,7 +584,10 @@ Apply writes the device directly (`applyNow`). Debug builds need their own grant
     (about 1000 K, extended range on). Service ON, in daylight. Load B, then A, by hand from
     Profiles; then do the same switch through a context rule (for example A as the baseline and a
     rule that picks B for an app). **Expected:** each time Night Light comes on at the day
-    temperature, possibly a moment after the load, with no red frame first.
+    temperature, possibly a moment after the load, with no red frame first. Then the screen's own
+    Apply (DD-091): service OFF, Night Light off with the key at a warm Kelvin; in Privileged
+    Display turn Night Light on with a visibly cooler setpoint and Apply. **Expected:** Night Light
+    comes on at the new setpoint, with no frame at the old one.
 39. **Panic resets the privileged keys (D-155).** With a profile holding grayscale + inversion +
     Night Light engaged (via context rule or Apply), fire the panic gesture (step 14).
     **Expected:** besides the SOS + max brightness + service stop, ALL display toggles return to

@@ -985,3 +985,9 @@
   the 750 ms DC-057 probe when one is due, and a failed write still switches on as before. It
   assumes the service keeps a Kelvin written while off, which the owner's deep red supports and
   AOSP's behaviour is recalled, not measured; JVM-tested, on-device unverified.
+- DD-091 [cited]: **The Privileged Display screen's service-off Apply now writes the Kelvin between
+  the two Night Light edges: a switch-off before it, a switch-on after it.** It switched on or off
+  first, so turning Night Light on with a new setpoint showed the held Kelvin first (DD-090's rule,
+  applied to D-152's direct write). The plan's "move the block after the Kelvin" was split instead,
+  since a switch-off after the write would show the new setpoint while still on. JVM-tested,
+  on-device unverified.
