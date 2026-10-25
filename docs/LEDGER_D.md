@@ -991,3 +991,8 @@
   applied to D-152's direct write). The plan's "move the block after the Kelvin" was split instead,
   since a switch-off after the write would show the new setpoint while still on. JVM-tested,
   on-device unverified.
+- DD-092: **No shared Night Light write-order helper: inline, the order is two one-line edges per
+  site, and a helper is longer.** The three sites (DD-059's restore, DD-090, DD-091) each handle
+  failure differently — stop, carry on, collect — so a helper needs inline lambdas with non-local
+  returns, adds a file and a test, and shortens no call site. The service-on and service-off paths
+  stay apart, as the light-refactor audit retained.

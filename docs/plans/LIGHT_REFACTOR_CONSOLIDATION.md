@@ -205,6 +205,7 @@ It also found three over-reaches:
   - They otherwise differ by design: anchors, restore and ticks on one side, a device-snapshot diff on
     the other.
   - At most a tiny shared write-order helper, which is that plan's Unit 3 (owner, 2026-10-25).
+    It was not landed, since it came out longer than the inline orders (DD-092).
 - **Brightness curve chart:**
   - It plots the base curve, but its "Now" marker shows the final output, which includes
     scale/offset/taper.

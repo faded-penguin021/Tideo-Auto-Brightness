@@ -39,7 +39,7 @@ stays closed (DB-051…DB-060), and Scorecard.dev is a run-once local input.
   circadian one lands. Each unit runs on the owner's go-ahead; an `app` comment-budget raise is
   pre-approved for Units 1–2, up to +5 between them, rule review still owed.
   [x] 0 plan committed · [x] 1 coordinator fix, tests, DD-090, 1.15.1 / vc31 · [x] 2 the screen's
-  Apply, DD-091 · [ ] 3 shared write-order helper, only if smaller · [ ] 4 owner device check and
+  Apply, DD-091 · [x] 3 shared write-order helper, not landed, DD-092 · [ ] 4 owner device check and
   close-out.
 - **Light refactor of duplicated logic** — `docs/plans/LIGHT_REFACTOR_CONSOLIDATION.md`, spec only
   (owner, 2026-10-21; D1–D5 decided). Each unit runs on the owner's go-ahead.
@@ -103,6 +103,8 @@ proposing work; changing it is legislation under RUNBOOK's rule-review protocol.
 
 Newest first; ledger rows are the durable detail.
 
+- 2026-10-25 — **No shared Night Light write-order helper: each site's order stays two inline
+  edges, since a helper came out longer (DD-092).**
 - 2026-10-25 — **The Privileged Display screen's service-off Apply now switches Night Light on
   after the setpoint lands and off before it; step 38b gains the case, JVM-tested only (DD-091).**
 - 2026-10-25 — **The Night Light switch-on plan gains Unit 3, the shared write-order helper the
