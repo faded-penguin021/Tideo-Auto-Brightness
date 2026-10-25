@@ -10,14 +10,14 @@ in grey boxes.
 
 Unless an example says otherwise, its numbers are calculated from Tideo's code (version 1.15.0)
 with the app's initial settings. The app rounds some intermediate results, so a simplified
-formula here can differ from what's sheen shown in the Live Debug screen in the last digit.
+formula here can differ from what's shown in the Live Debug screen in the last digit.
 
 **Where to start.** First decide which kind of problem you have:
 
 - **The brightness is wrong.** Once the light has been steady for a while and the screen has
   stopped changing, it's too bright or too dim. Change the curve or its limits (§3–§4).
 - **The brightness is right, but the changes are annoying.** The screen ends up at the correct
-  level, but its reacts either too often or too little, takes long to get tot the target brightness, 
+  level, but it reacts either too often or too little, takes long to get to the target brightness, 
   or the animations look jumpy. Change reactivity, smoothing or animation (§5–§7).
 
 The [cheat sheet](#13-symptom--setting-cheat-sheet) maps common issues to the settings that can be
@@ -116,8 +116,8 @@ curves.
 ### 2.1 Weber's law: we notice *relative* changes, not absolute ones
 
 Ernst Weber found that the smallest change in a stimulus that a person can perceive is
-a **fixed fraction** of the stimulus itself. Going from 10 to 20 lux is a very noticable change. The
-same +10 lux increase at 10,000 lux not so much. What matters is the **fold-change**.
+a **fixed fraction** of the stimulus itself. Going from 10 to 20 lux is a very noticeable change.
+The same +10 lux increase at 10,000 lux not so much. What matters is the **fold-change**.
 
 **Where Tideo uses it:** all reactivity thresholds are percentages, known as *Weber fractions*.
 Tideo measures a light change relative to the current smoothed lux level:
@@ -333,7 +333,7 @@ reliable "brighter outdoors" control**. With every other setting at its default,
 | 15,000 | 226.7 |
 
 Both a lower and a higher Zone 2 end come out brighter at 20,000 lux, so check the graph rather
-than assuming . The *Outdoors* profile uses 18,000 lx.
+than assuming. The *Outdoors* profile uses 18,000 lx.
 
 ### 3.5 Zone 3: bright daylight (approaching Max)
 
@@ -395,7 +395,7 @@ would be **50** instead. This is why Scale can seem to do nothing at either end:
 impacting the applied brightness.
 
 **Scale or Offset?** Use **Scale** to make everything proportionally brighter or dimmer. Use
-**Offset** to provide a fixed boost or cut to the dark end a without changing perceived bright light
+**Offset** to provide a fixed boost or cut to the dark end without changing perceived bright light
 behavior much. Neither changes how sensitive Tideo is to light changes; see §5.
 
 Min and Max limit Tideo's *target*. In PWM mode the hardware brightness can then be raised to the
@@ -408,7 +408,7 @@ PWM threshold, and Extra Dim can make a target brightness of 10 look darker than
 
 *Screen: **Reactivity**, "Reactivity thresholds"*
 
-Light sensors are noisy. For each of sensor event, new readings come in: a hand casts a shadow, a
+Light sensors are noisy. For each sensor event, new readings come in: a hand casts a shadow, a
 lamp flickers or a cloud passes. If Tideo reacted to every small change, the screen brightness would
 keep jumping up and down. The **dead zone** filters this out: Tideo only reacts when the light
 changes by more than the threshold **percentage**. This is Weber's law from §2.1.
@@ -760,7 +760,7 @@ is actually applied. The Dashboard's figure (for example "1.15×") is the scale 
 
 During the morning and evening ramps the Uncompressed scale refreshes every 2 minutes, but the
 screen only uses up a new multiplier when Tideo next recalculates brightness (§1), in steady
-light it might display values that don’t mach the ramp.
+light it might display values that don’t match the ramp.
 
 ### 8.4 Step 4: the compression taper ("Taper midpoint" and "Taper steepness")
 
