@@ -1,0 +1,2 @@
+Fixes:
+- switching to a profile that turns Night Light on no longer flashes the old temperature (often deep red) before the profile's own; Night Light now comes on at the right temperature, a moment later

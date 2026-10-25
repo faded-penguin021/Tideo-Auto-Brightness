@@ -568,8 +568,8 @@ Apply writes the device directly (`applyNow`). Debug builds need their own grant
     **Follow circadian scaling**, service ON, in daylight. **Expected:** the key sits near 7308 and
     Night Light switching on is barely visible. Turn Night Light, **Follow circadian scaling** and
     the row off and Apply, then turn all three on together and Apply once (#145, DD-064).
-    **Expected:** within about 5 s the key reads 7308, with no second Apply; a very short dip to a
-    warmer tint before the expected one is known (DD-065), so note only if it lasts longer.
+    **Expected:** within about 5 s the key reads 7308, with no second Apply, and no dip to a warmer
+    tint before it (DD-090 fixed the one DD-065 saw).
     Stop Shizuku (skip this check on a rooted phone, where root still carries the bridge), reopen
     the screen. **Expected:** the
     row stays visible with the "needs Shizuku" note, and with no Apply (there is nothing to apply)
@@ -578,6 +578,13 @@ Apply writes the device directly (`applyNow`). Debug builds need their own grant
     stock) and the slider still reads the stored setpoint. On a build that ignores the key (DC-057;
     the owner's OnePlus 13) the panel keeps what the display service last held — 4082 in
     `dumpsys color_display` — until Shizuku returns, as the note says (owner run, 2026-10-08).
+38b. **A switch-on from a Night-Light-off profile shows no stale Kelvin (DD-090).** With Shizuku or
+    root, hold profile A with Night Light on, **Follow circadian scaling** on and the extended range
+    on, and profile B with Night Light off, **Follow circadian scaling** off and a warm setpoint
+    (about 1000 K, extended range on). Service ON, in daylight. Load B, then A, by hand from
+    Profiles; then do the same switch through a context rule (for example A as the baseline and a
+    rule that picks B for an app). **Expected:** each time Night Light comes on at the day
+    temperature, possibly a moment after the load, with no red frame first.
 39. **Panic resets the privileged keys (D-155).** With a profile holding grayscale + inversion +
     Night Light engaged (via context rule or Apply), fire the panic gesture (step 14).
     **Expected:** besides the SOS + max brightness + service stop, ALL display toggles return to

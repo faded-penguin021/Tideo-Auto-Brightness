@@ -17,7 +17,7 @@ Harness AMH 15.1.0, scripts and hand-applied seed prose together (DD-066); the l
 (`scripts/session-facts.sh`, DC-030), settled by hand with
 `git ls-remote --tags --refs origin 'refs/tags/v*'`.
 
-The tree declares 1.15.0 / vc30 (the train paragraph under the Owner queue); 1.14.0's device
+The tree declares 1.15.1 / vc31 (the train paragraph under the Owner queue); 1.14.0's device
 round passed on 1.14.0-debug vc28 (DD-036), and step 38a's #145 check passed on 1.14.1-debug vc29
 with a brief warmer tint before the expected one (DD-065). The 0–4095 conversion
 path stays frozen as built (DC-011…DC-013, DC-025…DC-028, DB-083), the light-stall findings H1/H2
@@ -38,7 +38,7 @@ stays closed (DB-051…DB-060), and Scorecard.dev is a run-once local input.
   2026-10-20): a switch-on from a Night-Light-off profile flashes the held Kelvin (red) before the
   circadian one lands. Each unit runs on the owner's go-ahead; an `app` comment-budget raise is
   pre-approved for Units 1–2, up to +5 between them, rule review still owed.
-  [x] 0 plan committed · [ ] 1 coordinator fix, tests, DD-090, 1.15.1 / vc31 · [ ] 2 the screen's
+  [x] 0 plan committed · [x] 1 coordinator fix, tests, DD-090, 1.15.1 / vc31 · [ ] 2 the screen's
   Apply, DD-091 · [ ] 3 owner device check and close-out.
 - **Light refactor of duplicated logic** — `docs/plans/LIGHT_REFACTOR_CONSOLIDATION.md`, spec only
   (owner, 2026-10-21; D1–D5 decided). Each unit runs on the owner's go-ahead.
@@ -59,18 +59,11 @@ stays closed (DB-051…DB-060), and Scorecard.dev is a run-once local input.
 > fork, options, recommendation (D-167), dated (DA-006); credential leaks and external-content
 > escalations land here too.
 
-1. **[2026-10-04] Get 65 Chinese strings translated; they show in English until then.**
-   `help_pwm_exponent` (DD-014), `contexts_only_plugged_in` (DD-025),
-   `pd_night_light_temp_hint` (DD-045) and `ssid_help_dump_security` (DD-077, added 2026-10-17)
-   changed meaning, so their old Chinese was removed (DD-026),
-   the rule editor's four `contexts_offset_*` strings are new (DD-035), and so are the extended
-   Night Light range's four: `settings_night_light_extended` (DD-047),
-   `pd_night_light_temp_hint_extended` and the two `pd_night_light_extended*` (DD-050), and the
-   bright-light hand-off's 53 (`*handoff*`, `*handed_off*`, `flash_hbm_*`, `flash_calibration_*`,
-   `guide_s10_*`, the two `*_android` labels; DD-071…DD-077). All 65 are asked in #143 (first
-   2026-10-08, its body rewritten 2026-10-18); it does not block a release, since missing keys
-   fall back to English (owner, 2026-10-08). Paste translations replied there into the file.
-   Settles it: `comm -23 <(grep -v 'translatable="false"' app/src/main/res/values/strings.xml |
+1. **[2026-10-04] Get 65 Chinese strings translated; they show in English until then.** Four
+   changed meaning and lost their old Chinese (DD-026); the rest are new: the rule editor's
+   offsets, the extended Night Light range and the bright-light hand-off (DD-035, DD-047, DD-050,
+   DD-071…DD-077). #143 asks for all 65; missing keys fall back to English, so it does not block a
+   release (owner, 2026-10-08). Paste translations replied there into the file. Settles it: `comm -23 <(grep -v 'translatable="false"' app/src/main/res/values/strings.xml |
    grep -o 'name="[^"]*"' | sort) <(grep -o 'name="[^"]*"'
    app/src/main/res/values-b+zh+Hans/strings.xml | sort) | wc -l` prints 0 (65 on 2026-10-18).
 
@@ -94,10 +87,10 @@ stays closed (DB-051…DB-060), and Scorecard.dev is a run-once local input.
    `grep -rc 'ubuntu-24.04' .github/workflows/` prints 0 for every file, or a STATE changelog line
    records (b).
 
-**The tree declares `1.15.0` / vc30, this train's ONE bump**, made by the hand-off plan's unit 0
-after v1.14.1 was seen tagged on 2026-10-16 (`git ls-remote --tags --refs origin 'refs/tags/v*'`).
-`changelogs/30.txt` (500-character cap) carries only the hand-off. Never bump twice in one
-train.
+**The tree declares `1.15.1` / vc31, this train's ONE bump**, made by the Night Light switch-on
+plan's unit 1 after v1.15.0 was seen tagged on 2026-10-25 (`git ls-remote --tags --refs origin
+'refs/tags/v*'`). `changelogs/31.txt` (500-character cap) carries only that fix. Never bump twice
+in one train.
 
 ## Decided non-items
 
@@ -109,95 +102,27 @@ proposing work; changing it is legislation under RUNBOOK's rule-review protocol.
 
 Newest first; ledger rows are the durable detail.
 
-- 2026-10-21 — **Duplicated logic audited; Live Debug and the Dashboard differ in PWM mode because
-  they show hardware vs perceived brightness (both kept, D-109). Six consolidations planned in
-  `docs/plans/LIGHT_REFACTOR_CONSOLIDATION.md`, spec only (Unit 0).**
+- 2026-10-25 — **Night Light now switches on after the profile's Kelvin lands, so a switch from a
+  Night-Light-off profile no longer flashes the held (red) Kelvin; 1.15.1 / vc31, step 38b, JVM-tested
+  only (DD-090).**
 
-- 2026-10-20 — **The red flash on a switch to a circadian profile is validated as write order:
-  Night Light is switched on before the Kelvin is written, so the panel shows what the service
-  still held (DD-065's warmer tint). The fix plan is committed as
-  `docs/plans/NIGHT_LIGHT_SWITCH_ON_ORDER.md`, spec only (Unit 0); the owner added the screen's
-  service-off Apply, which has the same order, as its own Unit 2.**
-
-- 2026-10-19 — **Dark-room jitter closed with curve settings, no code: the owner's sensor reports
-  0 or ≥ 1.04 lx, so the rule approved 2026-10-08 never fires and is withdrawn unbuilt; a per-profile
-  MinBright at the curve's ~1.2 lx value holds one target (owner, DD-088, DD-089). The plan file
-  is deleted.**
-
-- 2026-10-19 — **The plan for faster Shizuku paths and Android 17's public brightness API is
-  committed as `docs/plans/PRIVILEGED_FAST_PATHS.md`, spec only (Unit 0). Past the owner's Astra
-  review it waits for ColorOS 17 on the owner's OnePlus 13.**
-
-- 2026-10-18 — **#143 now asks for all 65 untranslated Chinese strings, not 1.14.0's 11: 1.15.0
-  shipped `ssid_help_dump_security` changed and 53 hand-off strings new; Owner queue item 1
-  counts every missing key.**
-
-- 2026-10-17 — **E2E suite on 1.15.0-debug vc30: 17 of 20 auto rows pass, 3 skip on their own
-  preconditions, journal empty, after one harness-timing teardown miss that `--recover` fixed
-  (DD-086). #136's OxygenOS 16 calibration needed "Disable system optimization" on; it stays a
-  workaround (DD-087).**
-
-- 2026-10-17 — **Owner's cursory pass of DEVICE_TEST_SCRIPT §18 on the phone found it all fine;
-  Owner queue item 4 is closed and the train goes to its PR (DD-084). Astra's ship check said
-  HOLD on an interrupted calibration, left to the owner's merge call, and a data-keeping
-  downgrade, which the owner dismissed (DD-085).**
-
-- 2026-10-17 — **Hand-off unit 6 closes the #136 plan: `30.txt` final, parity gap dev-03,
-  DEVICE_TEST_SCRIPT §18 steps 58–61 with their e2e rows, the settings schema and the DataStore
-  map (now listing `display_prefs` and the controller's `screen_brightness_controller` prefs);
-  the AAB export in `dist/` and the plan file are deleted, the plan's last unrecorded facts kept
-  as DD-082 and DD-083 (Sol review). Owner queue item 4 asks for §18. The
-  low-lux jitter fix is deferred to the train after 1.15.0 (owner).**
-
-- 2026-10-15..17 — **Bright-light hand-off (#136) on 1.15.0 / vc30, from the owner's AAB build:
-  AAB's reference (DD-070, DD-072), domain `HandoffRules` and per-profile settings with four
-  owner-approved deviations (DD-071), the controller's `handed_off` marker (DD-073), the runtime coordinator (DD-074),
-  surfaces that say "Android", the Hand-off Behavior screen and AAB's flashes (DD-075, DD-076),
-  and the HBM readout with display calibration (DD-077…DD-080), which passed the owner's sunlight
-  test on the phone (DD-081; debug builds go on over adb, as Play Protect blocks a file-manager
-  install).**
-- 2026-10-16 — **`DraftSettingsViewModelTest`'s intermittent CI hang fixed, test-only: an earlier
-  test's in-flight `apply()` wedged the DataStore writer across Robolectric's looper reset
-  (DD-069).**
-- 2026-10-16 — **The `DraftSettingsViewModelTest` CI-hang fix went out as PR #147 off `main`;
-  Owner queue item 2 now asks for that merge.**
-- 2026-10-16 — **Every workflow pinned to `ubuntu-24.04` ahead of GitHub moving `ubuntu-latest`
-  to 26.04 (DD-068); the move itself is Owner queue item 3.**
-- 2026-10-16 — **CI speed: `build.yml` runs the guard fixture suites only after a failed ladder,
-  since `verify.sh` already runs them (~80 s a run, DD-067).**
-- 2026-10-13 — **Harness AMH 14.1.0 -> 15.1.0: root/home deletions permanently denied, checkpoint
-  reordered (STATE line → ladder → commit → `--guards-only` → push), a Destructive work section in
-  AGENTS.md, output redaction wired as a `PostToolUse` hook in both adapters (DD-066).**
-
-- 2026-10-10 — **1.14.1 / vc29 for #145: a circadian Night Light key that the device moved off
-  what Tideo wrote is rewritten by the next tick, and an apply gets an early tick 5 s later
-  (DD-064); owner-verified on device, with a brief warmer tint before the expected one (DD-065).**
-- 2026-10-10 — **Translation badges work on `main` (owner-confirmed; `badges` branch present,
-  DD-028).**
-- 2026-10-10 — **Owner-confirmed on device: Circadian follows a new location without a restart,
-  the live card shows the applied scale, and the dusk scale refresh steps (DD-061…DD-063).**
-- 2026-10-09 — **Open question answered (a): AAB's 2-minute prof758 re-run refreshes the scale
-  readout during the dawn/dusk ramps and moves no brightness; the owner declined (b) as jitter in
-  steady light. One shared helper now serves the pipeline, that tick and Night Light (DD-063).**
-- 2026-10-09 — **Night Light goes back as found on disable and on again on enable, both
-  owner-confirmed (DD-059, DD-060). A running service follows the stored circadian location and
-  the IP fallback switch (DD-061); a reapply now publishes the scale it applied (DD-062).**
-- 2026-10-08 — **Release preflight treats debug sources and `e2e/` as non-shipping (DD-058); Astra
-  review fixes for TIME wakes and the badge workflow (DD-056, DD-057); only the owning service
-  publishes live state (DD-055); debug builds are dark blue (DD-052, DD-054); step 38a passed on
-  device (DD-053); the low-lux jitter rule approved for after 1.14.0.**
-- 2026-10-06..08 — **Night Light: the device's Kelvin range (N2, DD-045) and the opt-in extended
-  686–7308 K range per profile, Shizuku or root only (N2b, DD-046…DD-051); the plan is archived as
-  `docs/history/NIGHT_LIGHT_CIRCADIAN_FIX.md`.**
-- 2026-10-04..07 — **E2E suite S5–S9 done on the owner's phone, S8 dropped (DD-029,
-  DD-032…DD-034, DD-039…DD-044); RUNBOOK playbook 9 runs it.**
-- 2026-10-06 — **Device round on 1.14.0-debug vc28 passed nine checks (DD-036); Decided non-items
-  moved to `docs/rebuild/DECIDED_NON_ITEMS.md` (DD-037); SUNRISE/SUNSET rules follow the pinned
-  location (DD-038); TIME rules wake only at the next context time (DD-042).**
-- 2026-10-01..06 — **This train (1.14.0 / vc28 after `main` shipped #141 as v1.13.0): E2E S1–S4
-  (DD-015…DD-021), the PWM help (DD-014), the proximity damp (DD-022,
-  DD-024), #139 (DD-025), translation policy and coverage badges (DD-023, DD-026…DD-028), the
-  owner's first-launch defaults (DD-030, DD-031), AAB's solar offsets (DD-035), #138's actions
-  bump.**
+- 2026-10-21 — **Duplicated logic audited: Live Debug and the Dashboard show hardware vs perceived
+  brightness in PWM mode, both kept (D-109); six consolidations planned in
+  `docs/plans/LIGHT_REFACTOR_CONSOLIDATION.md`, spec only.**
+- 2026-10-20 — **The red flash on a switch to a circadian profile is write order (DD-065's warmer
+  tint); its fix is planned in `docs/plans/NIGHT_LIGHT_SWITCH_ON_ORDER.md`, the screen's
+  service-off Apply as its Unit 2 (owner).**
+- 2026-10-19 — **Dark-room jitter closed with curve settings, no code (DD-088, DD-089); the
+  faster-Shizuku and Android 17 plan committed as `docs/plans/PRIVILEGED_FAST_PATHS.md`, spec
+  only.**
+- 2026-10-13..18 — **1.15.0 / vc30: the bright-light hand-off (#136) with the HBM readout and display
+  calibration, owner-passed in sunlight (DD-070…DD-085); E2E 17/20 on vc30 (DD-086, DD-087); #143
+  asks for all 65 strings. CI: a test-only DataStore hang fix (DD-069), runners pinned to
+  `ubuntu-24.04` (DD-068), fixture suites only after a failed ladder (DD-067). Harness AMH 14.1.0 →
+  15.1.0 (DD-066).**
+- 2026-10-01..10 — **1.14.0 / vc28 and 1.14.1 / vc29: E2E S1–S9 (DD-015…DD-044), Night Light's
+  device range, extended range and circadian fixes, owner-verified (DD-045…DD-065; plan archived as
+  `docs/history/NIGHT_LIGHT_CIRCADIAN_FIX.md`), translations and badges (DD-023…DD-028), the
+  owner's first-launch defaults (DD-030, DD-031), AAB's solar offsets (DD-035).**
 - 2026-06-23..09-28 — **v1.0.0 → v1.12.0 (D-096…DD-012); #133 and #134 owner-passed on
   1.12.0-debug vc26.**

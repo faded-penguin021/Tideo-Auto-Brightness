@@ -118,7 +118,7 @@ becomes a new DD row in the unit that acts on it:
     any failure.
   - BASIC behaviour is unchanged except for the public Android 17 APIs (Units 9 and 12).
   - No new dependencies.
-- **Version.** One bump per train. The first code unit takes the next minor (1.16.0 / vc31) and adds `changelogs/<vc>.txt` (≤ 500 characters).
+- **Version.** One bump per train. The first code unit takes the next minor (1.16.0) and the next free versionCode, and adds `changelogs/<vc>.txt` (≤ 500 characters).
 - **Shizuku lockstep.** Any change to the set of Shizuku runtime uses updates all of these in the
   same commit (DD-051: one consumer file per use):
   - AGENTS.md's claim;

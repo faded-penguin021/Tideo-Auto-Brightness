@@ -133,10 +133,12 @@ class DisplayTogglesCoordinatorTest {
         var reachable = true
         var quickRefused = false // stop()'s main thread: Shizuku cannot bind there
         val sets = mutableListOf<Int>()
+        var onSet: (Int) -> Unit = {}
         override suspend fun readKelvin(): Int? = null
         override suspend fun setKelvin(kelvin: Int, quick: Boolean): Int? {
             if (!reachable || (quick && quickRefused)) return null
             sets += kelvin
+            onSet(kelvin)
             return kelvin
         }
     }
@@ -160,7 +162,7 @@ class DisplayTogglesCoordinatorTest {
         runCurrent()
         // inversion is false in both; must not write
         assertEquals(
-            listOf("nightLight=true", "temp=2700", "daltonizer=GRAYSCALE"),
+            listOf("temp=2700", "nightLight=true", "daltonizer=GRAYSCALE"),
             h.display.writes,
         )
     }
@@ -365,7 +367,7 @@ class DisplayTogglesCoordinatorTest {
         h.effectiveFlow.value = baseline
         h.effectiveFlow.value = circadianProfile
         runCurrent()
-        assertEquals(listOf("nightLight=true", "temp=3400"), h.display.writes)
+        assertEquals(listOf("temp=3400", "nightLight=true"), h.display.writes)
     }
 
     @Test
@@ -677,7 +679,7 @@ class DisplayTogglesCoordinatorTest {
         h.effectiveFlow.value = baseline
         h.effectiveFlow.value = extended700
         runCurrent()
-        assertEquals(listOf("nightLight=true", "temp=700"), h.display.writes)
+        assertEquals(listOf("temp=700", "nightLight=true"), h.display.writes)
         assertEquals(listOf(700), h.service.sets)
     }
 
@@ -688,7 +690,7 @@ class DisplayTogglesCoordinatorTest {
         h.effectiveFlow.value = baseline
         h.effectiveFlow.value = extended700.copy(extendedNightLightEnabled = false)
         runCurrent()
-        assertEquals(listOf("nightLight=true", "temp=2596"), h.display.writes)
+        assertEquals(listOf("temp=2596", "nightLight=true"), h.display.writes)
     }
 
     @Test
@@ -714,7 +716,9 @@ class DisplayTogglesCoordinatorTest {
         h.effectiveFlow.value = baseline
         h.effectiveFlow.value = extended700
         runCurrent()
-        assertEquals(listOf("nightLight=true", "temp=2596"), h.display.writes, "the extended value never touches the key")
+        assertEquals(listOf("temp=2596"), h.display.writes, "Night Light waits for the key's DC-057 probe")
+        advanceTimeBy(NightLightTemperatureRoute.SETTLE_MS + 1)
+        assertEquals(listOf("temp=2596", "nightLight=true"), h.display.writes, "the extended value never touches the key")
         assertTrue(h.service.sets.isEmpty())
     }
 
@@ -758,7 +762,7 @@ class DisplayTogglesCoordinatorTest {
         h.rampKelvin = 6_500
         advanceTimeBy(60_001)
         assertEquals(listOf(6_000, 6_500), h.service.sets)
-        assertEquals(listOf("nightLight=true", "temp=6000", "temp=6500"), h.display.writes)
+        assertEquals(listOf("temp=6000", "nightLight=true", "temp=6500"), h.display.writes)
     }
 
     @Test
@@ -807,11 +811,45 @@ class DisplayTogglesCoordinatorTest {
         h.effectiveFlow.value = baseline
         h.effectiveFlow.value = extendedCircadian
         runCurrent()
-        assertEquals(listOf("nightLight=true", "temp=7308"), h.display.writes)
+        assertEquals(listOf("temp=7308", "nightLight=true"), h.display.writes)
         h.display.deviceTemp = 4_082 // the OS acting on the switch-on after Tideo's write
         h.display.writes.clear()
         advanceTimeBy(DisplayTogglesCoordinator.RECHECK_DELAY_MS + 1)
         assertEquals(listOf("temp=7308"), h.display.writes, "well before the minute's tick")
+    }
+
+    @Test
+    fun aSwitchOnFromANightLightOffProfile_landsTheRampKelvinFirst_DD090() = runTest(UnconfinedTestDispatcher()) {
+        val h = Harness(withService = true)
+        h.service.onSet = { h.display.writes += "service=$it" }
+        h.rampKelvin = 7_308
+        val circadian = extendedCircadian.copy(nightLightTemperature = 686)
+        h.coordinator.start(backgroundScope)
+        h.effectiveFlow.value = baseline
+        h.effectiveFlow.value = circadian
+        runCurrent()
+        h.effectiveFlow.value = AabSettings(nightLightTemperature = 686, extendedNightLightEnabled = true)
+        runCurrent()
+        h.display.writes.clear()
+        h.effectiveFlow.value = circadian
+        runCurrent()
+        assertEquals(
+            listOf("service=7308", "temp=7308", "nightLight=true"),
+            h.display.writes,
+            "switching on first shows the 686 K the switch-off left held",
+        )
+    }
+
+    @Test
+    fun aSwitchOnIntoAStaticSetpoint_landsTheKelvinFirst_DD090() = runTest(UnconfinedTestDispatcher()) {
+        val warmAndOff = baseline.copy(nightLightTemperature = 1_500)
+        val h = Harness(baseline = warmAndOff)
+        h.display.deviceTemp = 1_500
+        h.coordinator.start(backgroundScope)
+        h.effectiveFlow.value = warmAndOff
+        h.effectiveFlow.value = warmAndOff.copy(nightLightEnabled = true, nightLightTemperature = 4_000)
+        runCurrent()
+        assertEquals(listOf("temp=4000", "nightLight=true"), h.display.writes)
     }
 
     @Test
@@ -910,7 +948,7 @@ class DisplayTogglesCoordinatorTest {
         h.coordinator.start(backgroundScope)
         h.effectiveFlow.value = nightProfile
         runCurrent()
-        assertEquals(listOf("nightLight=true", "temp=2700", "daltonizer=GRAYSCALE"), h.display.writes)
+        assertEquals(listOf("temp=2700", "nightLight=true", "daltonizer=GRAYSCALE"), h.display.writes)
     }
 
     @Test
@@ -999,7 +1037,7 @@ class DisplayTogglesCoordinatorTest {
         h.display.writes.clear()
         next.start(backgroundScope)
         runCurrent()
-        assertEquals(listOf("nightLight=true", "temp=2700"), h.display.writes)
+        assertEquals(listOf("temp=2700", "nightLight=true"), h.display.writes)
         assertEquals(NightLightPrior(activated = false, kelvin = 1_500), h.storedPrior)
     }
 

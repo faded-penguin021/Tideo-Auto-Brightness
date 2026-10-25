@@ -258,7 +258,6 @@ class DisplayTogglesCoordinator(
         if (switching) capturePriorLocked()
         if (switching && !desired.nightLight) display.setNightLight(false)
         val released = desired.circadianTemp || releaseAnchorLocked(settings)
-        if (switching && desired.nightLight) display.setNightLight(true)
         // D-154: both paths diff against deviceTempK, which advances only on a write that landed.
         if (desired.circadianTemp) {
             val kelvin = acquireAnchorLocked()?.let { anchor ->
@@ -270,6 +269,7 @@ class DisplayTogglesCoordinator(
             val temperature = desired.temperatureK
             if (temperature == null) deviceTempK = null else writeKelvinLocked(temperature, settings, probe)
         }
+        if (switching && desired.nightLight) display.setNightLight(true) // DD-090: the Kelvin lands first
     }
 
     /** D-154: one circadian temperature tick, also rewriting a key moved off what landed (DD-064). Caller holds [applyMutex]. */

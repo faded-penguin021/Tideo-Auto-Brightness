@@ -678,6 +678,7 @@
   settled at the expected one; it is not a full red flash. Its cause is not established, and no
   fix is made for it; step 38a now expects it, so a later run can tell whether it grows or goes
   away.
+  Corrected by DD-090.
 - DD-066: **AMH 14.1.0 -> 15.1.0 landed whole in one commit, scripts and seed prose together, so
   the two version keys moved as one (2026-10-13).** MAJOR 15.0.0's binding notes are applied: the
   command guard now denies `rm -rf` and `git clean -fd` aimed at a root or home directory with no
@@ -975,3 +976,12 @@
   51.4 at 0). If another sensor shows the jitter under default settings, the option weighed was a
   dead band below ~2 lx of `min(1.5 × smallest non-zero reading seen, 1.5 lx)`, learned in memory
   per sensor session and applied only to fresh readings once settled, never mid-settling (#132).
+- DD-090 [cited]: **A Night Light switch-on now comes after the profile's Kelvin write, so a
+  switch from a Night-Light-off profile no longer shows the Kelvin the switch-off left held (owner
+  report, 2026-10-20: deep red, then the day value seconds later).** `applyNightLightLocked`
+  enabled first, then wrote the circadian or static Kelvin; leaving a circadian profile writes the
+  next profile's setpoint (DC-056), and the next switch-on showed it, which also explains DD-065's
+  warmer tint. Night Light now comes on later by the write, a Shizuku bind on the extended route or
+  the 750 ms DC-057 probe when one is due, and a failed write still switches on as before. It
+  assumes the service keeps a Kelvin written while off, which the owner's deep red supports and
+  AOSP's behaviour is recalled, not measured; JVM-tested, on-device unverified.
