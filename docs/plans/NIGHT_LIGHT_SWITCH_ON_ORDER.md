@@ -9,6 +9,8 @@
 - The screen's Apply gets the same fix, as its own Unit 2 (owner, 2026-10-20).
 - The owner pre-approved an `app` comment-budget raise for Units 1 and 2 (2026-10-20), up to +5
   lines between them. The rule review still runs.
+- Unit 3, one shared write-order helper, was added on 2026-10-25 (owner). It is the helper
+  `LIGHT_REFACTOR_CONSOLIDATION.md` defers until this plan's fixes land.
 
 ## The bug (owner report, 2026-10-20)
 
@@ -121,7 +123,7 @@ old one.
   - `--guards-only` again;
   - a push to the session branch.
 - **Reviews.**
-  - Units 1 and 2 write device settings, so each gets a blocking fresh-context glue review.
+  - Units 1, 2 and 3 write device settings, so each gets a blocking fresh-context glue review.
   - Each unit's comment-budget raise gets a rule review: fresh context, strongest tier, no
     self-review fallback. If no fresh context can be spawned, the raise waits in the Owner queue,
     and that unit's fix waits with it.
@@ -130,7 +132,7 @@ old one.
   - The faster-Shizuku plan's version line names vc31 for its own first code unit. Unit 1
     rewords that line to "the next free versionCode", since vc31 is then spent.
   - If that plan's bump has already happened in this train, this fix rides it instead.
-  - Unit 2 rides Unit 1's bump. It never bumps again.
+  - Units 2 and 3 ride Unit 1's bump. They never bump again.
 - **Records.** Code cites DD rows, never this plan, and ledger rows never cite its path.
 
 ## Units (sequential)
@@ -215,8 +217,33 @@ old one.
   characters.
 - **Gates.** Run `scripts/ladder.sh` green, then the glue review and any rule review.
 
-**3. Owner device check, and close-out.**
-- The owner runs steps 38a and 38b on 1.15.1-debug vc31, built from Unit 2's commit.
+**3. One write-order helper, only if it is smaller (one commit; owner, 2026-10-25).**
+- **Why.** `LIGHT_REFACTOR_CONSOLIDATION.md` keeps the service-on and service-off Night Light
+  writes apart by design and allows at most a tiny shared write-order helper once this plan's
+  fixes land. This unit is that helper.
+- **Scope: the order only.** Switch-off before the Kelvin, switch-on after it. After Unit 2 three
+  sites hold it: `restorePriorLocked` (DD-059), `applyNightLightLocked` (DD-090) and the screen's
+  Apply (DD-091). Everything else stays where it is: anchors, release, restore, re-check and ticks
+  in the coordinator; the snapshot diff in the ViewModel.
+- **Shape.** One small function in `app/runtime`, taking the switch (on, off or none), the
+  `setNightLight` call and the Kelvin write. Each site keeps its own failure handling:
+  - the restore stops at a failed step (DD-059);
+  - the coordinator switches on even after a failed Kelvin write (DD-090);
+  - the screen's Apply collects every result.
+- **Gate: land it only if it is smaller.** If the helper and its call sites are not shorter and
+  plainer than the three inline orders, for example because the failure handling differs per
+  site, do not land it. Record why in the DD row instead.
+- **Tests.** No behaviour change. The order tests from Units 1 and 2 and DD-059's restore tests
+  pass unchanged. If the helper lands, add one direct test of its order.
+- **Comment budget.** No pre-approval. The change should remove comments, not add them; any raise
+  is asked for first.
+- **Ledger.** New DD row: the helper landed, or why it did not. Either way it is the lasting record
+  the light-refactor plan's close-out needs for this item.
+- **Gates.** Run `scripts/ladder.sh` green, then the Sol review and the glue review.
+
+**4. Owner device check, and close-out.**
+- The owner runs steps 38a and 38b on 1.15.1-debug vc31, built from the last code commit (Unit 3's,
+  or Unit 2's if Unit 3 landed no code).
 - Agent: record the result in a new DD row (verified, or the finding).
 - Delete this plan file, and remove its Active work item. Its content then lives in DD-090, the
   new row and the STATE Changelog.

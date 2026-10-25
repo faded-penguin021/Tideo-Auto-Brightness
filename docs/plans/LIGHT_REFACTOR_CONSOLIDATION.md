@@ -204,7 +204,7 @@ It also found three over-reaches:
   - The two paths share the order bug, and the existing plan fixes it in both.
   - They otherwise differ by design: anchors, restore and ticks on one side, a device-snapshot diff on
     the other.
-  - After that plan lands, at most a tiny shared write-order helper.
+  - At most a tiny shared write-order helper, which is that plan's Unit 3 (owner, 2026-10-25).
 - **Brightness curve chart:**
   - It plots the base curve, but its "Now" marker shows the final output, which includes
     scale/offset/taper.

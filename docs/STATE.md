@@ -39,7 +39,8 @@ stays closed (DB-051…DB-060), and Scorecard.dev is a run-once local input.
   circadian one lands. Each unit runs on the owner's go-ahead; an `app` comment-budget raise is
   pre-approved for Units 1–2, up to +5 between them, rule review still owed.
   [x] 0 plan committed · [x] 1 coordinator fix, tests, DD-090, 1.15.1 / vc31 · [ ] 2 the screen's
-  Apply, DD-091 · [ ] 3 owner device check and close-out.
+  Apply, DD-091 · [ ] 3 shared write-order helper, only if smaller · [ ] 4 owner device check and
+  close-out.
 - **Light refactor of duplicated logic** — `docs/plans/LIGHT_REFACTOR_CONSOLIDATION.md`, spec only
   (owner, 2026-10-21; D1–D5 decided). Each unit runs on the owner's go-ahead.
   [x] 0 plan · [ ] 1 dimming readout · [ ] 2 brightness labels · [ ] 3 PWM dimming chart ·
@@ -102,6 +103,8 @@ proposing work; changing it is legislation under RUNBOOK's rule-review protocol.
 
 Newest first; ledger rows are the durable detail.
 
+- 2026-10-25 — **The Night Light switch-on plan gains Unit 3, the shared write-order helper the
+  light-refactor plan defers to it, landed only if smaller (owner).**
 - 2026-10-25 — **Night Light now switches on after the profile's Kelvin lands, so a switch from a
   Night-Light-off profile no longer flashes the held (red) Kelvin; 1.15.1 / vc31, step 38b, JVM-tested
   only (DD-090).**
