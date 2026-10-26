@@ -26,6 +26,11 @@ stays closed (DB-051…DB-060), and Scorecard.dev is a run-once local input.
 
 ## Active work
 
+- **Shizuku helper reuse** — `docs/plans/SHIZUKU_HELPER_REUSE.md`, spec only (owner,
+  2026-10-26). A bind right after a `remove = true` unbind hangs for the 4 s timeout, so a
+  return to a circadian profile shows 4082 K first on an install holding the DC-057 verdict.
+  The fix keeps the helper bound (owner). Each unit runs on the owner's go-ahead.
+  [x] 0 plan · [ ] 1 fix, tests, 1.15.2 / vc32 · [ ] 2 owner device check and close-out.
 - **Faster Shizuku paths and Android 17 display APIs** — `docs/plans/PRIVILEGED_FAST_PATHS.md`,
   spec only (owner, 2026-10-19). Unit 1 is the owner's Astra review. Units 2–13 wait until the
   owner's OnePlus 13 runs ColorOS 17, and each unit runs on the owner's go-ahead.
@@ -81,10 +86,10 @@ stays closed (DB-051…DB-060), and Scorecard.dev is a run-once local input.
    `grep -rc 'ubuntu-24.04' .github/workflows/` prints 0 for every file, or a STATE changelog line
    records (b).
 
-**The tree declares `1.15.1` / vc31, this train's ONE bump**, made by the Night Light switch-on
-plan's unit 1 after v1.15.0 was seen tagged on 2026-10-25 (`git ls-remote --tags --refs origin
-'refs/tags/v*'`). `changelogs/31.txt` (500-character cap) carries only that fix. Never bump twice
-in one train.
+**The tree declares `1.15.1` / vc31, seen tagged on 2026-10-26** (`git ls-remote --tags --refs
+origin 'refs/tags/v*'`), so this train owes one bump: the Shizuku helper-reuse plan's Unit 1
+makes it, 1.15.2 / vc32 with `changelogs/32.txt` (500-character cap). Never bump twice in one
+train.
 
 ## Decided non-items
 
@@ -96,6 +101,10 @@ proposing work; changing it is legislation under RUNBOOK's rule-review protocol.
 
 Newest first; ledger rows are the durable detail.
 
+- 2026-10-26 — **Planned the Shizuku helper reuse: on return from a Night-Light-off profile the
+  anchor read and the Kelvin write bind twice, and the second bind hangs 4 s, so Night Light
+  shows 4082 K before 7308 K (owner's release install, measured over adb); the fix keeps the
+  helper bound (owner). Spec only.**
 - 2026-10-25 — **Night Light switch-on order closed: the owner passed the context-switch case on
   1.15.1-debug vc31; the screen's Apply stays on-device unverified (DD-090…DD-093).**
 - 2026-10-25 — **The session banner now fetches and warns when HEAD can fast-forward to any branch,

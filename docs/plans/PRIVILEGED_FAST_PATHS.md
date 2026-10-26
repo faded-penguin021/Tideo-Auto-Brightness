@@ -222,6 +222,10 @@ becomes a new DD row in the unit that acts on it:
     automation scenario, or by the owner.
 
 **6. Keep the helper resident (reopens DC-057's per-operation binding).**
+- If `SHIZUKU_HELPER_REUSE.md` has landed, the helper is already held bound; this unit adds only
+  the idle and teardown rules that still earn their place, on that same binding.
+- If `SHIZUKU_HELPER_REUSE.md` has landed, widen its session (3 s idle window) rather than build
+  a second one; its accepted residual is the case this unit closes.
 - `ShizukuShell` keeps one binding while a feature needs it:
   - `daemon(false)`, so the helper dies with Tideo;
   - bind on first use;
