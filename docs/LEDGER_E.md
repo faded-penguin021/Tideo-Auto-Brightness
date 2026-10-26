@@ -63,6 +63,7 @@
   with `remove = true`; a null or -1 answer keeps the helper, since it answered and a release
   would re-arm the race. The helper is `daemon(false)`, and the first call after a helper death
   can still time out once (accepted). JVM-tested against a fake that loses the bind as 13.1.5 does; on-device unverified.
+  Device-verified by DE-003.
 - DE-002: **1.15.1's Night Light fix shipped as device-verified, but only the debug install
   was checked, and it did not take the release install's path, so the release still showed the
   wrong Kelvin first (owner, 2026-10-26).** DD-093 passed DD-090 on 1.15.1-debug vc31; that install
@@ -71,3 +72,9 @@
   (the DC-057 verdict, DD-077's calibration) live per install in `display_prefs`; a device check
   that depends on one first makes the debug install hold the same fact as the release install.
   Step 38b's DE-001 case does this with the app's own probe.
+- DE-003: **DE-001 is device-verified: on the owner's OnePlus 13, 1.15.2-debug vc32 holding the
+  DC-057 verdict from the app's own probe (owner, 2026-10-26), context-rule returns from Photos
+  landed 7308 K with Night Light on in one ~0.1 s adb sample, never 4082 K or a 4 s pause, and one
+  `:aab_shell` PID stayed up across them.** After a Shizuku restart a new helper bound and the
+  switches still landed 7308 K; leaving the circadian profile restored 2596 K (DC-056), and a
+  force-stop of Tideo ended the helper (`daemon(false)`).

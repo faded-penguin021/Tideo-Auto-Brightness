@@ -19,17 +19,14 @@ Harness AMH 15.1.0, scripts and hand-applied seed prose together (DD-066); the l
 
 The tree declares 1.15.2 / vc32 (the train paragraph under the Owner queue); 1.14.0's device
 round passed on 1.14.0-debug vc28 (DD-036), and step 38a's #145 check passed on 1.14.1-debug vc29
-with a brief warmer tint before the expected one (DD-065). The 0–4095 conversion
+with a brief warmer tint before the expected one (DD-065); DE-001's held Shizuku helper passed on
+1.15.2-debug vc32 (DE-003). The 0–4095 conversion
 path stays frozen as built (DC-011…DC-013, DC-025…DC-028, DB-083), the light-stall findings H1/H2
 are DD-003/DD-002, no round script is alive (RUNBOOK §6, DB-010), the force-stop investigation
 stays closed (DB-051…DB-060), and Scorecard.dev is a run-once local input.
 
 ## Active work
 
-- **Shizuku helper reuse** — `docs/plans/SHIZUKU_HELPER_REUSE.md` (owner, 2026-10-26). The
-  helper stays bound (DE-001), JVM-tested only. Unit 2 is the owner's device check on the debug
-  install, after step 38b's preparation teaches it the DC-057 verdict.
-  [x] 0 plan · [x] 1 fix, tests, 1.15.2 / vc32 · [ ] 2 owner device check and close-out.
 - **Faster Shizuku paths and Android 17 display APIs** — `docs/plans/PRIVILEGED_FAST_PATHS.md`,
   spec only (owner, 2026-10-19). Unit 1 is the owner's Astra review. Units 2–13 wait until the
   owner's OnePlus 13 runs ColorOS 17, and each unit runs on the owner's go-ahead.
@@ -98,6 +95,9 @@ proposing work; changing it is legislation under RUNBOOK's rule-review protocol.
 
 Newest first; ledger rows are the durable detail.
 
+- 2026-10-26 — **Shizuku helper reuse closed: the owner passed DE-001 on 1.15.2-debug vc32 holding
+  the verdict, with one helper across the switches, 7308 K first, and a clean rebind after a
+  Shizuku restart (DE-003); plan deleted.**
 - 2026-10-26 — **Shizuku's helper now stays bound, so a return from a Night-Light-off profile no
   longer shows 4082 K for ~5 s; 1.15.2 / vc32, step 38b gains a debug-install case, JVM-tested
   only (DE-001). 1.15.1's fix missed on release because only the debug install, which lacked
