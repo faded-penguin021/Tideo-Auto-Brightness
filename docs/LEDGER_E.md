@@ -63,7 +63,7 @@
   with `remove = true`; a null or -1 answer keeps the helper, since it answered and a release
   would re-arm the race. The helper is `daemon(false)`, and the first call after a helper death
   can still time out once (accepted). JVM-tested against a fake that loses the bind as 13.1.5 does; on-device unverified.
-  Device-verified by DE-003.
+  Device-verified by DE-003. Liveness check amended by DE-004.
 - DE-002: **1.15.1's Night Light fix shipped as device-verified, but only the debug install
   was checked, and it did not take the release install's path, so the release still showed the
   wrong Kelvin first (owner, 2026-10-26).** DD-093 passed DD-090 on 1.15.1-debug vc31; that install
@@ -78,3 +78,10 @@
   `:aab_shell` PID stayed up across them.** After a Shizuku restart a new helper bound and the
   switches still landed 7308 K; leaving the circadian profile restored 2596 K (DC-056), and a
   force-stop of Tideo ended the helper (`daemon(false)`).
+- DE-004 [cited]: **The held helper's liveness check is `isBinderAlive`, a local read, never
+  `pingBinder` (Astra, PR #155).** `pingBinder` is a blocking IPC that DE-001 ran on the caller's
+  thread under the `serial` lock, outside the cancellable worker, so a helper that stayed alive but
+  stopped answering would hang every later Shizuku call. A helper that died before its death notice
+  arrives now costs that one call a null answer; the next call binds again. Not re-checked on device.
+  Shizuku's own server ping in `isUsable` and the bind and unbind still run on the caller's
+  thread, as before DE-001; a hung Shizuku server stays out of scope (Sol).

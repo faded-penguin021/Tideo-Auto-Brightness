@@ -95,6 +95,8 @@ proposing work; changing it is legislation under RUNBOOK's rule-review protocol.
 
 Newest first; ledger rows are the durable detail.
 
+- 2026-10-26 — **The held Shizuku helper is now checked locally, so a helper that stops answering
+  cannot hang every later Shizuku call; Astra's PR-time finding, JVM-tested only (DE-004).**
 - 2026-10-26 — **Shizuku helper reuse closed: the owner passed DE-001 on 1.15.2-debug vc32 holding
   the verdict, with one helper across the switches, 7308 K first, and a clean rebind after a
   Shizuku restart (DE-003); plan deleted.**

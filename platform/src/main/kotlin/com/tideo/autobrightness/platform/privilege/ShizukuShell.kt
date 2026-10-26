@@ -69,7 +69,7 @@ object ShizukuShell {
             return null
         }
         return withTimeoutOrNull(timeoutMs) {
-            val current = held?.takeIf { it.service.asBinder().pingBinder() }
+            val current = held?.takeIf { it.service.asBinder().isBinderAlive }
                 ?: run { release(appContext); connect(appContext) }
                 ?: return@withTimeoutOrNull null
             held = current

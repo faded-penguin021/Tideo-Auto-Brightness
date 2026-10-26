@@ -90,7 +90,8 @@ class ShizukuShellTest {
     private class FakeService : IShizukuUserService.Stub() {
         var alive = true
 
-        override fun pingBinder() = alive
+        override fun isBinderAlive() = alive
+        override fun pingBinder(): Boolean = error("DE-004: a blocking IPC outside the cancellable worker")
         override fun destroy() = Unit
         override fun grantWriteSecureSettings() = false
         override fun wifiStatus(): String? = null
