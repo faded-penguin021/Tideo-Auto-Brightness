@@ -18,8 +18,8 @@ android {
         // the change — RUNBOOK §6 "Cutting a release". `release-preflight.yml` (D-124) enforces this on PRs.
         // Per-version history is NOT kept here — see the docs/STATE.md Changelog, docs/LEDGER.md, and
         // fastlane/.../changelogs/<versionCode>.txt.
-        versionCode = 31
-        versionName = "1.15.1"
+        versionCode = 32
+        versionName = "1.15.2"
         manifestPlaceholders["appLabel"] = "Tideo Auto Brightness"
     }
 

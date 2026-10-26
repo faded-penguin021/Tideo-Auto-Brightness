@@ -1,0 +1,2 @@
+Fixes:
+- with Shizuku, returning to a profile with Night Light on no longer shows the device's own temperature for several seconds first; Tideo keeps its Shizuku helper running instead of restarting it for every call

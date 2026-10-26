@@ -13,7 +13,10 @@ battery sensors, OEM brightness range, Shizuku binder, and doze are only exercis
 each step's **Expected**; log any miss in `../STATE.md` → "Owner queue". Build + install the debug APK
 with `./gradlew :app:assembleDebug` → `app/build/outputs/apk/debug/app-debug.apk` (or grab a published
 build from Releases). Install it over adb (`adb install` or `e2e/run.sh --install`): Play Protect
-blocks a debug build opened from a file manager with "App not installed" (DD-081).
+blocks a debug build opened from a file manager with "App not installed" (DD-081). The debug
+install learns its own device facts in `display_prefs` (the DC-057 verdict, the display
+calibration), apart from the release install's; before a step that depends on one, make the debug
+install hold what the release install holds, or it may take a path the release never does (DE-002).
 
 Legend: **[BASIC]** needs only WRITE_SETTINGS · **[ELEVATED]** needs WRITE_SECURE_SETTINGS · **[opt]**
 optional.
@@ -588,6 +591,19 @@ Apply writes the device directly (`applyNow`). Debug builds need their own grant
     Apply (DD-091): service OFF, Night Light off with the key at a warm Kelvin; in Privileged
     Display turn Night Light on with a visibly cooler setpoint and Apply. **Expected:** Night Light
     comes on at the new setpoint, with no frame at the old one.
+    **With the key-ignoring verdict (DE-001).** On a build that ignores the key (DC-057), first
+    give the install the verdict with the app's own probe; a debug install works, so this runs
+    before a release: force-stop the app; with Shizuku running and the service OFF, open
+    Privileged Display, turn the extended range off, Apply an in-range Kelvin that differs from
+    the device's, wait 2 s, Apply a second different one, wait 2 s. `adb shell run-as
+    com.tideo.autobrightness.debug cat files/datastore/display_prefs.preferences_pb | grep -ac
+    night_light_key_not_honoured` prints 1. Restore A's and B's extended range, service ON, and do
+    about five context-rule switches B → A while polling `adb shell pidof
+    com.tideo.autobrightness.debug:aab_shell`. **Expected:** Night Light comes on at the day
+    temperature about 1 s after each switch, never a 4 s pause or a step at 4082 first, and one
+    `:aab_shell` PID stays up across them. Leaving A restores the device Kelvin (DC-056);
+    after a Shizuku restart the next switch binds a new helper and still lands the day value (one
+    4 s fallback right after it is accepted); a force-stop of Tideo ends the helper.
 39. **Panic resets the privileged keys (D-155).** With a profile holding grayscale + inversion +
     Night Light engaged (via context rule or Apply), fire the panic gesture (step 14).
     **Expected:** besides the SOS + max brightness + service stop, ALL display toggles return to

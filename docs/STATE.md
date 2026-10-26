@@ -13,11 +13,11 @@ adds super dimming and Privileged Display.
 ## Current state
 
 Harness AMH 15.1.0, scripts and hand-applied seed prose together (DD-066); the live ledger is
-`LEDGER_D.md`. **Release standing is NOT recorded here:** the session banner computes it
+`LEDGER_E.md`. **Release standing is NOT recorded here:** the session banner computes it
 (`scripts/session-facts.sh`, DC-030), settled by hand with
 `git ls-remote --tags --refs origin 'refs/tags/v*'`.
 
-The tree declares 1.15.1 / vc31 (the train paragraph under the Owner queue); 1.14.0's device
+The tree declares 1.15.2 / vc32 (the train paragraph under the Owner queue); 1.14.0's device
 round passed on 1.14.0-debug vc28 (DD-036), and step 38a's #145 check passed on 1.14.1-debug vc29
 with a brief warmer tint before the expected one (DD-065). The 0–4095 conversion
 path stays frozen as built (DC-011…DC-013, DC-025…DC-028, DB-083), the light-stall findings H1/H2
@@ -26,11 +26,10 @@ stays closed (DB-051…DB-060), and Scorecard.dev is a run-once local input.
 
 ## Active work
 
-- **Shizuku helper reuse** — `docs/plans/SHIZUKU_HELPER_REUSE.md`, spec only (owner,
-  2026-10-26). A bind right after a `remove = true` unbind hangs for the 4 s timeout, so a
-  return to a circadian profile shows 4082 K first on an install holding the DC-057 verdict.
-  The fix keeps the helper bound (owner). Each unit runs on the owner's go-ahead.
-  [x] 0 plan · [ ] 1 fix, tests, 1.15.2 / vc32 · [ ] 2 owner device check and close-out.
+- **Shizuku helper reuse** — `docs/plans/SHIZUKU_HELPER_REUSE.md` (owner, 2026-10-26). The
+  helper stays bound (DE-001), JVM-tested only. Unit 2 is the owner's device check on the debug
+  install, after step 38b's preparation teaches it the DC-057 verdict.
+  [x] 0 plan · [x] 1 fix, tests, 1.15.2 / vc32 · [ ] 2 owner device check and close-out.
 - **Faster Shizuku paths and Android 17 display APIs** — `docs/plans/PRIVILEGED_FAST_PATHS.md`,
   spec only (owner, 2026-10-19). Unit 1 is the owner's Astra review. Units 2–13 wait until the
   owner's OnePlus 13 runs ColorOS 17, and each unit runs on the owner's go-ahead.
@@ -86,10 +85,8 @@ stays closed (DB-051…DB-060), and Scorecard.dev is a run-once local input.
    `grep -rc 'ubuntu-24.04' .github/workflows/` prints 0 for every file, or a STATE changelog line
    records (b).
 
-**The tree declares `1.15.1` / vc31, seen tagged on 2026-10-26** (`git ls-remote --tags --refs
-origin 'refs/tags/v*'`), so this train owes one bump: the Shizuku helper-reuse plan's Unit 1
-makes it, 1.15.2 / vc32 with `changelogs/32.txt` (500-character cap). Never bump twice in one
-train.
+**The tree declares `1.15.2` / vc32, this train's one bump (DE-001)**; 1.15.1 was seen tagged on
+2026-10-26 (`git ls-remote --tags --refs origin 'refs/tags/v*'`). Never bump twice in one train.
 
 ## Decided non-items
 
@@ -101,6 +98,11 @@ proposing work; changing it is legislation under RUNBOOK's rule-review protocol.
 
 Newest first; ledger rows are the durable detail.
 
+- 2026-10-26 — **Shizuku's helper now stays bound, so a return from a Night-Light-off profile no
+  longer shows 4082 K for ~5 s; 1.15.2 / vc32, step 38b gains a debug-install case, JVM-tested
+  only (DE-001). 1.15.1's fix missed on release because only the debug install, which lacked
+  the verdict, was checked; device checks now give it the release install's learned facts first
+  (DE-002, owner).**
 - 2026-10-26 — **Shizuku helper-reuse plan revised after Sol's review: the lost connect is the
   client's cached connection (read from 13.1.5's bytecode), any failure releases the binding, and
   the device check runs on the debug install once its own probe has learned the verdict (owner).**

@@ -18,14 +18,19 @@ import kotlin.coroutines.resume
 object ShizukuShell {
     private const val BIND_TIMEOUT_MS = 4_000L
 
-    // DD-077: one service identity, and each call unbinds it with remove = true, so calls never overlap.
-    private val serial = Mutex()
-
-    private fun isUsable(): Boolean = try {
-        Shizuku.pingBinder() && Shizuku.checkSelfPermission() == PackageManager.PERMISSION_GRANTED
-    } catch (_: Throwable) {
-        false
+    internal interface UserServiceBinding {
+        fun isUsable(): Boolean
+        fun bind(context: Context, connection: ServiceConnection)
+        fun unbind(context: Context, connection: ServiceConnection)
     }
+
+    internal var binding: UserServiceBinding = ShizukuBinding
+
+    private class Held(val connection: ServiceConnection, val service: IShizukuUserService)
+
+    // DE-001: one binding, held while it answers and released on any failure; calls never overlap.
+    private val serial = Mutex()
+    private var held: Held? = null
 
     enum class ReadOperation { WIFI_STATUS, FORCE_DARK, DISPLAY_BRIGHTNESS }
 
@@ -56,50 +61,79 @@ object ShizukuShell {
         context: Context,
         timeoutMs: Long = BIND_TIMEOUT_MS,
         operation: (IShizukuUserService) -> T?,
-    ): T? = serial.withLock { callExclusive(context, timeoutMs, operation) }
+    ): T? = serial.withLock { callExclusive(context.applicationContext, timeoutMs, operation) }
 
-    private suspend fun <T : Any> callExclusive(context: Context, timeoutMs: Long, operation: (IShizukuUserService) -> T?): T? {
-        if (!isUsable()) return null
-        val appContext = context.applicationContext
-        val args = Shizuku.UserServiceArgs(
-            ComponentName(appContext.packageName, ShizukuUserService::class.java.name),
+    private suspend fun <T : Any> callExclusive(appContext: Context, timeoutMs: Long, operation: (IShizukuUserService) -> T?): T? {
+        if (!binding.isUsable()) {
+            release(appContext)
+            return null
+        }
+        return withTimeoutOrNull(timeoutMs) {
+            val current = held?.takeIf { it.service.asBinder().pingBinder() }
+                ?: run { release(appContext); connect(appContext) }
+                ?: return@withTimeoutOrNull null
+            held = current
+            var answered = false
+            try {
+                val out = onWorker { operation(current.service) }
+                answered = out.isSuccess
+                out.getOrNull()
+            } finally {
+                if (!answered) release(appContext)
+            }
+        }
+    }
+
+    private fun release(appContext: Context) {
+        val released = held ?: return
+        held = null
+        runCatching { binding.unbind(appContext, released.connection) }
+    }
+
+    private suspend fun connect(appContext: Context): Held? = suspendCancellableCoroutine { cont ->
+        val connection = object : ServiceConnection {
+            override fun onServiceConnected(name: ComponentName?, binder: IBinder?) {
+                if (binder != null && cont.isActive) cont.resume(Held(this, IShizukuUserService.Stub.asInterface(binder)))
+            }
+
+            override fun onServiceDisconnected(name: ComponentName?) {}
+        }
+        // D-145: a bind that never connects would otherwise stay registered forever.
+        cont.invokeOnCancellation { runCatching { binding.unbind(appContext, connection) } }
+        try {
+            binding.bind(appContext, connection)
+        } catch (_: Throwable) {
+            runCatching { binding.unbind(appContext, connection) }
+            if (cont.isActive) cont.resume(null)
+        }
+    }
+
+    /** Off the caller's thread, so a timeout returns while a binder call is still blocked. */
+    private suspend fun <T> onWorker(block: () -> T): Result<T> = suspendCancellableCoroutine { cont ->
+        thread(name = "shizuku-shell") {
+            val out = runCatching(block)
+            if (cont.isActive) cont.resume(out)
+        }
+    }
+
+    private object ShizukuBinding : UserServiceBinding {
+        override fun isUsable(): Boolean = try {
+            Shizuku.pingBinder() && Shizuku.checkSelfPermission() == PackageManager.PERMISSION_GRANTED
+        } catch (_: Throwable) {
+            false
+        }
+
+        override fun bind(context: Context, connection: ServiceConnection) = Shizuku.bindUserService(args(context), connection)
+
+        override fun unbind(context: Context, connection: ServiceConnection) =
+            Shizuku.unbindUserService(args(context), connection, true)
+
+        private fun args(context: Context) = Shizuku.UserServiceArgs(
+            ComponentName(context.packageName, ShizukuUserService::class.java.name),
         )
             .processNameSuffix("aab_shell")
             .debuggable(false)
+            .daemon(false)
             .version(4)
-
-        return withTimeoutOrNull(timeoutMs) {
-            suspendCancellableCoroutine { cont ->
-                val connection = object : ServiceConnection {
-                    override fun onServiceConnected(name: ComponentName?, binder: IBinder?) {
-                        // Run off callback thread; `this` is the ServiceConnection (not shadowed by thread{}).
-                        thread(name = "shizuku-shell") {
-                            val out = try {
-                                if (binder == null || !binder.pingBinder()) {
-                                    null
-                                } else {
-                                    operation(IShizukuUserService.Stub.asInterface(binder))
-                                }
-                            } catch (_: Throwable) {
-                                null
-                            } finally {
-                                runCatching { Shizuku.unbindUserService(args, this, true) }
-                            }
-                            if (cont.isActive) cont.resume(out)
-                        }
-                    }
-
-                    override fun onServiceDisconnected(name: ComponentName?) {}
-                }
-                // Unbind on the timeout too (D-145): a bind that never connects would otherwise stay
-                // registered forever. Idempotent vs the onServiceConnected finally-unbind (runCatching).
-                cont.invokeOnCancellation { runCatching { Shizuku.unbindUserService(args, connection, true) } }
-                try {
-                    Shizuku.bindUserService(args, connection)
-                } catch (_: Throwable) {
-                    if (cont.isActive) cont.resume(null)
-                }
-            }
-        }
     }
 }

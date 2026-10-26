@@ -132,7 +132,7 @@ pointer in the faster-Shizuku plan's Unit 6.
   row's one-line pointer.
 - **Comment budget.** No pre-approval. Any `platform` raise is a rule change and needs a rule
   review.
-- **Ledger.** New row **DD-094 [cited]**: the cause measured above and the held binding.
+- **Ledger.** New row **DE-001 [cited]**: the cause measured above and the held binding.
   It reopens DD-077's per-call `remove = true` and DC-057's per-operation binding. Append a
   pointer line to each of those two rows.
 - **Device steps.** Extend step 38b in `docs/rebuild/DEVICE_TEST_SCRIPT.md` with a case on an

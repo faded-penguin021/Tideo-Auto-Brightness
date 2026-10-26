@@ -847,6 +847,7 @@
   stamped with `Build.FINGERPRINT` like the Night Light verdict (DD-048), outside every profile, and
   Shizuku's runtime uses become four. AAB's reference is DD-078, and the port's deviations from it
   are DD-079 and DD-080.
+  Per-call `remove = true` unbind superseded by DE-001.
 - DD-078: **AAB's HBM readout and display calibration, as handed over in the hand-off export
   (`dist/aab-bright-light-handoff/`, removed by the plan's unit 6).** Profile `High Brightness
   Updates` (Tick 2000 ms while `%AAB_AdaptiveHandoff` is 1, `%AAB_Service` is On,
@@ -1003,3 +1004,4 @@
   load is noticeable and accepted (DD-090's trade-off). A service stop put the device Kelvin back
   and Night Light off (DD-059), and a start switched it on quickly (DD-060). Not run: step 38a,
   38b's manual load and DD-091's screen Apply, which stays on-device unverified.
+  Corrected by DE-002.
