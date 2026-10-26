@@ -85,3 +85,17 @@
   arrives now costs that one call a null answer; the next call binds again. Not re-checked on device.
   Shizuku's own server ping in `isUsable` and the bind and unbind still run on the caller's
   thread, as before DE-001; a hung Shizuku server stays out of scope (Sol).
+- DE-005: **On a Pixel the display calibration (DD-079) cannot pass, because manual brightness
+  stops at the panel's High Brightness Mode transition point, so the sweep's top levels read one
+  value; the failure then blames the DUMP grant (a reporter's `dumpsys display`, relayed by the
+  owner, 2026-10-26).** The dump's brightness event log holds the sweep: `screen_brightness` 1 to
+  150 gave 0.0 to 0.5866142 on the 0–1 float scale, `(level − 1) / 254`, while 175 and 200 both
+  gave 0.63 with `unclampedBrt` 0.685 and 0.783 under `hbmMax=0.63` (`mHbmData` transition 0.63,
+  `minLux` 10000), and the restore came 3.3 s after 200 was written, as the 3 s window expired.
+  The sweep accepts a point only on a stable reading, so its ten points show a read source
+  answered; every failure stores AAB's one `error` (DD-078), which the flash and the card both
+  word as a missing DUMP grant. Any setting above about 161 shows 0.63 on this panel, Tideo's own
+  curve included, and only Adaptive Brightness at 10 000 lx or more may pass it
+  (`mIsHbmAllowed=false` in manual); below that, Adaptive is capped at 0.377495 under 1000 lx and
+  0.5353106 under 6000 lx. The dump names neither the model nor the build, so it is not shown to
+  be DD-087's crDroid Pixel 9 Pro.
