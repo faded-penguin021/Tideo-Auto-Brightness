@@ -99,3 +99,14 @@
   (`mIsHbmAllowed=false` in manual); below that, Adaptive is capped at 0.377495 under 1000 lx and
   0.5353106 under 6000 lx. The dump names neither the model nor the build, so it is not shown to
   be DD-087's crDroid Pixel 9 Pro.
+- DE-006: **On DE-005's Pixel, `screen_brightness` is linear in light while Android's slider is
+  perceptual, so Tideo's lowest step skips the dark range: setting 1 is 0 % of the slider at
+  2 nits and setting 2 is already 14 % at about 8 nits (owner, 2026-10-26, from
+  AdvancedAutoBrightness issue 26, whose body was not read here).** The dump's manual events give
+  the float as `(setting − 1) / 254` and nits as about 2 + 1584 × float, and their slider
+  percentages match AOSP's HLG gamma curve from 0 to the 0.63 ceiling at every logged point
+  (setting 4 at 24 %, 5 at 27 %, 15 at 51 %, 100 at 91 %, 150 at 99 %). From that curve, settings
+  2, 3 and 14 sit at 14, 19 and 49 % and 161 at 100 %, so half the slider lies between settings 1
+  and 14, and 162 to 255 add nothing. Under Adaptive Brightness the slider's top falls to
+  0.377495 below 1000 lx, so a float shows higher there: 0.010567754 is 22 % in manual, 29 % in
+  auto. No integer setting reaches between 2 and 8 nits; only a float write can.

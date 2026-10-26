@@ -40,7 +40,8 @@ stays closed (DB-051…DB-060), and Scorecard.dev is a run-once local input.
   [x] 0 plan · [ ] 1 dimming readout · [ ] 2 brightness labels · [ ] 3 PWM dimming chart ·
   [ ] 4 `keepGlobalsFrom` · [ ] 5 formula dedups · [ ] 6 engine `dimDynamic` · [ ] 7 AGENTS.md rule · [ ] 8 close-out.
 - **Pixel display calibration** — `docs/plans/DISPLAY_CALIBRATION_CEILING.md`, spec only (owner,
-  2026-10-26; DE-005). D1–D3 are open (Owner queue 4), and each unit runs on the owner's go-ahead.
+  2026-10-26; DE-005, DE-006). D1 is decided (a); D2–D3 are open (Owner queue 4), and each unit
+  runs on the owner's go-ahead.
   [x] 0 plan · [ ] 1 sweep accepts a ceiling · [ ] 2 readout above a ceiling · [ ] 3 failure
   causes · [ ] 4 device checks and close-out.
 
@@ -86,17 +87,16 @@ stays closed (DB-051…DB-060), and Scorecard.dev is a run-once local input.
    `grep -rc 'ubuntu-24.04' .github/workflows/` prints 0 for every file, or a STATE changelog line
    records (b).
 
-4. **[2026-10-26] Decide the Pixel calibration plan's three questions before its Unit 1.** A
-   Pixel's calibration fails because manual brightness stops at 0.63, so the top levels read the
-   same, and the failure then wrongly blames DUMP (DE-005). D1: (a) accept that ceiling at the top
-   of the sweep, (b) keep AAB's rule, so Pixels never calibrate, or (c) read the ceiling from
-   extra dump lines. D2: the readout in High Brightness Mode (HBM) on such a panel, as (a) AAB's
-   slope, up to ~1150, (b) proportional to the ceiling, up to ~405, or (c) proportional on every
-   panel. D3: (a) a message per cause, (b) one neutral message, or (c) unchanged.
-   Recommendation: D1 (a), D2 (b), D3 (a); reasons in the plan's Owner decisions. Unverified until
-   you answer; settles it: `grep -c '^## Owner decisions (open)'
-   docs/plans/DISPLAY_CALIBRATION_CEILING.md` prints 0 (retitled once all three are decided), or
-   the plan is gone.
+4. **[2026-10-26] Decide the Pixel calibration plan's two remaining questions before its Units 2
+   and 3.** A Pixel's calibration fails because manual brightness stops at 0.63, so the top
+   levels read the same, and the failure then wrongly blames DUMP (DE-005). You decided D1 (a):
+   accept that ceiling, since the value above which High Brightness Mode (HBM) is on is what
+   matters. D2: the readout in HBM on such a panel, as (a) AAB's slope, up to ~1150,
+   (b) proportional to the ceiling, up to ~405, or (c) proportional on every panel. D3: (a) a
+   message per cause, (b) one neutral message, or (c) unchanged. Recommendation: D2 (b), D3 (a);
+   reasons in the plan's Owner decisions. Unverified until you answer; settles it:
+   `grep -c '^## Owner decisions (open)' docs/plans/DISPLAY_CALIBRATION_CEILING.md` prints 0
+   (retitled once D2 and D3 are decided), or the plan is gone.
 
 **The tree declares `1.15.2` / vc32, this train's one bump (DE-001)**; 1.15.1 was seen tagged on
 2026-10-26 (`git ls-remote --tags --refs origin 'refs/tags/v*'`). Never bump twice in one train.
@@ -111,6 +111,10 @@ proposing work; changing it is legislation under RUNBOOK's rule-review protocol.
 
 Newest first; ledger rows are the durable detail.
 
+- 2026-10-26 — **Pixel calibration plan: D1 decided (a), the HBM threshold being what matters;
+  AdvancedAutoBrightness issue 26's dark-end gap measured on the same Pixel, setting 2 already at
+  14 % of the slider, and routed to the faster-Shizuku plan's float-write unit (DE-006); the
+  owner's `cmd display get-brightness` sunlight probe and how to read it added (owner).**
 - 2026-10-26 — **Planned the Pixel display calibration fix: a reporter's dump shows the reads
   worked and the sweep stalled at the 0.63 manual ceiling, then blamed DUMP (DE-005); the plan
   accepts a ceiling at the top, reads HBM above it in proportion and names each failure's cause.

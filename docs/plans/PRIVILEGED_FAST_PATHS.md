@@ -327,6 +327,9 @@ becomes a new DD row in the unit that acts on it:
 - This runs only if F8 is yes and the owner reopens DC-026. Otherwise it's dropped.
 - First, measure on the phone how the percentage maps to the shell's `screen_brightness`. If the
   mapping isn't monotonic and precise, drop the unit.
+  - A Pixel's mapping is already measured (DE-006): AOSP's HLG gamma curve up to the manual
+    ceiling, with setting 2 already at 14 % of the slider. AdvancedAutoBrightness issue 26
+    reports the same gap.
 - Animation frames *between* Tasker-domain endpoints use the public
   `setBrightness(…, BRIGHTNESS_UNIT_PERCENTAGE)`, which BASIC can call. Endpoints keep today's
   exact domain write.

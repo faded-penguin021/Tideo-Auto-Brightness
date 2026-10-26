@@ -6,8 +6,8 @@
   the Pixel whose display calibration fails with "grant the DUMP permission", and authorised
   **Unit 0 only**: this file, ledger row DE-005 and the STATE entries. Every later unit needs the
   owner's go-ahead.
-- Owner decisions D1–D3 below are **open**. Each has a recommendation. Unit 1 waits on D1, and
-  Units 2 and 3 wait on D2 and D3.
+- **D1 is decided: (a)** (owner, 2026-10-26). D2 and D3 below are open, each with a
+  recommendation. Unit 1 waits only on the owner's go-ahead, and Units 2 and 3 wait on D2 and D3.
 - Evidence: a reporter's `dumpsys display`, relayed by the owner, read against
   `DisplayCalibrationRun`, `DisplayCalibration` and `DisplayBrightnessDump` at `3512908`
   (DE-005).
@@ -64,6 +64,10 @@ Two defects, in three units:
 - **Why the ceiling must map to 255.** The readout's contract is "above 255 means High Brightness
   Mode" (`help_handoff_calibration`, `handoff_calibration_note_calibrated`). The ceiling is where
   that mode starts, so it must read exactly 255.
+- **The threshold is what matters** (the owner's condition for D1). The stored 255 point's raw is
+  the value above which High Brightness Mode is on: 0.63 on this Pixel, 4095 on the owner's
+  OnePlus (DD-081). Collapsing the repeated readings onto 255 keeps the stored points strictly
+  rising, so the format and `decode` do not change.
 - **Why level 128.** It is the middle of the range.
   - The existing flat-panel test (`min(level, 100) × 16`, flat from 128 after 100) still fails.
   - A thermal clamp sits lower. This Pixel's first throttling step caps it at 0.3806513, about
@@ -164,10 +168,51 @@ Two defects, in three units:
   - "Deliberately left alone" has a lasting home: DE-005 already holds the curve-ceiling fact.
   - Remove the STATE checklist and delete this file.
 
+## Inputs that may add work
+
+### The owner's sunlight probe
+
+The owner will log, every 2 s in bright light under Adaptive Brightness on the OnePlus,
+`cmd display get-brightness 0`, the setting, `mScreenBrightness` and
+`mCachedBrightnessInfo.brightness`. Tideo must be off or handed off, or it switches the mode back
+to MANUAL. Adding `mode=$(settings get system screen_brightness_mode)` to each line shows that.
+
+- **`get` matches `mScreenBrightness` on every line, above 4095 too.** Then `get-brightness` is a
+  cheap source on this phone for root and Shizuku: one binder call, not a full dump. It would be
+  a new unit here or join faster-Shizuku Unit 7.
+- **`get` stays at or below 4095 while `mScreenBrightness` passes it.** Then it reads the setting,
+  not the panel, and is no source for the readout.
+- **`mCachedBrightnessInfo.brightness` passes 4095 with the panel.** Then BrightnessInfo
+  (faster-Shizuku Unit 7) carries High Brightness Mode on this phone.
+- **It cannot be assumed elsewhere.**
+  - In AOSP, `getBrightness` returns the display's brightness setting, not what Adaptive
+    Brightness applies. OPlus writes its auto value into the setting (DD-083), which is why it
+    can track on the OnePlus.
+  - On the Pixel at setting 200, `unclampedBrt` was 0.783 while the panel showed 0.63 (DE-005),
+    so a calibration read through the setting would likely miss the ceiling.
+  - A `get-brightness` source must therefore be adopted per device on evidence. A calibration
+    must record its source with its field and never be read through another.
+  - DUMP-only users keep dumpsys. `get-brightness` needs `CONTROL_DISPLAY_BRIGHTNESS`, which the
+    shell has and an app does not.
+
+### Low brightness on the 0–255 scale (AdvancedAutoBrightness issue 26)
+
+- The same Pixel's dump measures it (DE-006):
+  - `screen_brightness` is linear in light, about 6 nits per step;
+  - the slider is perceptual, following AOSP's HLG gamma curve up to the ceiling;
+  - setting 1 is 0 % of the slider at 2 nits, and setting 2 is already 14 % at about 8 nits;
+  - half the slider lies between settings 1 and 14.
+- No integer setting reaches between 2 and 8 nits, so neither this plan nor a new Tideo
+  conversion can fix it. It needs a float write, which is faster-Shizuku Unit 12 ("Finer
+  brightness steps", which reopens DC-026). DE-006 is the measurement that unit's first step asks
+  for, on a Pixel.
+
 ## Owner decisions (open)
 
-1. **D1. Accept a ceiling at the top of the sweep?**
-   - (a) **Recommended.** Unit 1 as written. Pixels, and any panel whose manual range stops below
+1. **D1. Accept a ceiling at the top of the sweep?** **Decided: (a)** (owner, 2026-10-26:
+   repeated 0.63 readings break the rising-readings assumption, "That's fine. As long as we know
+   the value above which we can assume hbm to be activated").
+   - (a) Unit 1 as written. Pixels, and any panel whose manual range stops below
      its High Brightness Mode range, can calibrate. Nothing changes where the sweep passes today.
    - (b) Keep AAB's rule. These panels never calibrate, and the readout stays the setting, at
      most 255 (DD-080). Record it in Decided non-items, and still do Unit 3 so the message stops
@@ -199,6 +244,8 @@ Two defects, in three units:
 - **Calibrating under Adaptive Brightness.** No: the sweep never writes the mode (DD-079).
 - **The interpolation between the last rising point and the ceiling** (Unit 1, "Known
   approximation").
+- **Low-brightness resolution** (DE-006). It belongs to faster-Shizuku Unit 12; see "Inputs that
+  may add work".
 
 ## Relation to other plans
 
@@ -226,7 +273,6 @@ Two defects, in three units:
 - **Version.** Unit 1 carries the train's one version bump by playbook 6: a patch, expected to be
   1.15.3 / vc33. Check the live tags first, and never bump twice in one train.
 - **Decisions reshape units.**
-  - D1 (b) drops Units 1 and 2.
   - D2 (a) drops Unit 2.
   - D3 (b) or (c) reshapes or drops Unit 3.
 - **Comment budget.** A raise is a rule change and is asked for first.
