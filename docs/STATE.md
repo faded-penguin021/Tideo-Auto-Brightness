@@ -101,6 +101,9 @@ proposing work; changing it is legislation under RUNBOOK's rule-review protocol.
 
 Newest first; ledger rows are the durable detail.
 
+- 2026-10-26 — **Shizuku helper-reuse plan revised after Sol's review: the lost connect is the
+  client's cached connection (read from 13.1.5's bytecode), any failure releases the binding, and
+  the device check runs on the debug install once its own probe has learned the verdict (owner).**
 - 2026-10-26 — **Planned the Shizuku helper reuse: on return from a Night-Light-off profile the
   anchor read and the Kelvin write bind twice, and the second bind hangs 4 s, so Night Light
   shows 4082 K before 7308 K (owner's release install, measured over adb); the fix keeps the
