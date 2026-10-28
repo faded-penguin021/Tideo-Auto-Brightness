@@ -60,9 +60,10 @@ API 36 also added `EVENT_TYPE_DISPLAY_STATE`, but nothing in Tideo needs it. Com
 **OxygenOS 16 priors, re-measured in Unit 2.**
 - DD-083: `BrightnessInfo` floats are in panel units (755 of 4095). OPlus's own auto controller
   is in charge, and AOSP's HBM controller is idle. The brightness setting tracks auto mode.
-- DE-007: in sunlight, BrightnessInfo's brightness, the setting and `cmd display get-brightness`
-  all stop at 4095 while `mScreenBrightness` goes on to 4174. So on OxygenOS 16, BrightnessInfo
-  does not carry High Brightness Mode, and the setting tracks auto only up to 4095.
+- DE-007: in sunlight, handed off (DE-008), BrightnessInfo's brightness, the setting and
+  `cmd display get-brightness` all stop at 4095 while `mScreenBrightness` goes on to 4174. So
+  on OxygenOS 16, BrightnessInfo does not carry High Brightness Mode, and the setting tracks
+  auto only up to 4095.
 - DC-025: apps see 0–255 while the shell sees 0–4095.
 - DC-054: the shell holds `CONTROL_DISPLAY_COLOR_TRANSFORMS`.
 - DC-057 and DC-058: Night Light goes through `color_display`; Shizuku posts bind callbacks to

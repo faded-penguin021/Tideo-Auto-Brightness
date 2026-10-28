@@ -122,3 +122,9 @@
   follow it. This adds no unit to the Pixel calibration plan, and gates the faster-Shizuku plan's
   BrightnessInfo source on a sunlight re-measurement under ColorOS 17, since on this build it
   would cap the readout at 255 and DD-081's flash would never fire.
+  Its mode, AUTOMATIC under Tideo's hand-off: DE-008.
+- DE-008: **DE-007's probe ran with Tideo running and handed off to Adaptive Brightness above
+  65 000 lx (owner, 2026-10-28), so Android was in AUTOMATIC under the hand-off (DD-073), the
+  state in which the HBM readout runs (DD-077).** The setting that followed the panel up to 4095
+  was therefore OPlus's auto value (DD-083), and `get-brightness` and BrightnessInfo stop at 4095
+  exactly where the readout needs them. The build was still not logged.

@@ -112,9 +112,10 @@ proposing work; changing it is legislation under RUNBOOK's rule-review protocol.
 Newest first; ledger rows are the durable detail.
 
 - 2026-10-28 — **The owner's sunlight probe settles the calibration plan's `get-brightness`
-  input: on the OnePlus, `get-brightness`, the setting and BrightnessInfo stop at 4095 while the
-  panel passes it, so `dumpsys display` stays the readout's source and that plan gains no unit;
-  faster-Shizuku Unit 7 now waits on a sunlight re-check under ColorOS 17 (DE-007, owner).**
+  input: on the OnePlus, handed off above 65 000 lx, `get-brightness`, the setting and
+  BrightnessInfo stop at 4095 while the panel passes it, so `dumpsys display` stays the readout's
+  source and that plan gains no unit; faster-Shizuku Unit 7 now waits on a sunlight re-check
+  under ColorOS 17 (DE-007, DE-008, owner).**
 - 2026-10-26 — **Pixel calibration plan: D1 decided (a), the HBM threshold being what matters;
   AdvancedAutoBrightness issue 26's dark-end gap measured on the same Pixel, setting 2 already at
   14 % of the slider, and routed to the faster-Shizuku plan's float-write unit (DE-006); the

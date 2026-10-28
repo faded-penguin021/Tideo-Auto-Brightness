@@ -180,7 +180,8 @@ Two defects, in three units:
   `dumpsys display` stays the source and this plan gains no unit.
 - **BrightnessInfo does not carry High Brightness Mode on this phone either.** That gates
   faster-Shizuku Unit 7, not this plan (see "Relation to other plans").
-- The mode was not logged. Whatever drove the panel past 4095, the other three did not follow it.
+- Tideo was running, handed off to Adaptive Brightness above 65 000 lx (DE-008). That is the
+  state in which the readout runs.
 
 ### Low brightness on the 0–255 scale (AdvancedAutoBrightness issue 26)
 
