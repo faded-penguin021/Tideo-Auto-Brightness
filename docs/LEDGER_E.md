@@ -110,3 +110,15 @@
   and 14, and 162 to 255 add nothing. Under Adaptive Brightness the slider's top falls to
   0.377495 below 1000 lx, so a float shows higher there: 0.010567754 is 22 % in manual, 29 % in
   auto. No integer setting reaches between 2 and 8 nits; only a float write can.
+- DE-007: **In sunlight on the owner's OnePlus, `cmd display get-brightness 0`, `screen_brightness`
+  and `mCachedBrightnessInfo.brightness` stop at 4095 while `mScreenBrightness` passes it, so
+  neither `get-brightness` nor BrightnessInfo reads High Brightness Mode there and `dumpsys
+  display` stays the readout's source (owner's 2 s probe, 2026-10-28).** Over 20 s all four rose
+  together from 1734.0 to 3019.0, `get` reporting the setting's 0–4095 value; from the fourth
+  sample the three held 4095.0 while `mScreenBrightness` climbed from 4111.0 to 4174.0, within
+  DD-083's 4674 range maximum. So the setting tracks Adaptive Brightness (DD-083) only up to the
+  normal maximum, and `get-brightness` returns that setting, as AOSP's `getBrightness` does. The
+  mode and the build were not logged; whatever drove the panel past 4095, the other three did not
+  follow it. This adds no unit to the Pixel calibration plan, and gates the faster-Shizuku plan's
+  BrightnessInfo source on a sunlight re-measurement under ColorOS 17, since on this build it
+  would cap the readout at 255 and DD-081's flash would never fire.

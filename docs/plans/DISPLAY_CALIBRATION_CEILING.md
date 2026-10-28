@@ -170,30 +170,17 @@ Two defects, in three units:
 
 ## Inputs that may add work
 
-### The owner's sunlight probe
+### The owner's sunlight probe: settled, no unit (DE-007)
 
-The owner will log, every 2 s in bright light under Adaptive Brightness on the OnePlus,
-`cmd display get-brightness 0`, the setting, `mScreenBrightness` and
-`mCachedBrightnessInfo.brightness`. Tideo must be off or handed off, or it switches the mode back
-to MANUAL. Adding `mode=$(settings get system screen_brightness_mode)` to each line shows that.
-
-- **`get` matches `mScreenBrightness` on every line, above 4095 too.** Then `get-brightness` is a
-  cheap source on this phone for root and Shizuku: one binder call, not a full dump. It would be
-  a new unit here or join faster-Shizuku Unit 7.
-- **`get` stays at or below 4095 while `mScreenBrightness` passes it.** Then it reads the setting,
-  not the panel, and is no source for the readout.
-- **`mCachedBrightnessInfo.brightness` passes 4095 with the panel.** Then BrightnessInfo
-  (faster-Shizuku Unit 7) carries High Brightness Mode on this phone.
-- **It cannot be assumed elsewhere.**
-  - In AOSP, `getBrightness` returns the display's brightness setting, not what Adaptive
-    Brightness applies. OPlus writes its auto value into the setting (DD-083), which is why it
-    can track on the OnePlus.
-  - On the Pixel at setting 200, `unclampedBrt` was 0.783 while the panel showed 0.63 (DE-005),
-    so a calibration read through the setting would likely miss the ceiling.
-  - A `get-brightness` source must therefore be adopted per device on evidence. A calibration
-    must record its source with its field and never be read through another.
-  - DUMP-only users keep dumpsys. `get-brightness` needs `CONTROL_DISPLAY_BRIGHTNESS`, which the
-    shell has and an app does not.
+- **What it showed.** The owner logged ten 2 s samples on the OnePlus in sunlight (2026-10-28).
+  - All four values rose together from 1734 to 3019.
+  - Then `get`, the setting and `mCachedBrightnessInfo.brightness` held 4095.0 while
+    `mScreenBrightness` rose from 4111.0 to 4174.0.
+- **`get-brightness` reads the setting, not the panel.** It is no source for the readout, so
+  `dumpsys display` stays the source and this plan gains no unit.
+- **BrightnessInfo does not carry High Brightness Mode on this phone either.** That gates
+  faster-Shizuku Unit 7, not this plan (see "Relation to other plans").
+- The mode was not logged. Whatever drove the panel past 4095, the other three did not follow it.
 
 ### Low brightness on the 0–255 scale (AdvancedAutoBrightness issue 26)
 
@@ -253,6 +240,8 @@ to MANUAL. Adding `mode=$(settings get system screen_brightness_mode)` to each l
   `DisplayBrightnessReader` and the sweep's polling.
   - BrightnessInfo's brightness also stops at the transition point in manual mode
     (`mCachedBrightnessInfo.brightnessMax=0.63` here), so Unit 1's rule stays needed there.
+  - On the owner's OnePlus in sunlight it stops at 4095 while the panel passes it (DE-007), so
+    that unit is gated on a sunlight re-measurement under ColorOS 17.
   - Whichever plan lands second rebases on the other.
 - **Light refactor, Unit 1** changes what `dimming.disengage()` publishes. The sweep calls it but
   is not changed by it.
