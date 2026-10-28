@@ -29,7 +29,7 @@ jobs:
   clean:
     permissions:
       contents: write  # needed to push the removal commit
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 10  # quick git op; cap a hang
     steps:
       - name: Checkout

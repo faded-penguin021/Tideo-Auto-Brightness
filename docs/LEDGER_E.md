@@ -128,3 +128,16 @@
   state in which the HBM readout runs (DD-077).** The setting that followed the panel up to 4095
   was therefore OPlus's auto value (DD-083), and `get-brightness` and BrightnessInfo stop at 4095
   exactly where the readout needs them. The build was still not logged.
+- DE-009 [cited]: **All nine workflows move from `ubuntu-24.04` to `ubuntu-26.04`, still an exact
+  image and never `ubuntu-latest`, on 2026-10-28 while GitHub's `latest` rollout still runs (owner's
+  queue answer (a), timed by the owner; DD-068).** The change is the twelve `runs-on` labels and
+  `build.yml`'s pin comment, nothing else in the workflows, and its acceptance is RUNBOOK §8's: full
+  CI green on the PR on 26.04 (`Build`, CodeQL, Release preflight and the four `F-Droid
+  compatibility` jobs), the reproducibility job above all. `release.yml`, `release-signing.yml`,
+  `clean-dist.yml` and `translation-badges.yml` run only on a tag, a dispatch or `main`, and
+  `redirect-external-prs.yml` runs the base branch's copy, so no PR runs them on the new image; of
+  the preinstalled tools they lean on, `gh` and the SDK's `apksigner` (`release.yml`), `apksigner`
+  (`release-signing.yml`) and `python3` (`translation-badges.yml`) first run there after the merge,
+  while `fdroid-compat.yml`'s `pipx`, `docker`, `sudo` and apt run on the PR. The reproducibility
+  job compares entry contents, not zip framing, which is where a host image would differ, so the
+  first release's F-Droid verification is the full proof.

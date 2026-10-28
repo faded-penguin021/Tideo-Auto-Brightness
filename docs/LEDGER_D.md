@@ -701,6 +701,7 @@
   two runs of one commit, a release among them, could land on different images. The JDK and the
   Gradle inputs do not depend on the image, but the preinstalled SDK, Python, pipx and apt do;
   the move to 26.04 is a later change of its own, accepted when `fdroid-compat.yml` is green on it.
+  Superseded by DE-009.
 - DD-069 [cited]: **`DraftSettingsViewModelTest`'s intermittent CI hang (run 38039291255 on `main`)
   was a DataStore write wedged by an earlier test; fixed in the test only.** DataStore 1.1.1 holds
   its write lock while it runs a transform in the caller's context, so `apply()`'s write from
