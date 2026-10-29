@@ -60,6 +60,10 @@ API 36 also added `EVENT_TYPE_DISPLAY_STATE`, but nothing in Tideo needs it. Com
 **OxygenOS 16 priors, re-measured in Unit 2.**
 - DD-083: `BrightnessInfo` floats are in panel units (755 of 4095). OPlus's own auto controller
   is in charge, and AOSP's HBM controller is idle. The brightness setting tracks auto mode.
+- DE-007: in sunlight, handed off (DE-008), BrightnessInfo's brightness, the setting and
+  `cmd display get-brightness` all stop at 4095 while `mScreenBrightness` goes on to 4174. So
+  on OxygenOS 16, BrightnessInfo does not carry High Brightness Mode, and the setting tracks
+  auto only up to 4095.
 - DC-025: apps see 0–255 while the shell sees 0–4095.
 - DC-054: the shell holds `CONTROL_DISPLAY_COLOR_TRANSFORMS`.
 - DC-057 and DC-058: Night Light goes through `color_display`; Shizuku posts bind callbacks to
@@ -162,7 +166,8 @@ becomes a new DD row in the unit that acts on it:
     Each must read `granted=true`. This gates Units 5, 7, 10 and 11.
   - F4 `dumpsys display | grep -E 'mCachedBrightnessInfo|mUserDisabledHdrTypes|mAreUserDisabledHdrTypesAllowed|HdrCapabilities|AutomaticBrightness'`.
     It shows whether BrightnessInfo tracks the panel, whether the HDR fields exist, and which
-    auto controller runs. This gates Units 7 and 11 and re-checks the exclusions.
+    auto controller runs. This gates Units 7 and 11 and re-checks the exclusions. For Unit 7,
+    also run it handed off in sunlight, with `mScreenBrightness` above 4095 (DE-007).
   - F5 The agent switches `screen_brightness_mode` with `settings put`, recording and restoring
     the prior value, and reads `screen_brightness` in each mode. Does the setting track auto
     (the DD-083 prior)? Then, with the owner's slider at the top, it reads the stored maximum
@@ -247,6 +252,10 @@ becomes a new DD row in the unit that acts on it:
   - with Tideo disabled the helper process is gone.
 
 **7. Read the brightness from `BrightnessInfo` through the helper.**
+- **Gate (DE-007).** Run this unit only if F4's sunlight run shows
+  `mCachedBrightnessInfo.brightness` passing 4095 together with `mScreenBrightness`. On
+  OxygenOS 16 it stopped at 4095, so this source would cap the readout at 255 and the HBM flash
+  would never fire. If it still stops, drop the unit; dumpsys stays the readout's source.
 - A new helper operation returns BrightnessInfo as primitives: brightness, min, max, HBM mode,
   transition point, max reason and window override. The helper reads it by reflection, following
   the `ColorDisplayBinder` pattern. F3 shows the shell holds `CONTROL_DISPLAY_BRIGHTNESS`.
@@ -285,15 +294,16 @@ becomes a new DD row in the unit that acts on it:
   goes.
 - If the device step shows the event doesn't fire under OPlus's controller, trigger on the
   `SCREEN_BRIGHTNESS` observer instead, but only if F5 showed the setting tracks auto. Build
-  only what fires on the phone.
+  only what fires on the phone. The setting holds at 4095 while the panel is above it (DE-007),
+  so under that observer only the safety poll moves the readout above 4095.
 - Tests, with a fake trigger and virtual time:
   - one read per event;
   - the safety poll;
   - nothing while not handed off;
   - cancellation on hand-back.
 - Glue review. A DD row and a `parity_gaps.md` entry record the deviation.
-- Device: in a sunlight hand-off, the readout follows within about 1 s, the HBM flash still
-  turns on and off, and reads per minute fall against Unit 4's baseline.
+- Device: in a sunlight hand-off, the readout follows within about 1 s, above 4095 too, the HBM
+  flash still turns on and off, and reads per minute fall against Unit 4's baseline.
 
 **10. Push-based foreground app (fifth runtime use).**
 - The helper registers `ITaskStackListener` and pushes the front package through a oneway
@@ -327,6 +337,9 @@ becomes a new DD row in the unit that acts on it:
 - This runs only if F8 is yes and the owner reopens DC-026. Otherwise it's dropped.
 - First, measure on the phone how the percentage maps to the shell's `screen_brightness`. If the
   mapping isn't monotonic and precise, drop the unit.
+  - A Pixel's mapping is already measured (DE-006): AOSP's HLG gamma curve up to the manual
+    ceiling, with setting 2 already at 14 % of the slider. AdvancedAutoBrightness issue 26
+    reports the same gap.
 - Animation frames *between* Tasker-domain endpoints use the public
   `setBrightness(…, BRIGHTNESS_UNIT_PERCENTAGE)`, which BASIC can call. Endpoints keep today's
   exact domain write.

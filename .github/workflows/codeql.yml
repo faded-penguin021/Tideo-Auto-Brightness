@@ -32,7 +32,7 @@ concurrency:
 jobs:
   analyze:
     name: Analyze (java-kotlin)
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 30  # cap a hung analysis (GitHub's default is 360)
     permissions:
       security-events: write  # upload results to the Security tab

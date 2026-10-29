@@ -701,6 +701,7 @@
   two runs of one commit, a release among them, could land on different images. The JDK and the
   Gradle inputs do not depend on the image, but the preinstalled SDK, Python, pipx and apt do;
   the move to 26.04 is a later change of its own, accepted when `fdroid-compat.yml` is green on it.
+  Superseded by DE-009.
 - DD-069 [cited]: **`DraftSettingsViewModelTest`'s intermittent CI hang (run 38039291255 on `main`)
   was a DataStore write wedged by an earlier test; fixed in the test only.** DataStore 1.1.1 holds
   its write lock while it runs a transform in the caller's context, so `apply()`'s write from
@@ -919,6 +920,7 @@
   `mCachedBrightnessInfo.hbmTransitionPoint=Infinity`, and the display reported
   `mScreenBrightnessNormalMaximum=4095.0` and `mScreenBrightnessRangeMaximum=4674.0`. No reading
   above 4095 was taken that day, which was cloudy; DD-081 took one in sunlight.
+  Above 4095 the setting and BrightnessInfo stop while the panel goes on: DE-007.
 - DD-084: **The owner ran a cursory pass of DEVICE_TEST_SCRIPT §18 (steps 58–61, the
   bright-light hand-off) on the phone and found it all fine (owner, 2026-10-17), closing the
   Owner-queue item that asked for steps 58–60.** The report gives no per-step readings, so this

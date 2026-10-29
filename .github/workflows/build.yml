@@ -28,10 +28,9 @@ concurrency:
 
 jobs:
   build:
-    # Every workflow names ubuntu-24.04, never ubuntu-latest: GitHub moves `latest` to 26.04 one
-    # run at a time (2026-10-19..11-19), and a release must not change OS mid-rollout. Moving to
-    # 26.04 is its own change, with fdroid-compat's reproducibility stage green on it (DD-068).
-    runs-on: ubuntu-24.04
+    # Every workflow names one exact image, never ubuntu-latest, so a release cannot change OS when
+    # GitHub moves `latest`; a move to the next image is its own change (DD-068, DE-009).
+    runs-on: ubuntu-26.04
     timeout-minutes: 30  # cap a hung Gradle daemon / SDK fetch (GitHub's default is 360)
     steps:
       - name: Checkout

@@ -39,6 +39,11 @@ stays closed (DB-051…DB-060), and Scorecard.dev is a run-once local input.
   (owner, 2026-10-21; D1–D5 decided). Each unit runs on the owner's go-ahead.
   [x] 0 plan · [ ] 1 dimming readout · [ ] 2 brightness labels · [ ] 3 PWM dimming chart ·
   [ ] 4 `keepGlobalsFrom` · [ ] 5 formula dedups · [ ] 6 engine `dimDynamic` · [ ] 7 AGENTS.md rule · [ ] 8 close-out.
+- **Pixel display calibration** — `docs/plans/DISPLAY_CALIBRATION_CEILING.md`, spec only (owner,
+  2026-10-26; DE-005, DE-006). D1 is decided (a); D2–D3 are open (Owner queue 3), and each unit
+  runs on the owner's go-ahead.
+  [x] 0 plan · [ ] 1 sweep accepts a ceiling · [ ] 2 readout above a ceiling · [ ] 3 failure
+  causes · [ ] 4 device checks and close-out.
 
 ## Owner queue
 
@@ -73,14 +78,23 @@ stays closed (DB-051…DB-060), and Scorecard.dev is a run-once local input.
    redact-tool-output scripts/guards/*.sh` prints a nonzero count, or a STATE changelog line records
    (b).
 
-3. **[2026-10-16] Move CI to Ubuntu 26.04 when you choose; nothing breaks if you wait.** Every
-   workflow is pinned to `ubuntu-24.04` (DD-068), so GitHub's switch of `ubuntu-latest` to 26.04
-   (2026-10-19 to 11-19) changes nothing here. Options: (a) move after the rollout settles, in a
-   PR that changes only the runner labels; (b) stay on 24.04 until GitHub announces its
-   retirement. Recommendation (a): accept it only when that PR's `Build` and all four
-   `F-Droid compatibility` stages are green, the reproducibility stage above all. Settles it:
-   `grep -rc 'ubuntu-24.04' .github/workflows/` prints 0 for every file, or a STATE changelog line
-   records (b).
+3. **[2026-10-26] Decide the Pixel calibration plan's two remaining questions before its Units 2
+   and 3.** A Pixel's calibration fails because manual brightness stops at 0.63, so the top
+   levels read the same, and the failure then wrongly blames DUMP (DE-005). You decided D1 (a):
+   accept that ceiling, since the value above which High Brightness Mode (HBM) is on is what
+   matters. D2: the readout in HBM on such a panel, as (a) AAB's slope, up to ~1150,
+   (b) proportional to the ceiling, up to ~405, or (c) proportional on every panel. D3: (a) a
+   message per cause, (b) one neutral message, or (c) unchanged. Recommendation: D2 (b), D3 (a);
+   reasons in the plan's Owner decisions. Unverified until you answer; settles it:
+   `grep -c '^## Owner decisions (open)' docs/plans/DISPLAY_CALIBRATION_CEILING.md` prints 0
+   (retitled once D2 and D3 are decided), or the plan is gone.
+
+4. **[2026-10-28] Watch the first release on Ubuntu 26.04; no PR can run the release workflows.**
+   CI moved to `ubuntu-26.04` (DE-009), but `release.yml` runs only on a tag, so its first run
+   there is the next release. Check that it attaches a signed APK, that its changelog block
+   appears once, and that F-Droid's rebuild of that release matches ours. Settles it: `gh run list
+   --workflow release.yml --limit 1 --json conclusion,createdAt` shows `success` dated after the
+   merge, and the version appears on F-Droid as reproducible.
 
 **The tree declares `1.15.2` / vc32, this train's one bump (DE-001)**; 1.15.1 was seen tagged on
 2026-10-26 (`git ls-remote --tags --refs origin 'refs/tags/v*'`). Never bump twice in one train.
@@ -95,6 +109,22 @@ proposing work; changing it is legislation under RUNBOOK's rule-review protocol.
 
 Newest first; ledger rows are the durable detail.
 
+- 2026-10-28 — **CI moves to `ubuntu-26.04`: every workflow's runner label, still an exact image,
+  never `ubuntu-latest`; accepted on full CI green on its PR, and the tag, dispatch and
+  `main`-only workflows first run there after the merge (DE-009, owner's queue answer (a)).**
+- 2026-10-28 — **The owner's sunlight probe settles the calibration plan's `get-brightness`
+  input: on the OnePlus, handed off above 65 000 lx, `get-brightness`, the setting and
+  BrightnessInfo stop at 4095 while the panel passes it, so `dumpsys display` stays the readout's
+  source and that plan gains no unit; faster-Shizuku Unit 7 now waits on a sunlight re-check
+  under ColorOS 17 (DE-007, DE-008, owner).**
+- 2026-10-26 — **Pixel calibration plan: D1 decided (a), the HBM threshold being what matters;
+  AdvancedAutoBrightness issue 26's dark-end gap measured on the same Pixel, setting 2 already at
+  14 % of the slider, and routed to the faster-Shizuku plan's float-write unit (DE-006); the
+  owner's `cmd display get-brightness` sunlight probe and how to read it added (owner).**
+- 2026-10-26 — **Planned the Pixel display calibration fix: a reporter's dump shows the reads
+  worked and the sweep stalled at the 0.63 manual ceiling, then blamed DUMP (DE-005); the plan
+  accepts a ceiling at the top, reads HBM above it in proportion and names each failure's cause.
+  Spec only; D1–D3 open (owner).**
 - 2026-10-26 — **The held Shizuku helper is now checked locally, so a helper that stops answering
   cannot hang every later Shizuku call; Astra's PR-time finding, JVM-tested only (DE-004).**
 - 2026-10-26 — **Shizuku helper reuse closed: the owner passed DE-001 on 1.15.2-debug vc32 holding

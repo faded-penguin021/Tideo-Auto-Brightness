@@ -85,3 +85,59 @@
   arrives now costs that one call a null answer; the next call binds again. Not re-checked on device.
   Shizuku's own server ping in `isUsable` and the bind and unbind still run on the caller's
   thread, as before DE-001; a hung Shizuku server stays out of scope (Sol).
+- DE-005: **On a Pixel the display calibration (DD-079) cannot pass, because manual brightness
+  stops at the panel's High Brightness Mode transition point, so the sweep's top levels read one
+  value; the failure then blames the DUMP grant (a reporter's `dumpsys display`, relayed by the
+  owner, 2026-10-26).** The dump's brightness event log holds the sweep: `screen_brightness` 1 to
+  150 gave 0.0 to 0.5866142 on the 0–1 float scale, `(level − 1) / 254`, while 175 and 200 both
+  gave 0.63 with `unclampedBrt` 0.685 and 0.783 under `hbmMax=0.63` (`mHbmData` transition 0.63,
+  `minLux` 10000), and the restore came 3.3 s after 200 was written, as the 3 s window expired.
+  The sweep accepts a point only on a stable reading, so its ten points show a read source
+  answered; every failure stores AAB's one `error` (DD-078), which the flash and the card both
+  word as a missing DUMP grant. Any setting above about 161 shows 0.63 on this panel, Tideo's own
+  curve included, and only Adaptive Brightness at 10 000 lx or more may pass it
+  (`mIsHbmAllowed=false` in manual); below that, Adaptive is capped at 0.377495 under 1000 lx and
+  0.5353106 under 6000 lx. The dump names neither the model nor the build, so it is not shown to
+  be DD-087's crDroid Pixel 9 Pro.
+- DE-006: **On DE-005's Pixel, `screen_brightness` is linear in light while Android's slider is
+  perceptual, so Tideo's lowest step skips the dark range: setting 1 is 0 % of the slider at
+  2 nits and setting 2 is already 14 % at about 8 nits (owner, 2026-10-26, from
+  AdvancedAutoBrightness issue 26, whose body was not read here).** The dump's manual events give
+  the float as `(setting − 1) / 254` and nits as about 2 + 1584 × float, and their slider
+  percentages match AOSP's HLG gamma curve from 0 to the 0.63 ceiling at every logged point
+  (setting 4 at 24 %, 5 at 27 %, 15 at 51 %, 100 at 91 %, 150 at 99 %). From that curve, settings
+  2, 3 and 14 sit at 14, 19 and 49 % and 161 at 100 %, so half the slider lies between settings 1
+  and 14, and 162 to 255 add nothing. Under Adaptive Brightness the slider's top falls to
+  0.377495 below 1000 lx, so a float shows higher there: 0.010567754 is 22 % in manual, 29 % in
+  auto. No integer setting reaches between 2 and 8 nits; only a float write can.
+- DE-007: **In sunlight on the owner's OnePlus, `cmd display get-brightness 0`, `screen_brightness`
+  and `mCachedBrightnessInfo.brightness` stop at 4095 while `mScreenBrightness` passes it, so
+  neither `get-brightness` nor BrightnessInfo reads High Brightness Mode there and `dumpsys
+  display` stays the readout's source (owner's 2 s probe, 2026-10-28).** Over 20 s all four rose
+  together from 1734.0 to 3019.0, `get` reporting the setting's 0–4095 value; from the fourth
+  sample the three held 4095.0 while `mScreenBrightness` climbed from 4111.0 to 4174.0, within
+  DD-083's 4674 range maximum. So the setting tracks Adaptive Brightness (DD-083) only up to the
+  normal maximum, and `get-brightness` returns that setting, as AOSP's `getBrightness` does. The
+  mode and the build were not logged; whatever drove the panel past 4095, the other three did not
+  follow it. This adds no unit to the Pixel calibration plan, and gates the faster-Shizuku plan's
+  BrightnessInfo source on a sunlight re-measurement under ColorOS 17, since on this build it
+  would cap the readout at 255 and DD-081's flash would never fire.
+  Its mode, AUTOMATIC under Tideo's hand-off: DE-008.
+- DE-008: **DE-007's probe ran with Tideo running and handed off to Adaptive Brightness above
+  65 000 lx (owner, 2026-10-28), so Android was in AUTOMATIC under the hand-off (DD-073), the
+  state in which the HBM readout runs (DD-077).** The setting that followed the panel up to 4095
+  was therefore OPlus's auto value (DD-083), and `get-brightness` and BrightnessInfo stop at 4095
+  exactly where the readout needs them. The build was still not logged.
+- DE-009 [cited]: **All nine workflows move from `ubuntu-24.04` to `ubuntu-26.04`, still an exact
+  image and never `ubuntu-latest`, on 2026-10-28 while GitHub's `latest` rollout still runs (owner's
+  queue answer (a), timed by the owner; DD-068).** The change is the twelve `runs-on` labels and
+  `build.yml`'s pin comment, nothing else in the workflows, and its acceptance is RUNBOOK §8's: full
+  CI green on the PR on 26.04 (`Build`, CodeQL, Release preflight and the four `F-Droid
+  compatibility` jobs), the reproducibility job above all. `release.yml`, `release-signing.yml`,
+  `clean-dist.yml` and `translation-badges.yml` run only on a tag, a dispatch or `main`, and
+  `redirect-external-prs.yml` runs the base branch's copy, so no PR runs them on the new image; of
+  the preinstalled tools they lean on, `gh` and the SDK's `apksigner` (`release.yml`), `apksigner`
+  (`release-signing.yml`) and `python3` (`translation-badges.yml`) first run there after the merge,
+  while `fdroid-compat.yml`'s `pipx`, `docker`, `sudo` and apt run on the PR. The reproducibility
+  job compares entry contents, not zip framing, which is where a host image would differ, so the
+  first release's F-Droid verification is the full proof.
