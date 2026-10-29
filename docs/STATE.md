@@ -128,7 +128,8 @@ Newest first; ledger rows are the durable detail.
 - 2026-10-29 — **Codemap plan revised after Astra High's review: all nine findings accepted. The
   scanner reports lexical candidates, finds declarations by nesting across all brackets, and
   lands its `RULE_FILES` and split-table placement with its first code; D1–D4 to the Owner queue
-  (DE-010, owner).**
+  (DE-010, owner). A ChatGPT second pass found no blockers; Unit 5 now measures shared-settings
+  coupling and Unit 3's real-tree corpus covers every reference construct (DE-011).**
 - 2026-10-29 — **Planned a generated feature map so an agent finds a feature's existing owners
   before writing new logic: hand-kept anchors, a stdlib scanner that expands them from the code,
   live queries and a fail-closed freshness guard. DD-038's second copy of the solar math is the

@@ -157,3 +157,14 @@
   and wires its tests into `verify.sh`, which puts code units on the full ladder. Astra's D1–D4
   recommendations match the plan's, with D3 now the query-only option, and went to the Owner
   queue as recommendations, not decisions.
+- DE-011: **A second review of the revised codemap plan, by ChatGPT (relayed by the owner,
+  2026-10-29), found no blockers and three residual gaps, each taken as an amendment rather than
+  new machinery.** The map relates files only through anchors and references, so two readers of
+  one `AabSettings` field look unrelated; the plan had deferred a settings-field scan until its
+  seed-and-measure unit showed such a coupling, but no unit measured it, so that unit now does.
+  Two solar symbols were too easy a real-tree check, so the reference unit's corpus adds a
+  callable reference (`::hourToHhmm`, same package, no import), an extension call, a nested-type
+  import and `ThresholdConfig`'s two packages as expected non-matches, and identifiers after `.`
+  or `::` stay candidates because an extension call looks like member access. A feature nobody
+  registers stays invisible, since the guard proves only that declared anchors exist; that
+  residual is disclosed in the plan and left unguarded, as the review advised.

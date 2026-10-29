@@ -8,6 +8,8 @@
 - **Unit 1 is done.** Astra reviewed the plan at high effort ("Astra High"), and the owner relayed
   the findings on 2026-10-29. All nine findings were accepted and none rejected; this revision
   carries them. The dispositions are under **Unit 1 triage**, and the durable record is a DE row.
+  A second pass by ChatGPT, also relayed by the owner, found no blockers; its three residual gaps
+  are folded into Units 3 and 5 and the residuals (DE-011).
 - Two design passes fed it: this session's and a ChatGPT answer the owner supplied. They agreed
   on the core. Where they differed, the choice and its reason are under Design and Excluded.
 - **No unit changes the app.** Nothing under `app/`, `domain/` or `platform/` changes. So there
@@ -66,6 +68,9 @@ on every ladder run.
 **What it is not.** Every answer is a set of **lexical reference candidates**, not Kotlin semantic
 resolution. The tool does not enforce reuse, find every caller, or prove that no duplicate logic
 exists. An empty answer means "no references found within the scanned scope", never "unused".
+It relates files only through anchors and references, so two files that share state without
+referencing each other, such as two readers of one `AabSettings` field, look unrelated (Unit 5
+measures how often).
 Anchors describe navigation scope: they grant no architectural permission and repeal no invariant.
 Shared membership is not a requirement to unify behaviour; DD-061 kept two location orders apart
 on purpose, and the ledger rows the queries list are what carry such a difference.
@@ -142,6 +147,11 @@ on purpose, and the ledger rows the queries list are what carry such a differenc
     imports on 2026-10-29). That records a candidate on S of kind `member-import`;
   - F star-imports S's package;
   - or F names S fully qualified.
+
+  An identifier after `.` or `::` still counts: a top-level extension function is called as
+  `x.bar()`, and a top-level function is passed as `::bar` (`::hourToHhmm` on 2026-10-29). A
+  same-named member is the false positive listed below. `Type::member` and `Type::class` are
+  candidates on `Type`.
 
   A file's references to its own declarations are ignored. `internal` needs no rule while no
   package spans two modules; none did on 2026-10-29, and the scanner fails if one does. On that
@@ -231,6 +241,10 @@ fixes the numbers. A successful empty answer reads "no references found within s
 - **Residual.** A session can satisfy the anchor check by deleting an anchor instead of
   updating it. That is a reviewable escape hatch, not something the gate prevents: the edit shows
   in the `features.toml` diff, and under D2 (a) the members it drops show in the map diff.
+- **Residual: coverage.** The check proves that declared anchors exist, never that the registry
+  is complete. A new feature that nobody registers is invisible to every query. The `AGENTS.md`
+  sentence (Unit 7) and `suspects` are the only prompts, and no guard is planned: completeness is
+  a judgment, and the minimal registry is the chosen design.
 
 **The reinvention heuristic (D3).** For each feature with keywords, it lists the production files
 that meet three conditions:
@@ -368,6 +382,9 @@ D1–D4 are in the Owner queue, and the DE row is written.
 - The `who-uses` and `impact` queries (`impact` without its feature lines for now), their exit
   statuses and the empty-answer wording.
 - Tests, one case per rule, plus:
+  - a callable reference `::bar`, `Type::member`, `Type::class`, an extension call `x.bar()`
+    and a qualified `Obj.member`;
+  - a same-named member of another type, which is the documented false positive;
   - an unused import;
   - a `private` declaration beside a same-named identifier in another file of its package;
   - an imported nested type;
@@ -375,13 +392,22 @@ D1–D4 are in the Owner queue, and the DE row is written.
   - an ambiguous name, then a qualified name that resolves it;
   - an unknown symbol, a path outside the scanned scope, and each exit status.
 - Determinism as in Unit 2, on `who-uses --json` and `impact --json`.
-- Real tree: before running the scanner, re-derive the expected caller lists for
-  `SolarCalculator` and `ContextSolarTimes` at the unit's base with `grep -rlw` plus a reading.
-  Then the scanner's lists must equal them. The `ContextSolarTimes` list must include
-  `AndroidContextSignalSource`, the no-import case.
+- **Real-tree corpus.** Two solar symbols are too easy a check, so the corpus covers each
+  construct. Before running the scanner, derive each expected list at the unit's base with
+  `grep -rlw` plus a reading, as matches and non-matches (files that name the symbol only in a
+  comment or string, or mean another symbol of that name). Then the scanner's lists must equal
+  them:
+  - `SolarCalculator` (imports and qualified calls) and `ContextSolarTimes`, whose list must
+    include `AndroidContextSignalSource`, the no-import case;
+  - `hourToHhmm`, a top-level `internal` function reached through `::hourToHhmm`;
+  - one top-level extension function, chosen at the unit's base, called as `x.f()`;
+  - `DisplayCalibration`, reached through `import …DisplayCalibration.Point`;
+  - both `ThresholdConfig` symbols, each list excluding the other package's users.
+
+  The code reviewer re-derives the corpus lists independently.
 - Fresh-context code review.
-- Acceptance: the full ladder is green, `cmp` finds no difference, and both real-tree lists
-  match.
+- Acceptance: the full ladder is green, `cmp` finds no difference, and every corpus list
+  matches, non-matches included.
 
 **4. Features, queries, write and check.**
 - Add `codemap/features.toml` with `circadian` only, plus the `classify_path` line and its pin
@@ -430,6 +456,13 @@ D1–D4 are in the Owner queue, and the DE row is written.
       files, so a tool change cannot pass for membership churn.
     - Count the consecutive pairs whose map differs, and why. Report, per feature, the eligible
       pairs and the pairs excluded because an anchor did not resolve on one side.
+  - **Shared state.** The map relates files only through anchors, so two readers of one setting
+    look unrelated. For each seeded feature, list the `AabSettings` fields (its groups' fields
+    included) that its owner files read by name, then the production files outside the feature
+    that read any of them. Triage each file as a coupling the `feature` answer should have
+    shown, or noise, and record whether any would have changed a `feature` or `impact` answer.
+    The measuring script stays in scratch; nothing is committed. Stores and other state holders
+    are top-level classes, so they are already visible as references once anchored.
   - **Cost:** the runtime of `check` and of `check --anchors-only`, the number of ambiguous
     names, and the number of anchors that needed qualifying.
 - **The probe baseline (Unit 8),** run now, before anything advertises the map: one blocking
@@ -474,7 +507,7 @@ D1–D4 are in the Owner queue, and the DE row is written.
   > `python3 scripts/codemap.py impact <file>` before editing a file, and
   > `python3 scripts/codemap.py feature <name>` (`features` lists them) before adding behaviour
   > in a feature's area; reuse its owners and read the ledger rows it lists. When you add a
-  > class that owns a feature's logic, add it to `codemap/features.toml` as an anchor. The
+  > class that owns a feature's logic, or a new feature, add it to `codemap/features.toml`. The
   > answers are lexical candidates from Kotlin sources: an empty one means none were found in
   > the scanned scope, not that nothing exists (Session discipline 9), and two files sharing a
   > feature does not mean their behaviour must be unified.
@@ -547,6 +580,16 @@ establish that the caller list is exhaustive, which Unit 3 now does. Every findi
 - **Q8.** No relation types for now. Overlap cannot say "share this calculation and keep these
   policies apart"; the ledger rows carry that, and the probe tests that they are recovered.
 
+**Second pass (ChatGPT, relayed by the owner, 2026-10-29).** No blockers; it would retain the
+one-hop map, qualified anchors, the lexical-only claims, the byte checks, the owner/consumer split
+and the absence of relation types. Its three residual gaps:
+
+| # | Gap | Disposition |
+|---|---|---|
+| 1 | Features coupled through shared state (one `AabSettings` field) look unrelated | Accepted. The Excluded settings item named Unit 5 as its trigger, but no unit measured it. Unit 5 now does, and **What it is not** discloses the gap. |
+| 2 | Two solar symbols are too easy a real-tree check | Accepted. Unit 3's corpus adds a callable reference, an extension call, a nested-type import and `ThresholdConfig`'s two packages as non-matches, re-derived by the reviewer; the reference rules now say that identifiers after `.` or `::` count, and Unit 3 adds synthetic cases for them. |
+| 3 | Nothing notices an unregistered feature | Accepted as a residual, with no guard, as it advised. **Residual: coverage** states it, and Unit 7's draft asks for new features as well as new anchors. |
+
 ## Excluded
 
 - **Declared relation types beyond anchors.** Overlaps are derived. The rest would be hand-kept
@@ -562,7 +605,9 @@ establish that the caller list is exhaustive, which Unit 3 now does. Every findi
   never part of the gate.
 - **Graph rendering.** Seeing the graph is not the bottleneck; querying it is.
 - **Member-level settings fields** (who reads which `AabSettings` field). Deferred: revisit only
-  if Unit 5 shows overlaps missing a real coupling.
+  if Unit 5's shared-state measurement shows a real coupling that a `feature` or `impact` answer
+  misses. It is the strongest candidate for a later extension.
+- **A registry-completeness guard.** See **Residual: coverage**.
 - **An edit-time hint** (a Claude-only `PostToolUse` hook on a new `.kt` file). Deferred until the
   probe shows the queries help: it adds adapter-specific behaviour and a review surface before
   the main intervention is evaluated, and Codex has no post-edit hook.
