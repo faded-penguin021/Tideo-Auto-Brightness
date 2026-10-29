@@ -45,11 +45,10 @@ stays closed (DB-051…DB-060), and Scorecard.dev is a run-once local input.
   [x] 0 plan · [ ] 1 sweep accepts a ceiling · [ ] 2 readout above a ceiling · [ ] 3 failure
   causes · [ ] 4 device checks and close-out.
 - **Codemap, a generated feature map for agents** — `docs/plans/CODEMAP.md`, spec only (owner,
-  2026-10-29; D1–D4 open). Unit 1 is the owner's Astra High review, and each unit runs on the
-  owner's go-ahead.
-  [x] 0 plan · [ ] 1 Astra review · [ ] 2 scanner · [ ] 3 features and queries · [ ] 4 seed and
-  measure · [ ] 5 guard and committed map · [ ] 6 agent entry points · [ ] 7 edit-time hint
-  (optional) · [ ] 8 probe and close-out.
+  2026-10-29; D1–D4 open, Owner queue 5). Each unit runs on the owner's go-ahead.
+  [x] 0 plan · [x] 1 Astra review · [ ] 2 placement, tokenizer, declarations · [ ] 3 references ·
+  [ ] 4 features, queries, write and check · [ ] 5 seed and measure · [ ] 6 guard (per D2) ·
+  [ ] 7 agent entry points · [ ] 8 probe and close-out.
 
 ## Owner queue
 
@@ -102,6 +101,17 @@ stays closed (DB-051…DB-060), and Scorecard.dev is a run-once local input.
    --workflow release.yml --limit 1 --json conclusion,createdAt` shows `success` dated after the
    merge, and the version appears on F-Droid as reproducible.
 
+5. **[2026-10-29] Decide the codemap plan's four questions; D2 and D3 can wait for its Unit 5
+   numbers.** D1: who regenerates the map, (a) the author with CI only checking, or (b) a CI job
+   that commits. D2: (a) commit the generated map, or (b) only the anchors, checked live. D3: the
+   keyword heuristic as (a) a map section, (b) a query only, or (c) dropped. D4: (a) the plan adds
+   its own AGENTS.md sentence now, or (b) folds it into the light-refactor plan's Unit 7.
+   Recommendation: D1 (a), D2 (a) unless Unit 5's replay shows the map changing in most
+   snapshots, D3 (b), D4 (a); Astra recommended the same, and reasons are in the plan's Owner
+   decisions (DE-010). Unverified until you answer; settles it: `grep -c '^## Owner decisions
+   (open)' docs/plans/CODEMAP.md` prints 0 (retitled once all four are decided), or the plan is
+   gone.
+
 **The tree declares `1.15.2` / vc32, this train's one bump (DE-001)**; 1.15.1 was seen tagged on
 2026-10-26 (`git ls-remote --tags --refs origin 'refs/tags/v*'`). Never bump twice in one train.
 
@@ -115,6 +125,10 @@ proposing work; changing it is legislation under RUNBOOK's rule-review protocol.
 
 Newest first; ledger rows are the durable detail.
 
+- 2026-10-29 — **Codemap plan revised after Astra High's review: all nine findings accepted. The
+  scanner reports lexical candidates, finds declarations by nesting across all brackets, and
+  lands its `RULE_FILES` and split-table placement with its first code; D1–D4 to the Owner queue
+  (DE-010, owner).**
 - 2026-10-29 — **Planned a generated feature map so an agent finds a feature's existing owners
   before writing new logic: hand-kept anchors, a stdlib scanner that expands them from the code,
   live queries and a fail-closed freshness guard. DD-038's second copy of the solar math is the
@@ -135,43 +149,24 @@ Newest first; ledger rows are the durable detail.
   worked and the sweep stalled at the 0.63 manual ceiling, then blamed DUMP (DE-005); the plan
   accepts a ceiling at the top, reads HBM above it in proportion and names each failure's cause.
   Spec only; D1–D3 open (owner).**
-- 2026-10-26 — **The held Shizuku helper is now checked locally, so a helper that stops answering
-  cannot hang every later Shizuku call; Astra's PR-time finding, JVM-tested only (DE-004).**
-- 2026-10-26 — **Shizuku helper reuse closed: the owner passed DE-001 on 1.15.2-debug vc32 holding
-  the verdict, with one helper across the switches, 7308 K first, and a clean rebind after a
-  Shizuku restart (DE-003); plan deleted.**
-- 2026-10-26 — **Shizuku's helper now stays bound, so a return from a Night-Light-off profile no
-  longer shows 4082 K for ~5 s; 1.15.2 / vc32, step 38b gains a debug-install case, JVM-tested
-  only (DE-001). 1.15.1's fix missed on release because only the debug install, which lacked
-  the verdict, was checked; device checks now give it the release install's learned facts first
-  (DE-002, owner).**
-- 2026-10-26 — **Shizuku helper-reuse plan revised after Sol's review: the lost connect is the
-  client's cached connection (read from 13.1.5's bytecode), any failure releases the binding, and
-  the device check runs on the debug install once its own probe has learned the verdict (owner).**
-- 2026-10-26 — **Planned the Shizuku helper reuse: on return from a Night-Light-off profile the
-  anchor read and the Kelvin write bind twice, and the second bind hangs 4 s, so Night Light
-  shows 4082 K before 7308 K (owner's release install, measured over adb); the fix keeps the
-  helper bound (owner). Spec only.**
-- 2026-10-25 — **Night Light switch-on order closed: the owner passed the context-switch case on
-  1.15.1-debug vc31; the screen's Apply stays on-device unverified (DD-090…DD-093).**
+- 2026-10-26 — **Shizuku helper reuse, planned, revised after Sol's review and closed: the helper
+  stays bound, so a return from a Night-Light-off profile no longer shows 4082 K for ~5 s
+  (1.15.2 / vc32, DE-001); its liveness check is a local read (Astra, DE-004); the owner passed it
+  on 1.15.2-debug vc32 (DE-003). 1.15.1's fix had missed because only the debug install was
+  checked, so device checks now give it the release install's learned facts first (DE-002,
+  owner); plan deleted.**
 - 2026-10-25 — **The session banner now fetches and warns when HEAD can fast-forward to any branch,
   bot-only tips excluded, so a checkout behind a worktree's pushed work shows at start (owner).**
-- 2026-10-25 — **No shared Night Light write-order helper: each site's order stays two inline
-  edges, since a helper came out longer (DD-092).**
-- 2026-10-25 — **The Privileged Display screen's service-off Apply now switches Night Light on
-  after the setpoint lands and off before it; step 38b gains the case, JVM-tested only (DD-091).**
-- 2026-10-25 — **The Night Light switch-on plan gains Unit 3, the shared write-order helper the
-  light-refactor plan defers to it, landed only if smaller (owner).**
-- 2026-10-25 — **Night Light now switches on after the profile's Kelvin lands, so a switch from a
-  Night-Light-off profile no longer flashes the held (red) Kelvin; 1.15.1 / vc31, step 38b, JVM-tested
-  only (DD-090).**
+- 2026-10-20..25 — **Night Light switch-on order, planned and closed: Night Light switches on
+  after the profile's Kelvin lands, so a switch from a Night-Light-off profile no longer flashes
+  the held (red) Kelvin, both on a context switch (1.15.1 / vc31, DD-090) and in the Privileged
+  Display screen's service-off Apply (DD-091); no shared write-order helper, since one came out
+  longer (DD-092). The owner passed the context-switch case on 1.15.1-debug vc31; the screen's
+  Apply stays on-device unverified (DD-093).**
 
 - 2026-10-21 — **Duplicated logic audited: Live Debug and the Dashboard show hardware vs perceived
   brightness in PWM mode, both kept (D-109); six consolidations planned in
   `docs/plans/LIGHT_REFACTOR_CONSOLIDATION.md`, spec only.**
-- 2026-10-20 — **The red flash on a switch to a circadian profile is write order (DD-065's warmer
-  tint); its fix is planned in `docs/plans/NIGHT_LIGHT_SWITCH_ON_ORDER.md`, the screen's
-  service-off Apply as its Unit 2 (owner).**
 - 2026-10-19 — **Dark-room jitter closed with curve settings, no code (DD-088, DD-089); the
   faster-Shizuku and Android 17 plan committed as `docs/plans/PRIVILEGED_FAST_PATHS.md`, spec
   only.**

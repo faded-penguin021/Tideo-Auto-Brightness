@@ -141,3 +141,19 @@
   while `fdroid-compat.yml`'s `pipx`, `docker`, `sudo` and apt run on the PR. The reproducibility
   job compares entry contents, not zip framing, which is where a host image would differ, so the
   first release's F-Droid verification is the full proof.
+- DE-010: **Astra High reviewed the codemap plan before any code (relayed by the owner,
+  2026-10-29): two blockers and seven should-fixes, all accepted.** The blockers: brace depth 0
+  does not find top-level Kotlin declarations, since `DynamicScaleInput`'s constructor properties
+  sit at depth 0 inside its header's parentheses, so the scanner counts nesting across `()`, `[]`
+  and `{}`; and its answers are lexical reference candidates, never semantic usage, so an empty
+  one means none were found in the scanned scope, not that nothing uses a symbol. The
+  should-fixes add a byte-level determinism contract, a symbol identity of package plus name with
+  ambiguity failing closed, loud failure on malformed input, `write` and `check` built before
+  they are measured, a reproducible first-parent churn replay that reports its exclusions, ledger
+  joins that name their citing files, a probe baseline isolated from the plan, and the keyword
+  heuristic as a query first. The harness-fit finding was widened: `AGENTS.md`'s Harness section
+  already requires a new repo-local script to be named in `RULE_FILES` and the HARNESS_LOCAL split
+  table in the commit that adds it, so the scanner's first unit carries that under rule review
+  and wires its tests into `verify.sh`, which puts code units on the full ladder. Astra's D1–D4
+  recommendations match the plan's, with D3 now the query-only option, and went to the Owner
+  queue as recommendations, not decisions.
