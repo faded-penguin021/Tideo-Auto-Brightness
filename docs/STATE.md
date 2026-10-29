@@ -44,6 +44,12 @@ stays closed (DB-051…DB-060), and Scorecard.dev is a run-once local input.
   runs on the owner's go-ahead.
   [x] 0 plan · [ ] 1 sweep accepts a ceiling · [ ] 2 readout above a ceiling · [ ] 3 failure
   causes · [ ] 4 device checks and close-out.
+- **Codemap, a generated feature map for agents** — `docs/plans/CODEMAP.md`, spec only (owner,
+  2026-10-29; D1–D4 open). Unit 1 is the owner's Astra High review, and each unit runs on the
+  owner's go-ahead.
+  [x] 0 plan · [ ] 1 Astra review · [ ] 2 scanner · [ ] 3 features and queries · [ ] 4 seed and
+  measure · [ ] 5 guard and committed map · [ ] 6 agent entry points · [ ] 7 edit-time hint
+  (optional) · [ ] 8 probe and close-out.
 
 ## Owner queue
 
@@ -109,6 +115,10 @@ proposing work; changing it is legislation under RUNBOOK's rule-review protocol.
 
 Newest first; ledger rows are the durable detail.
 
+- 2026-10-29 — **Planned a generated feature map so an agent finds a feature's existing owners
+  before writing new logic: hand-kept anchors, a stdlib scanner that expands them from the code,
+  live queries and a fail-closed freshness guard. DD-038's second copy of the solar math is the
+  motivating incident. Spec only; Unit 1 is the owner's Astra High review (owner).**
 - 2026-10-28 — **CI moves to `ubuntu-26.04`: every workflow's runner label, still an exact image,
   never `ubuntu-latest`; accepted on full CI green on its PR, and the tag, dispatch and
   `main`-only workflows first run there after the merge (DE-009, owner's queue answer (a)).**
