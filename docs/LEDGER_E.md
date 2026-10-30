@@ -173,3 +173,22 @@
   (D1 (a)); the feature-level map is committed (D2 (a)), provisionally, since the plan's replay
   can still turn it to anchors-only; the keyword heuristic is a query only (D3 (b)); and the plan
   adds its own `AGENTS.md` sentence (D4 (a)).
+- DE-013: **Codemap Unit 5 seeded five features and measured them (2026-10-30): the map changes
+  in few merged snapshots, so D2 stays (a), and keyword leads are mostly noise, so D3 stays (b).**
+  The plan's 14 seed anchors missed owners, since an anchor is a symbol and a file reached only
+  through a co-declared type, a lambda wired in `AppModule` or an owner's own dependency stays
+  outside; the registry now holds 45 anchors (42 symbols, none qualified), circadian, contexts,
+  handoff, night-light, privilege and super-dimming have 29, 29, 23, 18, 19 and 21 member files,
+  100 in all, and `AppModule` is in all six (4, 2, 2, 6, 1 and 1 anchors), `AmbientMonitoringService`
+  in four. Four names are declared in two packages, and the tree holds 0 ambiguous candidates.
+  `suspects` gave 205 leads on the seed (contexts 80, mostly through `override`, a Kotlin
+  modifier) and 82 on the final registry (20, 5, 16, 14, 6 and 21): 1 second implementation
+  (`circadianDimMultiplier`, light-refactor finding 6), 6 missing anchors or edges and 75 noise,
+  while findings 1, 3 and 5 sit inside a feature or in a consumer, where it never looks. Over 30
+  first-parent snapshots back from `origin/main` at `282c95f` (not shallow), 6 of 29 pairs changed
+  an eligible feature, 8 of 99 eligible feature-pairs (privilege 4, super-dimming 3, night-light
+  1), with 75 excluded where an anchor did not exist yet (circadian 19, contexts 19, handoff 22,
+  night-light 15). Owners read 0–11 `AabSettings` fields and 7 of their 83 outside readers are
+  couplings a `feature` answer misses, only finding 6's sharing logic, now that `ProfileApplier`
+  (finding 4, a list overlapping `mergeProfile`'s) is anchored, so the settings-field scan stays
+  deferred; `check` and `--anchors-only` each take ~1.3 s.

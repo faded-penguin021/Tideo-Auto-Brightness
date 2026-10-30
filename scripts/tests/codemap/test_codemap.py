@@ -834,9 +834,9 @@ class RealTree(unittest.TestCase):
         self.assertEqual(proc.returncode, 0, proc.stderr.decode())
         out = json.loads(proc.stdout)
         anchor_files = {p for r in out["anchors"] for p in r["files"]}
-        self.assertEqual({r["path"].rsplit("/", 1)[1] for r in out["owners"]},
-                         {"SolarTimes.kt", "DynamicScaleEngine.kt", "NightLightTemperatureRamp.kt",
-                          "ContextSolarTimes.kt", "CircadianWindowProvider.kt"})
+        self.assertLessEqual({"SolarTimes.kt", "DynamicScaleEngine.kt", "NightLightTemperatureRamp.kt",
+                              "ContextSolarTimes.kt", "CircadianWindowProvider.kt"},
+                             {r["path"].rsplit("/", 1)[1] for r in out["owners"]})
         self.assertEqual({r["path"] for r in out["owners"]}, anchor_files)
         owners = {k: {p.rsplit("/", 1)[1] for p in v} for k, v in out["ledger"]["owners"].items()}
         self.assertIn("ContextSolarTimes.kt", owners["DD-038"])

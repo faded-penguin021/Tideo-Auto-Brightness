@@ -20,10 +20,19 @@
   guard, possibly one generated JSON file (D2), and edits to existing docs. This plan is deleted at
   close-out.
 - **Owner decisions D1–D4 are decided** (owner, 2026-10-30): every recommendation is taken, so
-  D1 (a), D2 (a), D3 (b) and D4 (a). D2 (a) stays provisional, as its recommendation says: Unit 5's
-  replay can still turn it to (b) (DE-012).
-- **Probe baseline:** not yet run. Unit 5 records it here, not in the ledger, so the Unit 8 probe
-  cannot read it (see Unit 8).
+  D1 (a), D2 (a), D3 (b) and D4 (a). Unit 5's replay kept D2 at (a) and its triage kept D3 at
+  (b) (DE-013).
+- **Probe baseline** (Unit 5, 2026-10-30): one general-purpose subagent at Opus 5.5, on a
+  detached worktree at `282c95f`, with Unit 8's prompt, the path and "read-only" only. **It
+  already passes four criteria, and the fifth is unestablished**, so one Unit 8 run can show the
+  map helping on the location orders at most:
+  - read all three `SolarCalculator` callers;
+  - changes only `CircadianWindowProvider` among them, saying why (it drops civil dusk);
+  - keeps `ContextSolarTimes`' SUNRISE/SUNSET triggers at sunset, explicitly, without citing
+    DD-038;
+  - unestablished: it changes no location code but names neither location order nor DD-061, so
+    it shows no sign of keeping them distinct;
+  - reuses `buildScheduleWindows`' dusk, so it adds no solar computation.
 
 ## Why
 

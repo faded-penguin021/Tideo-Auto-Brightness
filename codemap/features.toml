@@ -2,5 +2,33 @@
 
 [circadian]
 anchors = ["SolarCalculator", "DynamicScaleEngine", "NightLightTemperatureRamp",
-           "ContextSolarTimes", "CircadianWindowProvider"]
+           "ContextSolarTimes", "CircadianWindowProvider", "CircadianWindows",
+           "CircadianLocationStatus", "CircadianScaleRefresh", "ExperimentPrefsStore"]
 keywords = ["sunrise", "sunset", "solar", "circadian"]
+
+[night-light]
+anchors = ["NightLightTemperatureRamp", "NightLightTemperatureRoute", "NightLightVerdictStore",
+           "NightLightAnchorStore", "DisplayTogglesCoordinator", "SecureDisplayController",
+           "NightDisplayServiceBridge", "ColorDisplayBinder"]
+keywords = ["kelvin", "night"]
+
+[handoff]
+anchors = ["HandoffCoordinator", "HandoffRules", "HighBrightnessUpdates", "DisplayBrightnessReader",
+           "DisplayBrightnessDump", "DisplayCalibration", "DisplayCalibrationRun",
+           "DisplayCalibrationStore"]
+keywords = ["handoff", "hbm", "calibration"]
+
+[super-dimming]
+anchors = ["SuperDimmingCoordinator", "DimmingCoordinator", "SoftwareDimming",
+           "SecureDimmingController", "DynamicScaleEngine"]
+keywords = ["dimming"]
+
+[contexts]
+anchors = ["ContextEngine", "ContextMatching", "ContextOverrideResolver", "SolarTimeTokens",
+           "ContextSolarTimes", "ContextRuleStore", "ContextOverrideConfig", "ContextSignalTokens",
+           "ContextBaselineStore", "ProfileApplier", "WifiInfoReader"]
+keywords = ["ssid", "trigger"]
+
+[privilege]
+anchors = ["PrivilegeManager", "ShizukuShell", "ShizukuGrantGateway", "ShizukuUserService"]
+keywords = ["shizuku", "privilege", "privileged"]

@@ -47,7 +47,7 @@ stays closed (DB-051…DB-060), and Scorecard.dev is a run-once local input.
 - **Codemap, a generated feature map for agents** — `docs/plans/CODEMAP.md`, spec only (owner,
   2026-10-29; D1–D4 decided, DE-012). The owner's go-ahead covers the remaining units.
   [x] 0 plan · [x] 1 Astra review · [x] 2 placement, tokenizer, declarations · [x] 3 references ·
-  [x] 4 features, queries, write and check · [ ] 5 seed and measure · [ ] 6 guard (per D2) ·
+  [x] 4 features, queries, write and check · [x] 5 seed and measure · [ ] 6 guard (per D2) ·
   [ ] 7 agent entry points · [ ] 8 probe and close-out.
 
 ## Owner queue
@@ -114,19 +114,11 @@ proposing work; changing it is legislation under RUNBOOK's rule-review protocol.
 
 Newest first; ledger rows are the durable detail.
 
-- 2026-10-30 — **Codemap Unit 4: `codemap/features.toml` holds `circadian`; `features`, `feature`,
-  `suspects`, `write` and `check` (exit 8 on a missing or stale map) are in; `feature circadian`
-  lists the five anchor files as owners and joins DD-038 and DD-061 to their citing files. No map
-  is committed until Unit 6 (DE-010).**
-
-- 2026-10-30 — **Codemap Unit 3: reference candidates in Kotlin's scope order (explicit import,
-  own package, star import), plus `who-uses` and `impact` with exit statuses 5–7. The real-tree
-  corpus of seven symbols matches lists derived by grep and reading, non-matches included (DE-010).**
-
-- 2026-10-30 — **Codemap Unit 2: `scripts/codemap.py` tokenizes the tracked Kotlin, indexes
-  top-level declarations by nesting depth across all brackets and answers `declarations`; all 316
-  files scan, 767 declarations. Placed in `RULE_FILES`, the split table and `AGENTS.md`, its tests
-  run in `verify.sh` (DE-010).**
+- 2026-10-30 — **Codemap Units 2–5: `scripts/codemap.py` scans the tracked Kotlin and answers
+  `declarations`, `who-uses`, `impact`, `features`, `feature`, `suspects`, `write` and `check`
+  (DE-010); `codemap/features.toml` holds six features, 45 anchors. Unit 5's replay and triage
+  kept D2 (a) and D3 (b); the probe baseline already passes four of five criteria (plan Status).
+  No map is committed until Unit 6 (DE-013).**
 
 - 2026-10-30 — **Codemap plan: the owner took every D1–D4 recommendation, Astra's too: D1 (a),
   D2 (a) provisionally, D3 (b), D4 (a); Owner queue item removed (DE-012).**
