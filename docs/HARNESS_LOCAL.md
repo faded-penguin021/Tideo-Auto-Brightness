@@ -20,7 +20,7 @@ any of it.
 | | Files | Rule |
 |---|---|---|
 | **Shipped** | `scripts/{ladder,session-start,command-guard,redact,redact-tool-output,test-ladder-guards}.sh`, `scripts/MANIFEST.sha256` | **Never edit.** Parameter-free, they read `amh.conf` at runtime. The ladder's integrity rung hashes them against the manifest every run, so a local edit is reported rather than discovered a year later by whoever upgrades. |
-| **Ours** | `amh.conf`, `scripts/verify.sh`, `scripts/guards/*.sh`, `scripts/bootstrap.sh`, `scripts/session-facts.sh`, `scripts/tests/local-guards.sh` | The extension points. Everything repo-specific goes in one of these — if a change fits none of them, the harness is missing an extension point; raise it upstream rather than carrying a local patch. |
+| **Ours** | `amh.conf`, `scripts/verify.sh`, `scripts/guards/*.sh`, `scripts/bootstrap.sh`, `scripts/session-facts.sh`, `scripts/codemap.py`, `scripts/tests/local-guards.sh`, `scripts/tests/codemap/` | The extension points. Everything repo-specific goes in one of these — if a change fits none of them, the harness is missing an extension point; raise it upstream rather than carrying a local patch. |
 | **Ours (prose)** | `AGENTS.md`, `CLAUDE.md`, `docs/{STATE,RUNBOOK,LEDGER*}.md`, `docs/history/` | Seeded once, ours thereafter. Upgrades arrive as hand-applied notes, never a re-sync. |
 | **Ours (config)** | `.github/workflows/*`, `.claude/settings.json`, `.codex/*` | Written only when absent. Diff each against its upstream template on an upgrade and take what applies. |
 
@@ -237,7 +237,7 @@ which you chose and why.
 | `VERSION_FILE` | empty | This repo's version is a Kotlin DSL assignment in `app/build.gradle.kts`, not the first line of a plain file, so the release-window banner cannot read it. `release-preflight.yml` (D-124) enforces the version invariants instead. |
 | `REQUIRED_TOOLS` | `bash git java python3` | The ladder and its fixture suites are shell/Git programs, while the Android verification set requires the JVM. `python3` is there because the output-redaction hook (AMH 15.0.0) stands down silently without it, and the banner is the only place that stand-down is reported. The session banner reports availability; nothing consumes the states. |
 | `ADAPTER_FILES` | the Claude and Codex adapter paths | Names every adapter this repository ships. `configured` reports file presence, not that an integration or hook actually ran. |
-| `RULE_FILES` | `+ CLAUDE.md`, `scripts/{guards,tests,bootstrap.sh,session-facts.sh,verify.sh}`, `scripts/{MANIFEST.sha256,redact-tool-output.sh}`, **`docs/HARNESS_LOCAL.md`** | A repo-local guard is legislation exactly as a shipped one is, and `CLAUDE.md` must never diverge from the constitution it points at. The list must name every extension point `AGENTS.md` **Harness** admits, unshipped repo-local scripts included, or the rule-review tripwire has a hole exactly where local authority is widest. **This file** joined by owner decision (2026-09-04; recorded in the STATE changelog), the fourth doc in the list and the first that is neither constitution nor playbook: it is the authority on which scripts may never be edited, the adapter table saying which rails actually run, and this very table — the last prose copy of `LEDGER_LINE_CAP`. It went uncovered through two units that corrected the Codex-rail claim everywhere else while the most detailed statement of it sat here (DC-032, DC-034). |
+| `RULE_FILES` | `+ CLAUDE.md`, `scripts/{guards,tests,bootstrap.sh,session-facts.sh,codemap.py,verify.sh}`, `scripts/{MANIFEST.sha256,redact-tool-output.sh}`, **`docs/HARNESS_LOCAL.md`** | A repo-local guard is legislation exactly as a shipped one is, and `CLAUDE.md` must never diverge from the constitution it points at. The list must name every extension point `AGENTS.md` **Harness** admits, unshipped repo-local scripts included, or the rule-review tripwire has a hole exactly where local authority is widest. **This file** joined by owner decision (2026-09-04; recorded in the STATE changelog), the fourth doc in the list and the first that is neither constitution nor playbook: it is the authority on which scripts may never be edited, the adapter table saying which rails actually run, and this very table — the last prose copy of `LEDGER_LINE_CAP`. It went uncovered through two units that corrected the Codex-rail claim everywhere else while the most detailed statement of it sat here (DC-032, DC-034). |
 
 ## Adapter and CI notes
 
@@ -309,6 +309,18 @@ binds no one; the rule-review pass rejected that, and correctly. What it prints 
 guidance every session reads before deciding whether a version is safe to work on, so wording that
 drifts changes what agents believe while producing no advisory at all. Reporting is not the same as
 harmless.
+
+**`scripts/codemap.py`** is the third unshipped repo-local script, a stdlib-only Python 3.11+
+index of the tracked Kotlin under `{app,domain,platform}/src/{main,debug,test}/kotlin`, so an
+agent can find what already owns a feature before writing a second copy (DD-038 is the incident;
+DE-010). Its answers are lexical,
+never semantic. Today it tokenizes, reads top-level declarations and answers `declarations
+[<path>]`; it fails loudly, never with a smaller answer, on a git failure, an unreadable tracked
+file, invalid UTF-8, unclosed lexical input or unsupported syntax between declarations (a statement
+inside a declaration's tail is invalid Kotlin, left to the compiler). `scripts/verify.sh`
+runs its tests in `scripts/tests/codemap/`. No guard calls it yet, so nothing in the ladder
+depends on its answers; it is in `RULE_FILES` because `AGENTS.md` → Harness lists every
+unshipped repo-local script there.
 
 ## Adding an agent adapter
 

@@ -384,7 +384,8 @@ Never edit a script listed in `scripts/MANIFEST.sha256`. The ladder hashes those
 and a local edit would turn every later upgrade into a merge. Put repository-specific changes in
 `amh.conf`, `scripts/guards/*.sh`, `scripts/verify.sh`, `scripts/tests/local-guards.sh` (the
 repo-local guards' fixture suite, which `verify.sh` runs), or an unshipped repo-local script —
-`scripts/bootstrap.sh` and `scripts/session-facts.sh` are the two that exist. Every one of them is
+`scripts/bootstrap.sh`, `scripts/session-facts.sh` and `scripts/codemap.py` are the three that
+exist, the last with its tests in `scripts/tests/codemap/`, which `verify.sh` runs. Every one of them is
 listed in `RULE_FILES`, so the rule-review tripwire covers the whole set. Adding a script to that
 last category is itself a rule change: name it in `RULE_FILES` and in `docs/HARNESS_LOCAL.md`'s
 split table in the same commit. If a necessary change fits none of these locations, the harness

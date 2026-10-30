@@ -141,7 +141,7 @@
   while `fdroid-compat.yml`'s `pipx`, `docker`, `sudo` and apt run on the PR. The reproducibility
   job compares entry contents, not zip framing, which is where a host image would differ, so the
   first release's F-Droid verification is the full proof.
-- DE-010: **Astra High reviewed the codemap plan before any code (relayed by the owner,
+- DE-010 [cited]: **Astra High reviewed the codemap plan before any code (relayed by the owner,
   2026-10-29): two blockers and seven should-fixes, all accepted.** The blockers: brace depth 0
   does not find top-level Kotlin declarations, since `DynamicScaleInput`'s constructor properties
   sit at depth 0 inside its header's parentheses, so the scanner counts nesting across `()`, `[]`

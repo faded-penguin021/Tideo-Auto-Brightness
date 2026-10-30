@@ -46,7 +46,7 @@ stays closed (DB-051…DB-060), and Scorecard.dev is a run-once local input.
   causes · [ ] 4 device checks and close-out.
 - **Codemap, a generated feature map for agents** — `docs/plans/CODEMAP.md`, spec only (owner,
   2026-10-29; D1–D4 decided, DE-012). The owner's go-ahead covers the remaining units.
-  [x] 0 plan · [x] 1 Astra review · [ ] 2 placement, tokenizer, declarations · [ ] 3 references ·
+  [x] 0 plan · [x] 1 Astra review · [x] 2 placement, tokenizer, declarations · [ ] 3 references ·
   [ ] 4 features, queries, write and check · [ ] 5 seed and measure · [ ] 6 guard (per D2) ·
   [ ] 7 agent entry points · [ ] 8 probe and close-out.
 
@@ -113,6 +113,11 @@ proposing work; changing it is legislation under RUNBOOK's rule-review protocol.
 ## Changelog
 
 Newest first; ledger rows are the durable detail.
+
+- 2026-10-30 — **Codemap Unit 2: `scripts/codemap.py` tokenizes the tracked Kotlin, indexes
+  top-level declarations by nesting depth across all brackets and answers `declarations`; all 316
+  files scan, 767 declarations. Placed in `RULE_FILES`, the split table and `AGENTS.md`, its tests
+  run in `verify.sh` (DE-010).**
 
 - 2026-10-30 — **Codemap plan: the owner took every D1–D4 recommendation, Astra's too: D1 (a),
   D2 (a) provisionally, D3 (b), D4 (a); Owner queue item removed (DE-012).**
