@@ -350,6 +350,7 @@ REFS = {
     f"{MAIN}/../k3/Use.kt": "package k3\n\nfun use() = k.K2.thing\n",
     f"{MAIN}/../y/OwnDup.kt": "package y\n\nimport p2.*\n\nclass Dup\nfun use() = Dup()\n",
     f"{MAIN}/../z/DoubleStar.kt": "package z\n\nimport p2.*\nimport p2.*\n\nfun d() = Dup()\n",
+    "codemap/features.toml": '[lib]\nanchors = ["Obj"]\n',
 }
 REFS = {os.path.normpath(k): v for k, v in REFS.items()}
 
@@ -480,6 +481,7 @@ class References(unittest.TestCase):
         })
         self.assertEqual([u["path"].split("/kotlin/", 1)[1] for u in out["import_only"]], ["q/Imports.kt"])
         self.assertEqual(out["cites"], {"DX-901": [3], "DX-902": [3]})
+        self.assertEqual(out["features"], [{"feature": "lib", "role": "owner"}])
 
     def test_exit_statuses(self):
         cases = [
@@ -514,6 +516,268 @@ class References(unittest.TestCase):
             self.assertTrue(outs[0])
             self.assertEqual(outs[0], outs[1], args)
             self.assertEqual(outs[0], outs[2], args)
+
+
+class Registry(unittest.TestCase):
+    def assertMalformed(self, text, *needles):
+        with self.assertRaises(codemap.CodemapError) as cm:
+            codemap.parse_registry(text)
+        self.assertEqual(cm.exception.code, codemap.EXIT_MALFORMED)
+        for needle in needles:
+            self.assertIn(needle, str(cm.exception))
+
+    def test_valid(self):
+        got = codemap.parse_registry('[sun-times]\nanchors = ["A", "p.q.B"]\nkeywords = ["sun"]\n'
+                                     '[other]\nanchors = ["A"]\n')
+        self.assertEqual(got["sun-times"], codemap.Feature("sun-times", ("A", "p.q.B"), ("sun",)))
+        self.assertEqual(got["other"].keywords, ())
+        self.assertEqual(codemap.parse_registry('[a]\nanchors = ["A"]\nkeywords = []\n')["a"].keywords, ())
+
+    def test_unknown_key(self):
+        self.assertMalformed('[a]\nanchors = ["X"]\nfiles = ["y"]\n', "[a]: unknown key 'files'")
+
+    def test_nested_table_is_an_unknown_key(self):
+        self.assertMalformed('[a]\nanchors = ["X"]\n[a.sub]\nanchors = ["Y"]\n', "unknown key 'sub'")
+
+    def test_wrong_types(self):
+        self.assertMalformed('[a]\nanchors = "X"\n', "'anchors' must be a list of strings")
+        self.assertMalformed('[a]\nanchors = ["X"]\nkeywords = [1]\n', "'keywords' must be a list of strings")
+        self.assertMalformed('x = 1\n', "[x]: a feature must be a table")
+
+    def test_empty_and_missing_anchors(self):
+        self.assertMalformed('[a]\nanchors = []\n', "'anchors' is empty")
+        self.assertMalformed('[a]\nkeywords = ["x"]\n', "'anchors' is required")
+        self.assertMalformed('[a]\nanchors = [""]\n', "anchor '' is not a symbol name")
+
+    def test_duplicate_anchor(self):
+        self.assertMalformed('[a]\nanchors = ["X", "Y", "X"]\n', "anchor 'X' is listed twice")
+
+    def test_malformed_names(self):
+        self.assertMalformed('[Bad_Name]\nanchors = ["X"]\n', "[Bad_Name]: a feature name")
+        self.assertMalformed('[a]\nanchors = ["p..X"]\n', "anchor 'p..X' is not")
+        self.assertMalformed('[a]\nanchors = ["X"]\nkeywords = ["Sun set"]\n', "keyword 'Sun set'")
+
+    def test_every_error_is_reported(self):
+        self.assertMalformed('[a]\nanchors = []\nfoo = 1\n[b]\nanchors = ["X", "X"]\n',
+                             "'anchors' is empty", "unknown key 'foo'", "'X' is listed twice")
+
+    def test_invalid_toml(self):
+        self.assertMalformed('[a\n', "invalid TOML")
+
+    def test_word_parts(self):
+        self.assertEqual(codemap.word_parts("SUNSET_OFFSET"), {"sunset", "offset"})
+        self.assertEqual(codemap.word_parts("sunsetAt2"), {"sunset", "at", "2"})
+        self.assertEqual(codemap.word_parts("HTTPServer"), {"http", "server"})
+        self.assertNotIn("solar", codemap.word_parts("insolarX"))
+
+
+FEAT = {
+    "codemap/features.toml": '[sun]\nanchors = ["Calc", "Ramp"]\nkeywords = ["solar", "sunset"]\n\n'
+                             '[night]\nanchors = ["Ramp", "s.Night"]\n',
+    f"{MAIN}/../c/Calc.kt": "package c\n\n// DX-901 DX-902; Tasker: task90 \"x\" XML L1\n"
+                            "object Calc { fun at() = 1 }\nval solarNoon = 1\n",
+    f"{MAIN}/../c/Ramp.kt": "package c\n\n// DX-903\nobject Ramp { fun k() = Calc.at() }\n",
+    f"{MAIN}/../u/Chart.kt": "package u\n\nimport c.Calc\n\n// DX-901, prof7\nfun chart() = Calc.at()\n"
+                             "fun sunsetChart() = 2\n",
+    f"{MAIN}/../u/Indirect.kt": "package u\n\nfun indirect() = chart()\n",
+    f"{MAIN}/../u/Hub.kt": "package u\n\nimport c.Ramp\nimport s.Night\n\nfun hub() = listOf(Ramp, Night())\n",
+    f"{MAIN}/../w2/Both.kt": "package w2\n\nimport s.*\nimport t.*\n\nfun both() = Night()\n",
+    f"{MAIN}/../u/Rival.kt": "package u\n\n// solar math, again\nfun sunsetAt() = \"solar\"\nfun insolarX() = 1\n",
+    f"{MAIN}/../u/solar/Quiet.kt": "package u.solar\n\nfun q() = 1\n",
+    f"{MAIN}/../s/Night.kt": "package s\n\nclass Night\n",
+    f"{MAIN}/../t/Night.kt": "package t\n\nclass Night\n",
+    f"{TEST}/../c/CalcTest.kt": "package c\n\n// DX-904 task91\nclass CalcTest { fun t() = Calc.at() }\n"
+                                "fun solarTest() = 1\n",
+}
+FEAT = {os.path.normpath(k): v for k, v in FEAT.items()}
+
+
+def short(path):
+    return path.split("/kotlin/", 1)[1]
+
+
+class Features(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.tmp = Path(tempfile.mkdtemp(prefix="codemap-feat-"))
+        cls.root = cls.tmp / "t"
+        make_tree(cls.root, FEAT)
+
+    @classmethod
+    def tearDownClass(cls):
+        shutil.rmtree(cls.tmp)
+
+    def tree(self, name, registry=None, extra=None):
+        files = dict(FEAT)
+        if registry is not None:
+            files["codemap/features.toml"] = registry
+        files.update(extra or {})
+        root = self.tmp / name
+        make_tree(root, files)
+        return root
+
+    def cli(self, *args, root=None, code=0):
+        proc = run(["--root", str(root or self.root), *args])
+        self.assertEqual(proc.returncode, code, proc.stderr.decode())
+        return proc
+
+    def feature(self, name):
+        return json.loads(self.cli("feature", name, "--json").stdout)
+
+    def test_expansion(self):
+        out = self.feature("sun")
+        self.assertEqual([(short(r["path"]), r["anchors"]) for r in out["owners"]],
+                         [("c/Calc.kt", ["Calc"]), ("c/Ramp.kt", ["Ramp"])])
+        # Ramp.kt owns Ramp and calls Calc, so it is both; Indirect.kt calls only a consumer.
+        self.assertEqual([(short(r["path"]), r["anchors"]) for r in out["consumers"]],
+                         [("c/Ramp.kt", ["Calc"]), ("u/Chart.kt", ["Calc"]), ("u/Hub.kt", ["Ramp"])])
+        self.assertEqual([(short(r["path"]), r["anchors"]) for r in out["tests"]],
+                         [("c/CalcTest.kt", ["Calc"])])
+        self.assertEqual([(r["anchor"], r["symbol"]) for r in out["anchors"]],
+                         [("Calc", "c.Calc"), ("Ramp", "c.Ramp")])
+
+    def test_qualified_anchor_resolves(self):
+        out = self.feature("night")
+        self.assertIn(("s.Night", "s.Night"), [(r["anchor"], r["symbol"]) for r in out["anchors"]])
+        self.assertEqual(out["tests"], [])
+
+    def test_ambiguous_consumer_is_marked(self):
+        # Both.kt star-imports s and t, so its bare Night is a candidate on each, marked.
+        out = self.feature("night")
+        self.assertEqual([(short(r["path"]), r["anchors"], r["ambiguous"]) for r in out["consumers"]],
+                         [("u/Hub.kt", ["Ramp", "s.Night"], []), ("w2/Both.kt", ["s.Night"], ["s.Night"])])
+        self.assertIn("w2/Both.kt  s.Night (ambiguous)", self.cli("feature", "night").stdout.decode())
+        mapped = json.loads(self.cli("write", "--stdout").stdout)["features"]["night"]["derived"]
+        self.assertEqual([r["ambiguous"] for r in mapped["consumers"]], [[], ["s.Night"]])
+
+    def test_overlap(self):
+        self.assertEqual({k: [short(p) for p in v] for k, v in self.feature("sun")["overlaps"].items()},
+                         {"night": ["c/Ramp.kt", "u/Hub.kt"]})
+        text = self.cli("feature", "sun").stdout.decode()
+        self.assertIn("overlapping features (shared member files; behaviour need not agree):", text)
+
+    def test_joins_keep_owner_consumer_and_test_citations_apart(self):
+        out = self.feature("sun")
+        ledger = {g: {cid: [short(p) for p in ps] for cid, ps in t.items()} for g, t in out["ledger"].items()}
+        self.assertEqual(ledger, {
+            "owners": {"DX-901": ["c/Calc.kt"], "DX-902": ["c/Calc.kt"], "DX-903": ["c/Ramp.kt"]},
+            "consumers": {"DX-901": ["u/Chart.kt"]},
+            "tests": {"DX-904": ["c/CalcTest.kt"]},
+        })
+        tasker = {g: {c: [short(p) for p in ps] for c, ps in t.items()} for g, t in out["tasker"].items()}
+        self.assertEqual(tasker, {"owners": {"task90": ["c/Calc.kt"]}, "consumers": {"prof7": ["u/Chart.kt"]},
+                                  "tests": {"task91": ["c/CalcTest.kt"]}})
+        text = self.cli("feature", "sun").stdout.decode()
+        owners_at = text.index("ledger rows cited in owner files")
+        consumers_at = text.index("ledger rows cited in consumer files")
+        self.assertLess(owners_at, consumers_at)
+        self.assertIn("DX-903", text[owners_at:consumers_at])
+        self.assertNotIn("DX-903", text[consumers_at:])
+
+    def test_natural_id_order(self):
+        self.assertEqual(sorted(["DX-10", "DX-9", "D-100", "task100", "task9"], key=codemap.id_key),
+                         ["D-100", "DX-9", "DX-10", "task9", "task100"])
+
+    def test_suspects(self):
+        out = json.loads(self.cli("suspects", "--json").stdout)["features"]
+        # Rival.kt: `sunsetAt` holds a keyword part; `insolarX`, the comment and the string do not.
+        # Quiet.kt's keyword is only in its package header. Calc.kt (`solarNoon`, an owner),
+        # Chart.kt (`sunsetChart`, a consumer) and CalcTest.kt (`solarTest`, a test) are left out.
+        self.assertEqual([(short(s["path"]), s["identifiers"]) for s in out["sun"]["suspects"]],
+                         [("u/Rival.kt", ["sunsetAt"])])
+        self.assertEqual(out["night"], {"keywords": [], "suspects": []})
+        text = self.cli("suspects", "night").stdout.decode()
+        self.assertIn("no keywords declared", text)
+        self.assertIn("leads, not findings", text)
+        self.assertIn("not semantic resolution", text)
+        self.assertIn("leads, not findings", json.loads(self.cli("suspects", "--json").stdout)["note"])
+
+    def test_features_query(self):
+        text = self.cli("features").stdout.decode().splitlines()
+        self.assertEqual(text[:3], ["night", "  anchors: Ramp, s.Night", "sun"])
+        self.assertIn("-- " + codemap.APPROXIMATIONS[0], text)
+        out = json.loads(self.cli("features", "--json").stdout)
+        self.assertEqual(sorted(out["features"]), ["night", "sun"])
+        self.assertEqual((out["scope"], out["approximations"]), (codemap.SCOPE_TEXT, list(codemap.APPROXIMATIONS)))
+
+    def test_impact_lists_features(self):
+        out = json.loads(self.cli("impact", f"{os.path.normpath(MAIN + '/../u/Hub.kt')}", "--json").stdout)
+        self.assertEqual(out["features"], [{"feature": "night", "role": "consumer"},
+                                           {"feature": "sun", "role": "consumer"}])
+        text = self.cli("impact", os.path.normpath(MAIN + "/../c/Ramp.kt")).stdout.decode()
+        self.assertIn("features: night (owner), sun (owner)", text)
+        text = self.cli("impact", os.path.normpath(MAIN + "/../u/Rival.kt")).stdout.decode()
+        self.assertIn("features: none", text)
+
+    def test_unknown_feature(self):
+        for args in (["feature", "nope"], ["suspects", "nope"]):
+            self.assertIn("nope: no such feature", self.cli(*args, code=codemap.EXIT_UNKNOWN_FEATURE).stderr.decode())
+
+    def test_unresolved_and_ambiguous_anchors(self):
+        root = self.tree("bad-anchors", '[a]\nanchors = ["Missing", "Night", "CalcTest", "Calc", "c.Calc"]\n')
+        for args in (["check"], ["check", "--anchors-only"], ["feature", "a"], ["features"]):
+            err = self.cli(*args, root=root, code=codemap.EXIT_MALFORMED).stderr.decode()
+            self.assertIn("anchor Missing: no top-level symbol", err)
+            self.assertIn("anchor Night is ambiguous, qualify it: s.Night", err)
+            self.assertIn("t.Night", err)
+            self.assertIn("anchor CalcTest is declared only in test sources", err)
+            self.assertIn("anchors Calc and c.Calc name one symbol", err)
+
+    def test_malformed_and_missing_registry(self):
+        root = self.tree("bad-toml", '[a]\nanchors = []\n')
+        self.assertIn("'anchors' is empty", self.cli("check", root=root, code=codemap.EXIT_MALFORMED).stderr.decode())
+        root = self.tree("no-toml")
+        (root / "codemap" / "features.toml").unlink()
+        for args in (["check", "--anchors-only"], ["impact", os.path.normpath(MAIN + "/../c/Calc.kt")]):
+            err = self.cli(*args, root=root, code=codemap.EXIT_MALFORMED).stderr.decode()
+            self.assertIn("codemap/features.toml: unreadable", err)
+
+    def test_map_contents(self):
+        out = json.loads(self.cli("write", "--stdout").stdout)
+        self.assertEqual(out["schema"], codemap.SCHEMA)
+        sun = out["features"]["sun"]
+        self.assertEqual(sorted(sun), ["declared", "derived"])
+        self.assertEqual([(r["anchor"], [short(p) for p in r["files"]]) for r in sun["declared"]],
+                         [("Calc", ["c/Calc.kt"]), ("Ramp", ["c/Ramp.kt"])])
+        self.assertEqual(sorted(sun["derived"]), ["consumers", "owners", "tests"])
+        self.assertEqual([short(p) for p in sun["derived"]["tests"]], ["c/CalcTest.kt"])
+        self.assertNotIn(b"DX-9", self.cli("write", "--stdout").stdout)  # joins stay query-time
+        self.assertNotIn(b'"line"', self.cli("write", "--stdout").stdout)
+
+    def test_check_fresh_stale_missing_and_anchors_only(self):
+        root = self.tree("check")
+        missing = self.cli("check", root=root, code=codemap.EXIT_STALE).stderr.decode()
+        self.assertIn("codemap/map.json is missing", missing)
+        for needle in ("python3 scripts/codemap.py write", "git add", "review the map's diff"):
+            self.assertIn(needle, missing)
+        self.assertIn("anchors only", self.cli("check", "--anchors-only", root=root).stdout.decode())
+        self.assertIn("written", self.cli("write", root=root).stdout.decode())
+        self.assertIn("map.json current", self.cli("check", root=root).stdout.decode())
+        # A new consumer changes membership, so the committed map is stale.
+        (root / os.path.normpath(MAIN + "/../u/New.kt")).write_text("package u\n\nfun n() = c.Calc.at()\n")
+        subprocess.run(["git", "-C", str(root), "add", "-A"], check=True)
+        stale = self.cli("check", root=root, code=codemap.EXIT_STALE).stderr.decode()
+        self.assertIn("codemap/map.json is stale", stale)
+        self.cli("check", "--anchors-only", root=root)
+
+    def test_map_determinism_and_idempotent_write(self):
+        crlf = self.tmp / "crlf"
+        if not crlf.exists():
+            make_tree(crlf, FEAT, "\r\n")
+        outs = [
+            run(["--root", str(self.root), "write", "--stdout"], cwd=self.tmp, seed="1").stdout,
+            run(["--root", str(self.root), "write", "--stdout"], cwd="/", seed="2").stdout,
+            run(["--root", str(crlf), "write", "--stdout"], cwd=self.root, seed="3").stdout,
+        ]
+        self.assertTrue(outs[0].endswith(b"}\n") and b"\r" not in outs[0])
+        self.assertEqual(outs[0], outs[1])
+        self.assertEqual(outs[0], outs[2])
+        root = self.tree("write")
+        self.cli("write", root=root)
+        first = (root / "codemap" / "map.json").read_bytes()
+        self.assertEqual(first, outs[0])
+        self.assertIn("unchanged", self.cli("write", root=root).stdout.decode())
+        self.assertEqual((root / "codemap" / "map.json").read_bytes(), first)
 
 
 class RealTree(unittest.TestCase):
@@ -564,6 +828,19 @@ class RealTree(unittest.TestCase):
             got = {r.path.rsplit("/", 1)[1] for r in refs if r.kind != "import-only"}
             self.assertEqual(got, expected, symbol)
             self.assertEqual([r for r in refs if r.kind == "import-only"], [], symbol)
+
+    def test_circadian_feature(self):
+        proc = run(["feature", "circadian", "--json"], cwd="/")
+        self.assertEqual(proc.returncode, 0, proc.stderr.decode())
+        out = json.loads(proc.stdout)
+        anchor_files = {p for r in out["anchors"] for p in r["files"]}
+        self.assertEqual({r["path"].rsplit("/", 1)[1] for r in out["owners"]},
+                         {"SolarTimes.kt", "DynamicScaleEngine.kt", "NightLightTemperatureRamp.kt",
+                          "ContextSolarTimes.kt", "CircadianWindowProvider.kt"})
+        self.assertEqual({r["path"] for r in out["owners"]}, anchor_files)
+        owners = {k: {p.rsplit("/", 1)[1] for p in v} for k, v in out["ledger"]["owners"].items()}
+        self.assertIn("ContextSolarTimes.kt", owners["DD-038"])
+        self.assertIn("CircadianWindowProvider.kt", owners["DD-061"])
 
 
 if __name__ == "__main__":

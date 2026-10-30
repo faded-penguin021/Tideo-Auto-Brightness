@@ -1,0 +1,6 @@
+# Feature anchors for scripts/codemap.py, whose docstring states the format and what the map is.
+
+[circadian]
+anchors = ["SolarCalculator", "DynamicScaleEngine", "NightLightTemperatureRamp",
+           "ContextSolarTimes", "CircadianWindowProvider"]
+keywords = ["sunrise", "sunset", "solar", "circadian"]

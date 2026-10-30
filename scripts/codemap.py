@@ -23,9 +23,21 @@ see through its package, an import or a qualified name (Index has the rules). Ap
 - so does a same-named member of another type, such as x.compute() beside a top-level compute;
 - references from XML, the manifest, Gradle, reflection or generated code are invisible.
 
+Features: codemap/features.toml names each feature's anchors, the top-level symbols that own its
+logic (a bare name while unique, else package-qualified), and optional keywords. A feature expands
+one hop: owners declare an anchor, consumers are production files that reference one, tests are
+test files that do. Features sharing a member file overlap; that says nothing about whether their
+behaviour should agree. Ledger IDs and Tasker coordinates (whole-word task<N> and prof<N>; act and
+line positions are left to the file) are joined per member file at query time. `suspects` lists
+production files outside a feature whose identifiers hold a keyword as a whole camelCase or
+snake_case part: leads, never a finding. Anchors are plain identifiers, so a backticked name cannot
+be one, and keyword parts split on ASCII case; the tree's top-level names and identifiers are all
+ASCII. codemap/map.json is the feature-level map `write` generates and `check` compares byte for
+byte.
+
 Exit statuses: 0 success (with or without results), 2 usage, 3 malformed input or a failed scan,
 4 a path outside the scanned scope, 5 an unknown symbol, 6 an ambiguous symbol, 7 an unknown
-feature.
+feature, 8 a missing or stale map (`check`).
 """
 
 from __future__ import annotations
@@ -41,6 +53,8 @@ from pathlib import Path
 if sys.version_info < (3, 11):
     sys.exit("codemap.py needs Python 3.11 or later (tomllib)")
 
+import tomllib  # noqa: E402  (after the version check, which names it)
+
 EXIT_OK = 0
 EXIT_USAGE = 2
 EXIT_MALFORMED = 3
@@ -48,8 +62,11 @@ EXIT_OUT_OF_SCOPE = 4
 EXIT_UNKNOWN_SYMBOL = 5
 EXIT_AMBIGUOUS_SYMBOL = 6
 EXIT_UNKNOWN_FEATURE = 7
+EXIT_STALE = 8
 
 SCHEMA = 1
+FEATURES_PATH = "codemap/features.toml"
+MAP_PATH = "codemap/map.json"
 MODULES = ("app", "domain", "platform")
 SOURCE_SETS = ("main", "debug", "test")
 SCOPE_RE = re.compile(r"^(app|domain|platform)/src/(main|debug|test)/kotlin/.+\.kt$")
@@ -60,7 +77,10 @@ APPROXIMATIONS = (
     "references from XML, the manifest, Gradle, reflection or generated code are invisible",
 )
 EMPTY = "no references found within scanned scope"
+SUSPECTS_NOTE = ("leads, not findings: a production file outside the feature (no owner, no anchor "
+                 "reference) with a keyword as a whole camelCase or snake_case part of an identifier")
 CITATION_RE = re.compile(r"(?<!\w)D[A-Z]*-\d+(?!\w)")  # the ladder's citation shape, whole words
+TASKER_RE = re.compile(r"(?<!\w)(?:task|prof)\d+(?!\w)")  # AGENTS.md's `// Tasker: task<id> …`
 
 DECL_KEYWORDS = {"class", "interface", "object", "typealias", "fun", "val", "var"}
 CLASS_MODIFIERS = ("data", "enum", "sealed", "value", "annotation", "inner")
@@ -376,6 +396,7 @@ class FileIndex:
     code_start: int = 0  # first token after the package header and imports
     name_tokens: set[int] = field(default_factory=set)  # top-level declaration names
     citations: list[tuple[str, int]] = field(default_factory=list)  # (ledger ID, line)
+    tasker: list[tuple[str, int]] = field(default_factory=list)  # (Tasker coordinate, line)
 
     @property
     def role(self) -> str:
@@ -645,6 +666,7 @@ def index_file(path: str, data: bytes) -> FileIndex:
     DeclarationReader(path, index.tokens).read(index)
     for line_no, line in enumerate(normalise_newlines(text).split("\n"), 1):
         index.citations.extend((cid, line_no) for cid in CITATION_RE.findall(line))
+        index.tasker.extend((coord, line_no) for coord in TASKER_RE.findall(line))
     return index
 
 
@@ -881,12 +903,238 @@ def resolve_path_arg(root: Path, arg: str, known: set[str]) -> str:
     return rel
 
 
+# ---------------------------------------------------------------- features
+
+
+FEATURE_KEYS = ("anchors", "keywords")
+FEATURE_NAME_RE = re.compile(r"[a-z][a-z0-9]*(?:-[a-z0-9]+)*")
+ANCHOR_RE = re.compile(r"[^\W\d]\w*(?:\.[^\W\d]\w*)*")
+KEYWORD_RE = re.compile(r"[a-z][a-z0-9]*")
+WORD_PART_RE = re.compile(r"[A-Z]+(?![a-z])|[A-Z]?[a-z]+|\d+")
+
+
+@dataclass(frozen=True)
+class Feature:
+    name: str
+    anchors: tuple[str, ...]
+    keywords: tuple[str, ...]
+
+
+def string_list(table: dict, key: str, shape: re.Pattern, what: str, errors: list[str],
+                prefix: str, required: bool) -> tuple[str, ...]:
+    if key not in table:
+        if required:
+            errors.append(f"{prefix}: '{key}' is required")
+        return ()
+    value = table[key]
+    if not isinstance(value, list) or not all(isinstance(v, str) for v in value):
+        errors.append(f"{prefix}: '{key}' must be a list of strings")
+        return ()
+    if not value and required:
+        errors.append(f"{prefix}: '{key}' is empty")
+    for v in value:
+        if not shape.fullmatch(v):
+            errors.append(f"{prefix}: {key[:-1]} '{v}' is not {what}")
+    for v in sorted({v for v in value if value.count(v) > 1}):
+        errors.append(f"{prefix}: {key[:-1]} '{v}' is listed twice")
+    return tuple(value)
+
+
+def registry_error(errors: list[str]) -> CodemapError:
+    return CodemapError(f"{FEATURES_PATH} is malformed:\n" + "\n".join(f"  {e}" for e in errors))
+
+
+def parse_registry(text: str) -> dict[str, Feature]:
+    """One table per feature: `anchors` (required) and `keywords` (optional), nothing else."""
+    try:
+        data = tomllib.loads(text)
+    except tomllib.TOMLDecodeError as exc:
+        raise CodemapError(f"{FEATURES_PATH}: invalid TOML: {exc}") from None
+    errors: list[str] = []
+    features = {}
+    for name, table in data.items():
+        prefix = f"[{name}]"
+        if not FEATURE_NAME_RE.fullmatch(name):
+            errors.append(f"{prefix}: a feature name is lowercase words joined by '-'")
+        if not isinstance(table, dict):
+            errors.append(f"{prefix}: a feature must be a table")
+            continue
+        for key in sorted(set(table) - set(FEATURE_KEYS)):
+            errors.append(f"{prefix}: unknown key '{key}' (allowed: {', '.join(FEATURE_KEYS)})")
+        anchors = string_list(table, "anchors", ANCHOR_RE, "a symbol name, bare or package-qualified",
+                              errors, prefix, required=True)
+        keywords = string_list(table, "keywords", KEYWORD_RE, "one lowercase word",
+                               errors, prefix, required=False)
+        features[name] = Feature(name, anchors, keywords)
+    if errors:
+        raise registry_error(errors)
+    return features
+
+
+def load_registry(root: Path) -> dict[str, Feature]:
+    try:
+        data = (root / FEATURES_PATH).read_bytes()
+    except OSError as exc:
+        raise CodemapError(f"{FEATURES_PATH}: unreadable: {exc.strerror}") from None
+    return parse_registry(read_source(FEATURES_PATH, data))
+
+
+def feature_arg(registry: dict[str, Feature], name: str) -> Feature:
+    if name not in registry:
+        raise CodemapError(f"{name}: no such feature in {FEATURES_PATH} (`features` lists them)",
+                           EXIT_UNKNOWN_FEATURE)
+    return registry[name]
+
+
+@dataclass
+class Expansion:
+    """One feature, one hop out from its anchors. Path tables map a file to anchor names."""
+
+    feature: Feature
+    symbols: dict[str, Symbol] = field(default_factory=dict)  # anchor -> symbol
+    owners: dict[str, set[str]] = field(default_factory=dict)
+    consumers: dict[str, set[str]] = field(default_factory=dict)
+    tests: dict[str, set[str]] = field(default_factory=dict)
+    ambiguous: dict[str, set[str]] = field(default_factory=dict)  # through an ambiguous name
+
+    @property
+    def members(self) -> set[str]:
+        return set(self.owners) | set(self.consumers) | set(self.tests)
+
+    def role(self, path: str) -> str | None:
+        if path in self.owners:
+            return "owner"
+        if path in self.consumers:
+            return "consumer"
+        return "test" if path in self.tests else None
+
+
+def production_files(index: Index, sym: Symbol) -> list[str]:
+    return sorted({d.path for d in index.decls[sym] if index.by_path[d.path].role == "production"})
+
+
+def expand(index: Index, registry: dict[str, Feature]) -> dict[str, Expansion]:
+    """Resolve every anchor (each to exactly one symbol, or an error) and expand each feature."""
+    errors: list[str] = []
+    out = {name: Expansion(feat) for name, feat in registry.items()}
+    by_symbol: dict[Symbol, list[tuple[str, str]]] = {}
+    for name, feat in registry.items():
+        seen: dict[Symbol, str] = {}
+        for anchor in feat.anchors:
+            try:
+                sym = index.symbol_arg(anchor)
+            except CodemapError as exc:
+                errors.append(f"[{name}]: anchor {exc}")
+                continue
+            if not production_files(index, sym):
+                errors.append(f"[{name}]: anchor {anchor} is declared only in test sources")
+                continue
+            if sym in seen:
+                errors.append(f"[{name}]: anchors {seen[sym]} and {anchor} name one symbol")
+                continue
+            seen[sym] = anchor
+            out[name].symbols[anchor] = sym
+            by_symbol.setdefault(sym, []).append((name, anchor))
+            for path in production_files(index, sym):
+                out[name].owners.setdefault(path, set()).add(anchor)
+    if errors:
+        raise registry_error(errors)
+    for r in index.references():
+        if r.kind == "import-only" or r.symbol not in by_symbol:
+            continue
+        test = index.by_path[r.path].role == "test"
+        for name, anchor in by_symbol[r.symbol]:
+            e = out[name]
+            (e.tests if test else e.consumers).setdefault(r.path, set()).add(anchor)
+            if r.ambiguous:
+                e.ambiguous.setdefault(r.path, set()).add(anchor)
+    return out
+
+
+def load_features(root: Path) -> tuple[dict[str, Feature], Index, dict[str, Expansion]]:
+    registry = load_registry(root)  # a malformed registry fails before the scan
+    index = Index(build_index(root))
+    return registry, index, expand(index, registry)
+
+
+def overlaps(expansions: dict[str, Expansion], name: str) -> dict[str, list[str]]:
+    mine = expansions[name].members
+    return {other: sorted(mine & e.members) for other, e in sorted(expansions.items())
+            if other != name and mine & e.members}
+
+
+def id_key(cid: str) -> tuple[str, int]:
+    m = re.fullmatch(r"(.*?)(\d+)", cid)
+    return (m.group(1), int(m.group(2))) if m else (cid, -1)
+
+
+def joins(index: Index, e: Expansion, attr: str) -> dict[str, dict[str, list[str]]]:
+    """Per member group, each ledger ID or Tasker coordinate with the member files citing it.
+
+    An owner that also consumes another anchor cites under owners only.
+    """
+    out: dict[str, dict[str, list[str]]] = {}
+    for group, table in (("owners", e.owners), ("consumers", e.consumers), ("tests", e.tests)):
+        cited: dict[str, set[str]] = {}
+        for path in table:
+            if group == "consumers" and path in e.owners:
+                continue
+            for cid, _ in getattr(index.by_path[path], attr):
+                cited.setdefault(cid, set()).add(path)
+        out[group] = {cid: sorted(paths) for cid, paths in sorted(cited.items(), key=lambda kv: id_key(kv[0]))}
+    return out
+
+
+def word_parts(identifier: str) -> set[str]:
+    """camelCase and snake_case parts, lowercased: `SUNSET_OFFSET`, `sunsetAt` -> sunset, …"""
+    return {p.lower() for chunk in identifier.split("_") for p in WORD_PART_RE.findall(chunk)}
+
+
+def suspects(index: Index, e: Expansion) -> dict[str, list[str]]:
+    """Production files outside the feature with a keyword in an identifier past the imports."""
+    keywords = set(e.feature.keywords)
+    if not keywords:
+        return {}
+    out = {}
+    for f in index.files:
+        if f.role != "production" or f.path in e.owners or f.path in e.consumers:
+            continue
+        hits = sorted({t.text for t in f.tokens[f.code_start:]
+                       if t.kind in ("ident", "qident") and word_parts(t.text) & keywords})
+        if hits:
+            out[f.path] = hits
+    return out
+
+
+def declared_rows(index: Index, e: Expansion) -> list[dict]:
+    rows = [{"anchor": a, "files": production_files(index, sym), "symbol": sym.qualified}
+            for a, sym in e.symbols.items()]
+    return sorted(rows, key=lambda r: (r["files"], r["symbol"]))
+
+
+def member_rows(e: Expansion, table: dict[str, set[str]]) -> list[dict]:
+    return [{"ambiguous": sorted(e.ambiguous.get(p, set())), "anchors": sorted(a), "path": p}
+            for p, a in sorted(table.items())]
+
+
+def map_payload(index: Index, expansions: dict[str, Expansion]) -> dict:
+    """Feature level only: no line numbers and no joins, which change without membership."""
+    return {"features": {name: {"declared": declared_rows(index, e),
+                                "derived": {"consumers": member_rows(e, e.consumers),
+                                            "owners": sorted(e.owners), "tests": sorted(e.tests)}}
+                         for name, e in expansions.items()},
+            "schema": SCHEMA}
+
+
 # ---------------------------------------------------------------- output
 
 
+def json_bytes(payload: dict) -> bytes:
+    return (json.dumps(payload, indent=2, sort_keys=True, ensure_ascii=False) + "\n").encode("utf-8")
+
+
 def write_json(payload: dict) -> None:
-    text = json.dumps(payload, indent=2, sort_keys=True, ensure_ascii=False) + "\n"
-    sys.stdout.buffer.write(text.encode("utf-8"))
+    sys.stdout.buffer.write(json_bytes(payload))
 
 
 def write_text(lines: list[str]) -> None:
@@ -968,9 +1216,11 @@ def cmd_who_uses(root: Path, args: argparse.Namespace) -> int:
 
 
 def cmd_impact(root: Path, args: argparse.Namespace) -> int:
-    index = Index(build_index(root))
+    _, index, expansions = load_features(root)
     path = resolve_path_arg(root, args.path, set(index.by_path))
     f = index.by_path[path]
+    member_of = [{"feature": name, "role": e.role(path)} for name, e in sorted(expansions.items())
+                 if e.role(path)]
     declared = sorted({Symbol(d.package, d.name) for d in f.declarations})
     users: dict[str, set[str]] = {}
     importers: dict[str, set[str]] = {}
@@ -999,12 +1249,13 @@ def cmd_impact(root: Path, args: argparse.Namespace) -> int:
     if args.json:
         write_json({
             "approximations": list(APPROXIMATIONS), "cites": {k: sorted(v) for k, v in sorted(cites.items())},
-            "declares": decl_rows, "import_only": group(importers, None), "package": f.package,
-            "path": path, "role": f.role, "schema": SCHEMA, "scope": SCOPE_TEXT,
+            "declares": decl_rows, "features": member_of, "import_only": group(importers, None),
+            "package": f.package, "path": path, "role": f.role, "schema": SCHEMA, "scope": SCOPE_TEXT,
             "used_by": group(users, None),
         })
         return EXIT_OK
     lines = [f"impact {path}  ({f.role}, {f.module}/{f.source_set}, package {f.package or '<default>'})",
+             "features: " + (", ".join(f"{m['feature']} ({m['role']})" for m in member_of) or "none"),
              "declares:"]
     lines.extend(f"  {d['visibility']} {d['kind']} {d['name']}  ({d['line']}:{d['col']})" for d in decl_rows)
     for role, title in (("production", "used by (production):"), ("test", "used by (tests):")):
@@ -1020,6 +1271,135 @@ def cmd_impact(root: Path, args: argparse.Namespace) -> int:
     lines.append("cites: " + (", ".join(sorted(cites)) if cites else "no ledger rows"))
     footer(lines)
     write_text(lines)
+    return EXIT_OK
+
+
+def cmd_features(root: Path, args: argparse.Namespace) -> int:
+    registry, index, expansions = load_features(root)
+    if args.json:
+        write_json({"approximations": list(APPROXIMATIONS),
+                    "features": {name: {"anchors": declared_rows(index, e), "keywords": list(e.feature.keywords)}
+                                 for name, e in expansions.items()},
+                    "schema": SCHEMA, "scope": SCOPE_TEXT})
+        return EXIT_OK
+    lines = []
+    for name, feat in sorted(registry.items()):
+        lines.append(name)
+        lines.append("  anchors: " + ", ".join(feat.anchors))
+        if feat.keywords:
+            lines.append("  keywords: " + ", ".join(feat.keywords))
+    lines.append(f"-- {len(registry)} feature(s) in {FEATURES_PATH}")
+    footer(lines)
+    write_text(lines)
+    return EXIT_OK
+
+
+def cmd_feature(root: Path, args: argparse.Namespace) -> int:
+    registry, index, expansions = load_features(root)
+    e = expansions[feature_arg(registry, args.name).name]
+    shared = overlaps(expansions, args.name)
+    rows = joins(index, e, "citations")
+    coords = joins(index, e, "tasker")
+    if args.json:
+        write_json({
+            "anchors": declared_rows(index, e), "approximations": list(APPROXIMATIONS),
+            "consumers": member_rows(e, e.consumers), "feature": args.name,
+            "keywords": list(e.feature.keywords), "ledger": rows, "overlaps": shared,
+            "owners": member_rows(e, e.owners), "schema": SCHEMA, "scope": SCOPE_TEXT,
+            "tasker": coords, "tests": member_rows(e, e.tests),
+        })
+        return EXIT_OK
+
+    def listed(row: dict) -> str:
+        return ", ".join(a + (" (ambiguous)" if a in row["ambiguous"] else "") for a in row["anchors"])
+
+    lines = [f"feature {args.name}", "anchors:"]
+    lines.extend(f"  {r['anchor']}  {r['symbol']}  ({', '.join(r['files'])})" for r in declared_rows(index, e))
+    for title, table in (("owners:", e.owners), ("consumers (production):", e.consumers), ("tests:", e.tests)):
+        if table:
+            lines.append(title)
+            lines.extend(f"  {r['path']}  {listed(r)}" for r in member_rows(e, table))
+    if not e.consumers and not e.tests:
+        lines.append(EMPTY)
+    if shared:
+        lines.append("overlapping features (shared member files; behaviour need not agree):")
+        lines.extend(f"  {other}  {', '.join(paths)}" for other, paths in shared.items())
+    for what, table in (("ledger rows", rows), ("Tasker coordinates", coords)):
+        if not any(table.values()):
+            lines.append(f"{what}: none cited in member files")
+        for group in ("owners", "consumers", "tests"):
+            if table[group]:
+                lines.append(f"{what} cited in {group[:-1]} files (file-level context, not per anchor):")
+                lines.extend(f"  {cid}  {', '.join(paths)}" for cid, paths in table[group].items())
+    footer(lines)
+    write_text(lines)
+    return EXIT_OK
+
+
+def cmd_suspects(root: Path, args: argparse.Namespace) -> int:
+    registry, index, expansions = load_features(root)
+    names = [feature_arg(registry, args.name).name] if args.name else sorted(registry)
+    found = {name: suspects(index, expansions[name]) for name in names}
+    if args.json:
+        write_json({"approximations": list(APPROXIMATIONS),
+                    "features": {name: {"keywords": list(registry[name].keywords),
+                                        "suspects": [{"identifiers": ids, "path": p}
+                                                     for p, ids in sorted(found[name].items())]}
+                                 for name in names},
+                    "note": SUSPECTS_NOTE, "schema": SCHEMA, "scope": SCOPE_TEXT})
+        return EXIT_OK
+    lines = []
+    for name in names:
+        keywords = registry[name].keywords
+        lines.append(f"suspects {name}" + (f"  (keywords: {', '.join(keywords)})" if keywords else ""))
+        if not keywords:
+            lines.append("  no keywords declared")
+        elif not found[name]:
+            lines.append("  no production file outside the feature holds a keyword")
+        lines.extend(f"  {p}  {', '.join(ids)}" for p, ids in sorted(found[name].items()))
+    lines.append(f"-- {SUSPECTS_NOTE}")
+    footer(lines)
+    write_text(lines)
+    return EXIT_OK
+
+
+def cmd_write(root: Path, args: argparse.Namespace) -> int:
+    _, index, expansions = load_features(root)
+    data = json_bytes(map_payload(index, expansions))
+    if args.stdout:
+        sys.stdout.buffer.write(data)
+        return EXIT_OK
+    target = root / MAP_PATH
+    try:
+        unchanged = target.read_bytes() == data
+    except OSError:
+        unchanged = False
+    if not unchanged:
+        try:
+            target.write_bytes(data)
+        except OSError as exc:
+            raise CodemapError(f"{MAP_PATH}: cannot write: {exc.strerror}") from None
+    write_text([f"{MAP_PATH} {'unchanged' if unchanged else 'written'}; review its diff"])
+    return EXIT_OK
+
+
+def cmd_check(root: Path, args: argparse.Namespace) -> int:
+    registry, index, expansions = load_features(root)
+    if not args.anchors_only:
+        try:
+            have = (root / MAP_PATH).read_bytes()
+        except FileNotFoundError:
+            have = None
+        except OSError as exc:
+            raise CodemapError(f"{MAP_PATH}: unreadable: {exc.strerror}") from None
+        if have != json_bytes(map_payload(index, expansions)):
+            raise CodemapError(
+                f"{MAP_PATH} is {'missing' if have is None else 'stale'}: run "
+                "`python3 scripts/codemap.py write` (`git add` any new Kotlin file first: an unstaged "
+                "file is invisible to the scan), then review the map's diff", EXIT_STALE)
+    anchors = sum(len(f.anchors) for f in registry.values())
+    write_text([f"codemap check: ok, {len(registry)} feature(s), {anchors} anchor(s)"
+                + (", anchors only" if args.anchors_only else f", {MAP_PATH} current")])
     return EXIT_OK
 
 
@@ -1043,8 +1423,22 @@ def main(argv: list[str] | None = None) -> int:
     p = sub.add_parser("impact", help="what a file declares, who uses it, which rows it cites")
     p.add_argument("path", help="one scanned file, repo-relative or absolute")
     p.add_argument("--json", action="store_true")
+    p = sub.add_parser("features", help="every feature and its anchors")
+    p.add_argument("--json", action="store_true")
+    p = sub.add_parser("feature", help="a feature's owners, consumers, tests, overlaps and cited rows")
+    p.add_argument("name")
+    p.add_argument("--json", action="store_true")
+    p = sub.add_parser("suspects", help="keyword leads outside a feature (all features by default)")
+    p.add_argument("name", nargs="?")
+    p.add_argument("--json", action="store_true")
+    p = sub.add_parser("write", help=f"regenerate {MAP_PATH}")
+    p.add_argument("--stdout", action="store_true", help="print the map instead of writing it")
+    p = sub.add_parser("check", help=f"validate the registry and compare {MAP_PATH} byte for byte")
+    p.add_argument("--anchors-only", action="store_true", help="skip the map comparison")
     args = parser.parse_args(argv)
-    commands = {"declarations": cmd_declarations, "who-uses": cmd_who_uses, "impact": cmd_impact}
+    commands = {"declarations": cmd_declarations, "who-uses": cmd_who_uses, "impact": cmd_impact,
+                "features": cmd_features, "feature": cmd_feature, "suspects": cmd_suspects,
+                "write": cmd_write, "check": cmd_check}
     try:
         root = find_root(args.root)
         return commands[args.command](root, args)

@@ -47,7 +47,7 @@ stays closed (DB-051…DB-060), and Scorecard.dev is a run-once local input.
 - **Codemap, a generated feature map for agents** — `docs/plans/CODEMAP.md`, spec only (owner,
   2026-10-29; D1–D4 decided, DE-012). The owner's go-ahead covers the remaining units.
   [x] 0 plan · [x] 1 Astra review · [x] 2 placement, tokenizer, declarations · [x] 3 references ·
-  [ ] 4 features, queries, write and check · [ ] 5 seed and measure · [ ] 6 guard (per D2) ·
+  [x] 4 features, queries, write and check · [ ] 5 seed and measure · [ ] 6 guard (per D2) ·
   [ ] 7 agent entry points · [ ] 8 probe and close-out.
 
 ## Owner queue
@@ -113,6 +113,11 @@ proposing work; changing it is legislation under RUNBOOK's rule-review protocol.
 ## Changelog
 
 Newest first; ledger rows are the durable detail.
+
+- 2026-10-30 — **Codemap Unit 4: `codemap/features.toml` holds `circadian`; `features`, `feature`,
+  `suspects`, `write` and `check` (exit 8 on a missing or stale map) are in; `feature circadian`
+  lists the five anchor files as owners and joins DD-038 and DD-061 to their citing files. No map
+  is committed until Unit 6 (DE-010).**
 
 - 2026-10-30 — **Codemap Unit 3: reference candidates in Kotlin's scope order (explicit import,
   own package, star import), plus `who-uses` and `impact` with exit statuses 5–7. The real-tree
