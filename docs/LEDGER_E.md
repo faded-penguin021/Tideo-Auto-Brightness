@@ -168,3 +168,8 @@
   or `::` stay candidates because an extension call looks like member access. A feature nobody
   registers stays invisible, since the guard proves only that declared anchors exist; that
   residual is disclosed in the plan and left unguarded, as the review advised.
+- DE-012: **The owner decided the codemap plan's four questions by taking every recommendation
+  (2026-10-30), which were also Astra's.** The author regenerates the map and CI only checks it
+  (D1 (a)); the feature-level map is committed (D2 (a)), provisionally, since the plan's replay
+  can still turn it to anchors-only; the keyword heuristic is a query only (D3 (b)); and the plan
+  adds its own `AGENTS.md` sentence (D4 (a)).

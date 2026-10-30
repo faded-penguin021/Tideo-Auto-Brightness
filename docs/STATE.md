@@ -45,7 +45,7 @@ stays closed (DB-051…DB-060), and Scorecard.dev is a run-once local input.
   [x] 0 plan · [ ] 1 sweep accepts a ceiling · [ ] 2 readout above a ceiling · [ ] 3 failure
   causes · [ ] 4 device checks and close-out.
 - **Codemap, a generated feature map for agents** — `docs/plans/CODEMAP.md`, spec only (owner,
-  2026-10-29; D1–D4 open, Owner queue 5). Each unit runs on the owner's go-ahead.
+  2026-10-29; D1–D4 decided, DE-012). The owner's go-ahead covers the remaining units.
   [x] 0 plan · [x] 1 Astra review · [ ] 2 placement, tokenizer, declarations · [ ] 3 references ·
   [ ] 4 features, queries, write and check · [ ] 5 seed and measure · [ ] 6 guard (per D2) ·
   [ ] 7 agent entry points · [ ] 8 probe and close-out.
@@ -101,17 +101,6 @@ stays closed (DB-051…DB-060), and Scorecard.dev is a run-once local input.
    --workflow release.yml --limit 1 --json conclusion,createdAt` shows `success` dated after the
    merge, and the version appears on F-Droid as reproducible.
 
-5. **[2026-10-29] Decide the codemap plan's four questions; D2 and D3 can wait for its Unit 5
-   numbers.** D1: who regenerates the map, (a) the author with CI only checking, or (b) a CI job
-   that commits. D2: (a) commit the generated map, or (b) only the anchors, checked live. D3: the
-   keyword heuristic as (a) a map section, (b) a query only, or (c) dropped. D4: (a) the plan adds
-   its own AGENTS.md sentence now, or (b) folds it into the light-refactor plan's Unit 7.
-   Recommendation: D1 (a), D2 (a) unless Unit 5's replay shows the map changing in most
-   snapshots, D3 (b), D4 (a); Astra recommended the same, and reasons are in the plan's Owner
-   decisions (DE-010). Unverified until you answer; settles it: `grep -c '^## Owner decisions
-   (open)' docs/plans/CODEMAP.md` prints 0 (retitled once all four are decided), or the plan is
-   gone.
-
 **The tree declares `1.15.2` / vc32, this train's one bump (DE-001)**; 1.15.1 was seen tagged on
 2026-10-26 (`git ls-remote --tags --refs origin 'refs/tags/v*'`). Never bump twice in one train.
 
@@ -124,6 +113,9 @@ proposing work; changing it is legislation under RUNBOOK's rule-review protocol.
 ## Changelog
 
 Newest first; ledger rows are the durable detail.
+
+- 2026-10-30 — **Codemap plan: the owner took every D1–D4 recommendation, Astra's too: D1 (a),
+  D2 (a) provisionally, D3 (b), D4 (a); Owner queue item removed (DE-012).**
 
 - 2026-10-29 — **Codemap plan revised after Astra High's review: all nine findings accepted. The
   scanner reports lexical candidates, finds declarations by nesting across all brackets, and

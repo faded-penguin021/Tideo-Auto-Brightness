@@ -4,7 +4,8 @@
 
 - **Spec only. No code has changed.** The owner asked on 2026-10-29 for this plan, which
   authorised **Unit 0 only**: committing this file on the session branch
-  `session/dreamy-bardeen-c4jps1`. Every later unit needs the owner's separate go-ahead.
+  `session/dreamy-bardeen-c4jps1`. On 2026-10-30 the owner gave the go-ahead for the remaining
+  units, run one after another.
 - **Unit 1 is done.** Astra reviewed the plan at high effort ("Astra High"), and the owner relayed
   the findings on 2026-10-29. All nine findings were accepted and none rejected; this revision
   carries them. The dispositions are under **Unit 1 triage**, and the durable record is a DE row.
@@ -18,8 +19,9 @@
 - **No new Markdown.** The deliverable is one TOML file, one Python script and its tests, one
   guard, possibly one generated JSON file (D2), and edits to existing docs. This plan is deleted at
   close-out.
-- Owner decisions D1–D4 are open, with recommendations, and routed to the Owner queue. Astra's
-  recommendations match them; the review is not the owner's acceptance.
+- **Owner decisions D1–D4 are decided** (owner, 2026-10-30): every recommendation is taken, so
+  D1 (a), D2 (a), D3 (b) and D4 (a). D2 (a) stays provisional, as its recommendation says: Unit 5's
+  replay can still turn it to (b) (DE-012).
 - **Probe baseline:** not yet run. Unit 5 records it here, not in the ledger, so the Unit 8 probe
   cannot read it (see Unit 8).
 
@@ -272,9 +274,10 @@ to a branch (D1).
   `codemap/*` to `classify_path` as non-shipping, plus a pin line. The script and its tests sit
   under `scripts/`, which is already classified.
 
-## Owner decisions (open)
+## Owner decisions (decided 2026-10-30)
 
-All four are routed to the Owner queue. Astra recommended the same four options.
+The owner took every recommendation below, which are also Astra's: D1 (a), D2 (a) provisionally,
+D3 (b) and D4 (a) (DE-012).
 
 1. **D1. Who updates the map.**
    - (a) The author regenerates and CI only checks.
@@ -470,7 +473,8 @@ D1–D4 are in the Owner queue, and the DE row is written.
   prompt and nothing else (no map, no plan, no review transcript). Record the model tier, the
   verdict on each criterion and whether it already passes in this plan's Status, not in the DE
   row.
-- The owner decides D2 and D3 with these numbers if they are still open.
+- D2 turns to (b) if the replay shows the map changing in most snapshots, and D3 is promoted to
+  (a) only if the `suspects` lists are short and mostly worth reading; the DE row records which.
 - Fresh-context code review.
 - Acceptance: the full ladder is green, every anchor resolves to exactly one symbol, the DE row
   holds every number above, and the baseline is recorded in Status.
