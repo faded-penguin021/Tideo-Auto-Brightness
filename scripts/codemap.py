@@ -17,8 +17,15 @@ complete. One limit: past a declaration's first token its tail is free-form up t
 that starts a declaration, so a top-level statement there is read as part of that declaration.
 Only code the Kotlin compiler rejects can hold one, and the ladder's Gradle rung compiles it.
 
+References are lexical candidates: an identifier is a candidate on a top-level symbol its file can
+see through its package, an import or a qualified name (Index has the rules). Approximations:
+- a local name, parameter or member that shadows a top-level one gives a false positive;
+- so does a same-named member of another type, such as x.compute() beside a top-level compute;
+- references from XML, the manifest, Gradle, reflection or generated code are invisible.
+
 Exit statuses: 0 success (with or without results), 2 usage, 3 malformed input or a failed scan,
-4 a path outside the scanned scope.
+4 a path outside the scanned scope, 5 an unknown symbol, 6 an ambiguous symbol, 7 an unknown
+feature.
 """
 
 from __future__ import annotations
@@ -38,12 +45,22 @@ EXIT_OK = 0
 EXIT_USAGE = 2
 EXIT_MALFORMED = 3
 EXIT_OUT_OF_SCOPE = 4
+EXIT_UNKNOWN_SYMBOL = 5
+EXIT_AMBIGUOUS_SYMBOL = 6
+EXIT_UNKNOWN_FEATURE = 7
 
 SCHEMA = 1
 MODULES = ("app", "domain", "platform")
 SOURCE_SETS = ("main", "debug", "test")
 SCOPE_RE = re.compile(r"^(app|domain|platform)/src/(main|debug|test)/kotlin/.+\.kt$")
 SCOPE_TEXT = "tracked *.kt under {app,domain,platform}/src/{main,debug,test}/kotlin"
+APPROXIMATIONS = (
+    "a local name, parameter or member that shadows a top-level one gives a false positive",
+    "so does a same-named member of another type, such as x.compute() beside a top-level compute",
+    "references from XML, the manifest, Gradle, reflection or generated code are invisible",
+)
+EMPTY = "no references found within scanned scope"
+CITATION_RE = re.compile(r"(?<!\w)D[A-Z]*-\d+(?!\w)")  # the ladder's citation shape, whole words
 
 DECL_KEYWORDS = {"class", "interface", "object", "typealias", "fun", "val", "var"}
 CLASS_MODIFIERS = ("data", "enum", "sealed", "value", "annotation", "inner")
@@ -355,6 +372,10 @@ class FileIndex:
     imports: list[Import] = field(default_factory=list)
     declarations: list[Declaration] = field(default_factory=list)
     tokens: list[Token] = field(default_factory=list)
+    header_start: int = 0  # the package header's first token, after any file annotations
+    code_start: int = 0  # first token after the package header and imports
+    name_tokens: set[int] = field(default_factory=set)  # top-level declaration names
+    citations: list[tuple[str, int]] = field(default_factory=list)  # (ledger ID, line)
 
     @property
     def role(self) -> str:
@@ -510,21 +531,21 @@ class DeclarationReader:
                 return None
         return None
 
-    def header(self, k: int, mods: list[str]) -> tuple[Token, str, int]:
-        """At a declaration keyword: (name token, kind, index after the name)."""
+    def header(self, k: int, mods: list[str]) -> tuple[int, str, int]:
+        """At a declaration keyword: (name index, kind, index after the name)."""
         kw = self.t[k].text
         if kw in ("class", "interface", "object", "typealias"):
             if not is_name(self.tok(k + 1)):
                 raise self.err(k + 1, f"unsupported depth-0 syntax: {kw} name expected, got {self.describe(k + 1)}")
             prefix = [m for m in ("fun",) + CLASS_MODIFIERS if m in mods]
-            return self.t[k + 1], " ".join(prefix + [kw]), k + 2
+            return k + 1, " ".join(prefix + [kw]), k + 2
         j = k + 1
         if is_op(self.tok(j), "<"):
             j = self.skip_angle(j)
         if is_op(self.tok(j), "("):  # a parenthesised receiver type, `fun (A).b()`
             j = self.skip_bracket(j) + 1
         last, j = self.name_chain(j)
-        return self.t[last], kw, j
+        return last, kw, j
 
     def tail(self, k: int) -> int:
         while k < self.n:
@@ -565,6 +586,7 @@ class DeclarationReader:
         k = 0
         while is_op(self.tok(k), "@"):
             k = self.skip_annotation(k)
+        index.header_start = k
         if is_word(self.tok(k), "package"):
             parts, k = self.qualified(k + 1, "package")
             index.package = ".".join(parts)
@@ -584,6 +606,7 @@ class DeclarationReader:
             index.imports.append(Import(start.line, start.col, ".".join(parts), star, alias))
             if is_op(self.tok(k), ";"):
                 k += 1
+        index.code_start = k
         while k < self.n:
             if is_op(self.t[k], ";"):
                 k += 1
@@ -592,7 +615,9 @@ class DeclarationReader:
             if found is None:
                 raise self.err(k, f"unsupported depth-0 syntax: {self.describe(k)} where a declaration should start")
             kw, mods = found
-            name, kind, after = self.header(kw, mods)
+            name_at, kind, after = self.header(kw, mods)
+            name = self.t[name_at]
+            index.name_tokens.add(name_at)
             visibility = next((m for m in VISIBILITIES if m in mods), "public")
             index.declarations.append(
                 Declaration(self.path, index.package, name.text, kind, visibility, name.line, name.col)
@@ -615,8 +640,11 @@ def index_file(path: str, data: bytes) -> FileIndex:
     if not m:
         raise CodemapError(f"{path}: outside the scanned scope ({SCOPE_TEXT})", EXIT_OUT_OF_SCOPE)
     index = FileIndex(path, m.group(1), m.group(2))
-    index.tokens = tokenize(path, read_source(path, data))
+    text = read_source(path, data)
+    index.tokens = tokenize(path, text)
     DeclarationReader(path, index.tokens).read(index)
+    for line_no, line in enumerate(normalise_newlines(text).split("\n"), 1):
+        index.citations.extend((cid, line_no) for cid in CITATION_RE.findall(line))
     return index
 
 
@@ -658,9 +686,188 @@ def build_index(root: Path) -> list[FileIndex]:
     return files
 
 
+# ---------------------------------------------------------------- reference candidates
+
+
+@dataclass(frozen=True, order=True)
+class Symbol:
+    package: str
+    name: str
+
+    @property
+    def qualified(self) -> str:
+        return f"{self.package}.{self.name}" if self.package else self.name
+
+
+@dataclass(frozen=True, order=True)
+class Reference:
+    path: str
+    line: int
+    col: int
+    symbol: Symbol
+    kind: str  # same-package, import, member-import, star, qualified or import-only
+    ambiguous: bool
+
+
+class Index:
+    """Symbols (package plus name; overloads are one symbol) and their reference candidates.
+
+    A bare name resolves in Kotlin's scope order: an explicit import (an `as` alias or a member
+    import included), then the file's own package, then star imports. An explicit import of a
+    name outside the scanned scope still shadows the levels below it. Several symbols at the
+    winning level each get a candidate marked ambiguous; nothing picks one.
+    """
+
+    def __init__(self, files: list[FileIndex]):
+        self.files = files
+        self.by_path = {f.path: f for f in files}
+        self.decls: dict[Symbol, list[Declaration]] = {}
+        self.by_name: dict[str, list[Symbol]] = {}
+        modules: dict[str, set[str]] = {}
+        for f in files:
+            modules.setdefault(f.package, set()).add(f.module)
+            for d in f.declarations:
+                sym = Symbol(d.package, d.name)
+                if sym not in self.decls:
+                    self.decls[sym] = []
+                    self.by_name.setdefault(d.name, []).append(sym)
+                self.decls[sym].append(d)
+        for package, mods in sorted(modules.items()):
+            if len(mods) > 1:  # `internal` would then need a module rule
+                raise CodemapError(f"package {package or '<default>'} spans modules "
+                                   f"{', '.join(sorted(mods))}; the resolver assumes one module per package")
+        self.packages = set(modules)
+        self._refs: list[Reference] | None = None
+
+    def visible(self, sym: Symbol, f: FileIndex) -> bool:
+        for d in self.decls.get(sym, ()):
+            decl_set = self.by_path[d.path].source_set
+            if d.visibility == "private" and d.path != f.path:
+                continue
+            if decl_set == "main" or decl_set == f.source_set:
+                return True
+        return False
+
+    def own(self, sym: Symbol, f: FileIndex) -> bool:
+        return any(d.path == f.path for d in self.decls[sym])
+
+    def references(self) -> list[Reference]:
+        if self._refs is None:
+            refs: list[Reference] = []
+            for f in self.files:
+                refs.extend(self.resolve_file(f))
+            self._refs = sorted(set(refs))
+        return self._refs
+
+    def resolve_file(self, f: FileIndex) -> list[Reference]:
+        bound: dict[str, list[tuple[Symbol, str, Import]]] = {}  # name -> (symbol, kind, import)
+        stars: list[str] = []
+        refs: list[Reference] = []
+        for imp in f.imports:
+            owner = None if imp.star and imp.target in self.packages else self.import_owner(imp.target)
+            if imp.star:
+                if owner is None:
+                    stars.append(imp.target)
+                elif self.visible(owner, f) and not self.own(owner, f):  # `import p.Outer.*`
+                    refs.append(Reference(f.path, imp.line, imp.col, owner, "member-import", False))
+                continue
+            entries = bound.setdefault(imp.alias or imp.target.rpartition(".")[2], [])
+            if owner is not None and self.visible(owner, f) and not self.own(owner, f):
+                kind = "import" if owner.qualified == imp.target else "member-import"
+                entries.append((owner, kind, imp))
+
+        used: set[str] = set()
+        toks = f.tokens
+        n = len(toks)
+        i = 0
+        while i < n:
+            if f.header_start <= i < f.code_start:  # the package header and imports
+                i = f.code_start
+                continue
+            tok = toks[i]
+            if tok.kind not in ("ident", "qident") or i in f.name_tokens:
+                i += 1
+                continue
+            after_dot = i > 0 and is_op(toks[i - 1], ".", "?.")
+            if not after_dot and tok.text not in bound:
+                hit = self.qualified_at(toks, i)
+                if hit is not None:
+                    sym, at = hit
+                    if self.visible(sym, f) and not self.own(sym, f):
+                        refs.append(Reference(f.path, toks[at].line, toks[at].col, sym, "qualified", False))
+                    i = at + 1
+                    continue
+            name = tok.text
+            if name in bound:
+                used.add(name)
+                found = {sym: kind for sym, kind, _ in bound[name]}
+            else:
+                # The file's own package wins over star imports, even when the file itself
+                # declares the name, which then hides the candidate.
+                same = [s for s in self.by_name.get(name, ())
+                        if s.package == f.package and self.visible(s, f)]
+                if same:
+                    found = {s: "same-package" for s in same if not self.own(s, f)}
+                else:
+                    found = {Symbol(p, name): "star" for p in stars
+                             if Symbol(p, name) in self.decls and self.visible(Symbol(p, name), f)
+                             and not self.own(Symbol(p, name), f)}
+            for sym, kind in found.items():
+                refs.append(Reference(f.path, tok.line, tok.col, sym, kind, len(found) > 1))
+            i += 1
+        for name, entries in bound.items():
+            if name not in used:
+                for sym, _, imp in entries:
+                    refs.append(Reference(f.path, imp.line, imp.col, sym, "import-only", False))
+        return refs
+
+    def import_owner(self, target: str) -> Symbol | None:
+        """The top-level symbol an import names or reaches into (`p.Outer.Middle.Leaf`)."""
+        parts = target.split(".")
+        for cut in range(len(parts) - 1, -1, -1):
+            sym = Symbol(".".join(parts[:cut]), parts[cut])
+            if sym in self.decls:
+                return sym
+        return None
+
+    def qualified_at(self, toks: list[Token], i: int) -> tuple[Symbol, int] | None:
+        """`a.b.C` from token i, where `a.b` is a scanned package and `C` its symbol."""
+        parts = [i]
+        j = i
+        while j + 2 < len(toks) and is_op(toks[j + 1], ".") and toks[j + 2].kind in ("ident", "qident"):
+            j += 2
+            parts.append(j)
+        for cut in range(len(parts) - 1, 0, -1):
+            package = ".".join(toks[p].text for p in parts[:cut])
+            sym = Symbol(package, toks[parts[cut]].text)
+            if package in self.packages and sym in self.decls:
+                return sym, parts[cut]
+        return None
+
+    def symbol_arg(self, arg: str) -> Symbol:
+        if "." in arg:
+            pkg, _, name = arg.rpartition(".")
+            if Symbol(pkg, name) in self.decls:
+                return Symbol(pkg, name)
+            raise CodemapError(f"{arg}: no top-level symbol of that name in the scanned scope",
+                               EXIT_UNKNOWN_SYMBOL)
+        syms = sorted(self.by_name.get(arg, ()))
+        if not syms:
+            raise CodemapError(f"{arg}: no top-level symbol of that name in the scanned scope",
+                               EXIT_UNKNOWN_SYMBOL)
+        if len(syms) > 1:
+            listed = "; ".join(
+                f"{s.qualified} ({', '.join(sorted({d.path for d in self.decls[s]}))})" for s in syms)
+            raise CodemapError(f"{arg} is ambiguous, qualify it: {listed}", EXIT_AMBIGUOUS_SYMBOL)
+        return syms[0]
+
+
 def resolve_path_arg(root: Path, arg: str, known: set[str]) -> str:
+    """A repo-relative path first; else absolute or relative to the working directory."""
     candidate = Path(arg)
-    if not candidate.is_absolute() and (Path.cwd() / candidate).exists():
+    if not candidate.is_absolute() and candidate.as_posix() in known:
+        return candidate.as_posix()
+    if not candidate.is_absolute():
         candidate = Path.cwd() / candidate
     if candidate.is_absolute():
         try:
@@ -715,6 +922,107 @@ def cmd_declarations(root: Path, args: argparse.Namespace) -> int:
     return EXIT_OK
 
 
+def footer(lines: list[str]) -> None:
+    lines.append(f"-- scope: {SCOPE_TEXT}; lexical reference candidates, not semantic resolution")
+    lines.extend(f"-- {a}" for a in APPROXIMATIONS)
+
+
+def ref_row(r: Reference, index: Index) -> dict:
+    return {"ambiguous": r.ambiguous, "col": r.col, "kind": r.kind, "line": r.line,
+            "path": r.path, "role": index.by_path[r.path].role}
+
+
+def cmd_who_uses(root: Path, args: argparse.Namespace) -> int:
+    index = Index(build_index(root))
+    sym = index.symbol_arg(args.symbol)
+    refs = [r for r in index.references() if r.symbol == sym]
+    used = [r for r in refs if r.kind != "import-only"]
+    only = [r for r in refs if r.kind == "import-only"]
+    decls = sorted(index.decls[sym], key=lambda d: (d.path, d.line, d.col))
+    if args.json:
+        write_json({
+            "approximations": list(APPROXIMATIONS), "schema": SCHEMA, "scope": SCOPE_TEXT,
+            "symbol": {"declarations": [{"col": d.col, "kind": d.kind, "line": d.line,
+                                         "path": d.path, "visibility": d.visibility} for d in decls],
+                       "name": sym.name, "package": sym.package},
+            "references": [ref_row(r, index) for r in used],
+            "import_only": [ref_row(r, index) for r in only],
+        })
+        return EXIT_OK
+    lines = [f"who-uses {sym.qualified}"]
+    lines.extend(f"  declared {d.path}:{d.line}:{d.col}  {d.visibility} {d.kind}" for d in decls)
+    for role in ("production", "test"):
+        group = [r for r in used if index.by_path[r.path].role == role]
+        if group:
+            lines.append(f"{role}:")
+            lines.extend(f"  {r.path}:{r.line}:{r.col}  {r.kind}" + ("  ambiguous" if r.ambiguous else "")
+                         for r in group)
+    if only:
+        lines.append("import-only (imported, never used after the imports):")
+        lines.extend(f"  {r.path}:{r.line}:{r.col}" for r in only)
+    if not used:
+        lines.append(EMPTY)
+    footer(lines)
+    write_text(lines)
+    return EXIT_OK
+
+
+def cmd_impact(root: Path, args: argparse.Namespace) -> int:
+    index = Index(build_index(root))
+    path = resolve_path_arg(root, args.path, set(index.by_path))
+    f = index.by_path[path]
+    declared = sorted({Symbol(d.package, d.name) for d in f.declarations})
+    users: dict[str, set[str]] = {}
+    importers: dict[str, set[str]] = {}
+    ambiguous: dict[str, set[str]] = {}
+    for r in index.references():
+        if r.symbol in declared and r.path != path:
+            target = importers if r.kind == "import-only" else users
+            target.setdefault(r.path, set()).add(r.symbol.name)
+            if r.ambiguous:
+                ambiguous.setdefault(r.path, set()).add(r.symbol.name)
+    cites: dict[str, list[int]] = {}
+    for cid, line in f.citations:
+        cites.setdefault(cid, []).append(line)
+
+    def group(table: dict[str, set[str]], role: str | None) -> list[dict]:
+        return [{"ambiguous": sorted(ambiguous.get(p, set()) & s), "path": p,
+                 "role": index.by_path[p].role, "symbols": sorted(s)}
+                for p, s in sorted(table.items()) if role is None or index.by_path[p].role == role]
+
+    def listed(row: dict) -> str:
+        return ", ".join(s + (" (ambiguous)" if s in row["ambiguous"] else "") for s in row["symbols"])
+
+    decl_rows = [{"col": d.col, "kind": d.kind, "line": d.line, "name": d.name,
+                  "visibility": d.visibility}
+                 for d in sorted(f.declarations, key=lambda d: (d.name, d.line, d.col))]
+    if args.json:
+        write_json({
+            "approximations": list(APPROXIMATIONS), "cites": {k: sorted(v) for k, v in sorted(cites.items())},
+            "declares": decl_rows, "import_only": group(importers, None), "package": f.package,
+            "path": path, "role": f.role, "schema": SCHEMA, "scope": SCOPE_TEXT,
+            "used_by": group(users, None),
+        })
+        return EXIT_OK
+    lines = [f"impact {path}  ({f.role}, {f.module}/{f.source_set}, package {f.package or '<default>'})",
+             "declares:"]
+    lines.extend(f"  {d['visibility']} {d['kind']} {d['name']}  ({d['line']}:{d['col']})" for d in decl_rows)
+    for role, title in (("production", "used by (production):"), ("test", "used by (tests):")):
+        rows = group(users, role)
+        if rows:
+            lines.append(title)
+            lines.extend(f"  {r['path']}  {listed(r)}" for r in rows)
+    if importers:
+        lines.append("import-only (imported, never used after the imports):")
+        lines.extend(f"  {r['path']}  {listed(r)}" for r in group(importers, None))
+    if not users:
+        lines.append(EMPTY)
+    lines.append("cites: " + (", ".join(sorted(cites)) if cites else "no ledger rows"))
+    footer(lines)
+    write_text(lines)
+    return EXIT_OK
+
+
 class Parser(argparse.ArgumentParser):
     def error(self, message: str) -> None:  # usage errors exit 2, never 3
         self.print_usage(sys.stderr)
@@ -729,10 +1037,17 @@ def main(argv: list[str] | None = None) -> int:
     p = sub.add_parser("declarations", help="print the top-level declaration index")
     p.add_argument("path", nargs="?", help="one scanned file, repo-relative or absolute")
     p.add_argument("--json", action="store_true")
+    p = sub.add_parser("who-uses", help="reference candidates on one top-level symbol")
+    p.add_argument("symbol", help="a bare name while it is unique, else package-qualified")
+    p.add_argument("--json", action="store_true")
+    p = sub.add_parser("impact", help="what a file declares, who uses it, which rows it cites")
+    p.add_argument("path", help="one scanned file, repo-relative or absolute")
+    p.add_argument("--json", action="store_true")
     args = parser.parse_args(argv)
+    commands = {"declarations": cmd_declarations, "who-uses": cmd_who_uses, "impact": cmd_impact}
     try:
         root = find_root(args.root)
-        return cmd_declarations(root, args)
+        return commands[args.command](root, args)
     except CodemapError as exc:
         sys.stderr.write(f"codemap.py: {exc}\n")
         return exc.code

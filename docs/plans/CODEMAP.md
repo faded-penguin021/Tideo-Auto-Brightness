@@ -163,8 +163,13 @@ on purpose, and the ledger rows the queries list are what carry such a differenc
   - so does a same-named member of another type, such as `x.compute()` beside a top-level
     `compute`;
   - references from XML, the manifest, Gradle, reflection or generated code are invisible.
-- **Ambiguity.** A bare name that matches more than one symbol visible from F records a candidate
-  on each, marked ambiguous and counted. An anchor or a `who-uses` argument that matches more
+- **Scope order** (Unit 3, so a file that imports a same-named symbol from another package is
+  not its own package's consumer, as `AabSettingsMapper` is not): a bare name binds to an
+  explicit import first (an alias, a member import at any depth or `import Outer.*` included),
+  even one outside the scanned scope; then to F's own package, even when F itself declares it;
+  then to star imports.
+- **Ambiguity.** A bare name that matches more than one symbol at the winning level records a
+  candidate on each, marked ambiguous and counted, in `who-uses` and `impact` alike. An anchor or a `who-uses` argument that matches more
   than one symbol is an error that lists each one with its package; a qualified name resolves it.
   Nothing ever picks the first match.
 
