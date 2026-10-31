@@ -134,6 +134,9 @@ proposing work; changing it is legislation under RUNBOOK's rule-review protocol.
 
 Newest first; ledger rows are the durable detail.
 
+- 2026-10-31 — **HyperOS plan links the reporter's fork commit, and Unit 1 opens by
+  cherry-picking its scale line with the reporter as author, leaving out its timeouts and
+  workflow, so the credit is fair (owner).**
 - 2026-10-31 — **Both calibration plans revised after an owner-relayed review, all six findings
   taken: a plateau is the HBM threshold only when the dump confirms it, its key and raw-based HBM
   flag ship in one release, permission advice only when shown, HyperOS checks split scale from

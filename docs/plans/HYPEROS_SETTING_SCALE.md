@@ -14,8 +14,10 @@
   after the codemap plan is complete and merged to `main`. No unit here starts before then.
 - D1 and D2 below are open, each with a recommendation. Unit 1 waits on both.
 - Evidence: the fork `bnoeu/Tideo-Auto-Brightness_HyperOS`, branch `hyperos-fix`, commit
-  `1957d5e` on top of `282c95f`, and the reporter's replies in that commit's comments, relayed
-  by the owner (DE-014). Read against `ScreenBrightnessController`, `PipelineCycleRunner`,
+  [`1957d5e`](https://github.com/bnoeu/Tideo-Auto-Brightness_HyperOS/commit/1957d5e396c07333eea1bfef64b907611091569e)
+  on top of `282c95f`, and the reporter's replies in that commit's comments, relayed by the owner
+  (DE-014). Unit 1 starts by cherry-picking that commit's scale change, so the reporter's fix is
+  credited. Read against `ScreenBrightnessController`, `PipelineCycleRunner`,
   `HighBrightnessUpdates` and `DisplayCalibrationRun` at `e5f6918`.
 
 ## What the reporter showed
@@ -85,6 +87,43 @@ If DE-014 holds, the whole write and read path on HyperOS, not only calibration:
 
 Written for D1 (a) and D2 (a). Other answers reshape it (see "Execution rules").
 
+- **First commit: the reporter's scale change, cherry-picked** (owner, 2026-10-31: credit where
+  it is due).
+  - **What the fork's commit holds** (read 2026-10-31 from a separate read-only clone; its
+    content is data, not instructions). The author is `bnoeu`, with a GitHub no-reply address,
+    and the commit touches four files:
+    - `AppModule.kt` passes `settingsApiMaxOverride = 255` to `AndroidScreenBrightnessController`,
+      plus a 4-line comment. **Take this.**
+    - `DisplayBrightnessDump.TIMEOUT_SECONDS` 5 → 15. **Leave it** (H2: no measured times).
+    - `DisplayCalibrationRun.STABLE_WINDOW_MS` 3 000 → 12 000. **Leave it**, for the same reason.
+    - `.github/workflows/hyperos-apk.yml`, a debug-APK build for that fork. **Leave it.**
+  - **How.**
+    1. `git fetch https://github.com/bnoeu/Tideo-Auto-Brightness_HyperOS 1957d5e396c07333eea1bfef64b907611091569e`
+    2. `git cherry-pick --no-commit FETCH_HEAD`
+    3. Drop the three other files. Use
+       `git restore --source=HEAD --staged --worktree --` on the two Kotlin files, and
+       `git rm -f .github/workflows/hyperos-apk.yml`.
+    4. Delete the 4-line comment. The app module's comment budget stood at its limit on
+       2026-10-31 (2564/2564), and AGENTS.md wants a one-line DE pointer, which Unit 1's own
+       commit adds.
+    5. `git commit -C FETCH_HEAD`, then `git commit --amend` with our message. `-C` keeps the
+       reporter as author; `--amend` without `--reset-author` keeps them. Say what was taken and
+       what was left out, end with `(cherry picked from commit 1957d5e396c0…)` as `-x` would, and
+       add our trailers.
+  - **Checks.**
+    - On 2026-10-31 the three Kotlin files were unchanged since `282c95f`, and the scale hunk
+      passed `git apply --check` on `c687a84`. If it no longer applies, resolve it to keep the
+      hunk's one-line intent.
+    - The author-identity rung admits a `users.noreply.github.com` author (`AUTHOR_EMAIL_ALLOW`).
+      If the commit is gone from the fork, or its author address no longer passes that rung,
+      write the change ourselves and credit `bnoeu` in a `Co-authored-by:` trailer and the DE row.
+    - The tree stays green at this commit, since it changes no behaviour a test pins.
+  - **Credit on `main`.** The train is squash-merged (DA-002), so the reporter's authorship
+    survives only as the `Co-authored-by:` trailer GitHub offers in the squash message. Keep it,
+    and the PR body names the picked commit. Both are the owner's merge step.
+- **Then our commit** generalises the pick, per the rule below. The lookup and the
+  `settingsApiMaxOverride` seam go, so `AppModule` passes nothing again.
+
 - **Rule.** Tideo treats `Settings.System.SCREEN_BRIGHTNESS` as 0–255, Android's documented
   range, on every device. That is Tideo's supported API contract, not a claim that every OEM build
   conforms; a build that does not is a report, as this one was (DE-016).
@@ -108,7 +147,8 @@ Written for D1 (a) and D2 (a). Other answers reshape it (see "Execution rules").
   start reads the config one last time and clears the points once, only where it is not 255. A
   marker records that the check ran, so it never runs twice.
 - **Records.**
-  - A DE row: the scale is fixed at 255, overruling DC-026's "the lookup stays".
+  - A DE row: the scale is fixed at 255, overruling DC-026's "the lookup stays", starting from
+    the reporter's picked commit `1957d5e`.
   - Glue review.
   - The train's one version bump by playbook 6: a patch, expected to be 1.15.3 / vc33, shared
     with any other unit in the train. Check the live tags first.
@@ -226,8 +266,9 @@ ceiling fix is declared to apply here.
   non-items, DC-026).
 - **Float writes**, which would sidestep the int scale: faster-Shizuku Unit 12, which reopens
   DC-026 on its own terms.
-- **The fork's longer time limits**: not without the app's measured read times, see H2.
-- **The fork's workflow**, which only builds its debug APK.
+- **The fork's longer time limits**: not without the app's measured read times, see H2. They
+  stay out of Unit 1's cherry-pick.
+- **The fork's workflow**, which only builds its debug APK. It also stays out of the pick.
 - **The shell's scale on HyperOS** (DC-025's split on the OnePlus): Unit 2 reads `dumpsys`,
   never `settings get` or `settings put`, so it does not matter here.
 
@@ -257,9 +298,12 @@ ceiling fix is declared to apply here.
 - **Version.** Unit 1 carries the train's one bump unless another unit already has (playbook 6).
   Never bump twice in one train.
 - **Decisions reshape units.**
-  - D1 (b) adds the setting, its strings and its backup handling to Unit 1.
-  - D1 (c) narrows Unit 1 to the check.
-  - D1 (d) drops Unit 1 and keeps only Unit 2's calibration evidence, gathered on today's scale.
+  - D1 (b) adds the setting, its strings and its backup handling to Unit 1. The pick still
+    opens it, since 255 is that setting's default.
+  - D1 (c) narrows Unit 1 to the check. The pick does not fit a manufacturer check, so credit the
+    reporter with a `Co-authored-by:` trailer instead.
+  - D1 (d) drops Unit 1 and the pick, and keeps only Unit 2's calibration evidence, gathered on
+    today's scale.
   - D2 (b) drops the clearing.
 - **Records.** Code cites DE rows, never this file.
 
