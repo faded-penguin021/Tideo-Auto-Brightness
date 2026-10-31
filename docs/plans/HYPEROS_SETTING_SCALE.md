@@ -5,6 +5,13 @@
 - **Spec only. No code has changed.** On 2026-10-31 a reporter's public fork patched Tideo's
   brightness scale for their phone, and the owner asked for a plan, not a fix. This file, ledger
   row DE-014 and the STATE entries are **Unit 0**. Every later unit needs the owner's go-ahead.
+- **Revised on 2026-10-31 after a review of this plan and the Pixel calibration plan, relayed by
+  the owner (DE-015, DE-016).** All calibration work moved to the Pixel plan
+  (`DISPLAY_CALIBRATION_CEILING.md`), now the shared calibration plan. This plan keeps the
+  setting's scale and the override-point migration, and its reporter checks gather the HyperOS
+  calibration evidence that plan needs.
+- **Sequencing (owner, 2026-10-31).** Both plans stay open, and executing them is the next stage,
+  after the codemap plan is complete and merged to `main`. No unit here starts before then.
 - D1 and D2 below are open, each with a recommendation. Unit 1 waits on both.
 - Evidence: the fork `bnoeu/Tideo-Auto-Brightness_HyperOS`, branch `hyperos-fix`, commit
   `1957d5e` on top of `282c95f`, and the reporter's replies in that commit's comments, relayed
@@ -78,7 +85,9 @@ If DE-014 holds, the whole write and read path on HyperOS, not only calibration:
 
 Written for D1 (a) and D2 (a). Other answers reshape it (see "Execution rules").
 
-- **Rule.** `Settings.System.SCREEN_BRIGHTNESS` is on 0–255 on every device Tideo supports.
+- **Rule.** Tideo treats `Settings.System.SCREEN_BRIGHTNESS` as 0–255, Android's documented
+  range, on every device. That is Tideo's supported API contract, not a claim that every OEM build
+  conforms; a build that does not is a report, as this one was (DE-016).
   `AndroidScreenBrightnessController` stops reading `config_screenBrightnessSettingMaximum`,
   `settingsApiMax` is always 255, and `toDevice` and `toDomain` become the clamped identity they
   already are on a 255 device.
@@ -108,60 +117,88 @@ Written for D1 (a) and D2 (a). Other answers reshape it (see "Execution rules").
 
 The owner has no HyperOS phone. The reporter offered to test debug builds and to open an issue
 on this repository, so this unit asks them, through the Owner queue, to run a debug build of
-Unit 1:
+Unit 1. Step 5 also needs the calibration plan's Unit 1 (its trace) in that build.
 
-1. **The scale.** Live Debug reads `Settings API max: 255`. With **Requested → acknowledged**
-   between 50 and 200, `adb shell "dumpsys display | grep -E 'mScreenBrightness=|brt='"` shows
-   about `(requested − 1) / 254`.
-2. **The floor.** In the dark at domain 1, `mScreenBrightness` reads 0.0 or the panel's minimum
+Two values are kept apart throughout (DE-016): the **app-facing setting**, which Live Debug's
+**Requested → acknowledged** reads back, and the **applied panel brightness**,
+`mScreenBrightness` in `dumpsys display`. Under H1 the panel stops at about 0.49976 from setting
+128 up, while the setting keeps the value written.
+
+1. **The scale, below any ceiling.** Live Debug reads `Settings API max: 255`. Vary the light
+   until **Requested → acknowledged** shows about 25, 50 and 100. At each,
+   `adb shell "dumpsys display | grep -E 'mScreenBrightness=|brt='"` shows about
+   `(requested − 1) / 254`. These three decide the scale.
+2. **Saturation, checked separately.** At a request of 128 or more:
+   - pass for the scale: acknowledged equals requested, and where the dump's brightness event log
+     has `unclampedBrt` (DE-005's Pixel did), the latest one is about `(requested − 1) / 254`;
+   - record `mScreenBrightness`: still on `(requested − 1) / 254` means no manual ceiling (H1
+     false), and about 0.49976 means H1's ceiling. Either passes; which one is H1's first
+     evidence.
+3. **The floor.** In the dark at domain 1, `mScreenBrightness` reads 0.0 or the panel's minimum
    of 9.7704E-4, about 2 nits.
-3. **The read side.** Drag the system slider while Tideo runs. Tideo pauses, and the settled
-   value on Live Debug's override diagnostic is about `mScreenBrightness × 254 + 1` from
-   `dumpsys display` right after. Use `dumpsys`, never `settings get`: on the owner's OnePlus the
-   shell speaks another scale than the app (DC-025).
-4. **Days of use**, nights included, with the screen never brighter than the dashboard says.
-5. **The calibration evidence** (next section): calibrate, then at once
-   `adb shell dumpsys display > display.txt` and attach it, and run
-   `adb shell "time dumpsys display > /dev/null"` three times.
+4. **The read side.** Drag the system slider low, where `mScreenBrightness` stays below 0.49976,
+   while Tideo runs. Tideo pauses, and the settled value on Live Debug's override diagnostic is
+   about `mScreenBrightness × 254 + 1` from `dumpsys display` right after. Above a ceiling that
+   formula cannot rebuild the setting, so at a high slider position compare with
+   `unclampedBrt × 254 + 1` from the event log instead, or skip it. Use `dumpsys`, never
+   `settings get`: on the owner's OnePlus the shell speaks another scale than the app (DC-025).
+5. **Days of use**, nights included, with the screen never brighter than the dashboard says.
+6. **The calibration evidence** (next section). Start
+   `adb logcat -s <the calibration plan's trace tag> > trace.txt`, calibrate, then at once run
+   `adb shell dumpsys display > display.txt`, and attach both. The trace gives the failing level,
+   each read's source, field, raw samples and elapsed time, across every source tried. The dump's
+   event log gives each level's `brt` and `unclampedBrt`. A shell `time dumpsys display` is not
+   asked for: it times one call, not the app's read path.
 
 ### Unit 3. Close out
 
-- Every finding has its DE row. The calibration evidence goes to the Pixel plan or to its own
-  row.
+- Every finding has its DE row. The calibration evidence goes to its own row, and settles the
+  calibration plan's provisional F4 case.
 - Remove the STATE checklist and delete this file.
 
-## Calibration on HyperOS: probably DE-005's ceiling
+## Calibration on HyperOS: hypotheses, settled by the corrected build
 
-Two causes remain once the scale is fixed. The reporter's full dump after a failed run tells them
-apart, because its brightness event log records each level's `brt` and `unclampedBrt`, as it did
-for DE-005.
+The scale fix does not fix the Pixel's calibration failure (DE-005), and it is not shown to fix
+the F4's. H1 and H2 below are hypotheses, not an exhaustive list of causes (DE-016). The cause is
+established from the corrected build's evidence (Unit 2, step 6) before the calibration plan's
+ceiling fix is declared to apply here.
 
-- **H1, a manual ceiling (likely).** The dump gives `hbmTransitionPoint=0.49975574`, 500 nits on
-  the spline.
+- **H1, a manual ceiling (plausible).** The dump gives `hbmTransitionPoint=0.49975574`, 500 nits
+  on the spline.
   - If manual brightness stops there, as the Pixel's stops at 0.63 (DE-005), every setting from
     128 up shows 0.49976.
   - Level 128 asks for 0.5, reads 0.49976 and still rises past level 100's 0.38976. Level 150
     repeats it, so `readStable` fails there.
-  - The Pixel plan's Unit 1 accepts exactly this, and the F4's ceiling falls on level 128, the
-    lowest previous point that rule accepts.
-  - Expected in the log: events for levels 1 to 150, then the restore.
-- **H2, a slow dump.** `readStable` needs a second read to start inside its window
+  - The calibration plan's Unit 2 accepts this only if the dump corroborates the plateau as the
+    transition point. The F4's plateau would start at level 128, that unit's floor.
+  - Expected: event-log entries for levels 1 to 150, then the restore. The trace shows readings at
+    every level through 128, the stall at 150 on about 0.49976, and the transition point
+    0.49975574 in its corroboration lines.
+- **H2, a slow read path.** `readStable` needs a second read to start inside its window
   (`DisplayCalibrationRun.kt:92`).
-  - With the 3 s window, a `dumpsys display` slower than about 2.85 s fails the first level. One
-    over 5 s is cut off as no reading (`DisplayBrightnessDump.TIMEOUT_SECONDS`).
-  - The fork's 12 s window and 15 s limit cover dumps up to about 11.8 s, and calibration still
-    failed there, so H2 alone does not explain it.
-  - Expected in the log: one level, then the restore.
-- **What this plan does with it.** No code here. Under H1 the F4 joins the Pixel plan's Unit 1,
-  and that unit's "Why level 128" gains a second panel on its lower bound. H2 would get a new unit
-  built on measured times, not the fork's limits. Either finding gets a DE row.
+  - One read can try its preferred source and then fall through DUMP, root and Shizuku in turn.
+    Each dump may take 5 s (`DisplayBrightnessDump.TIMEOUT_SECONDS`) plus a 2 s reap, and
+    Shizuku adds up to 4 s to bind. So one read can far outlast one `dumpsys display`.
+  - The fork's 12 s window and 15 s limit did not make it pass. Without measured times that
+    excludes nothing: a read that falls through two sources can still outlast 12 s.
+  - Expected: elapsed times near the limits in the trace, and the window running out wherever
+    they first add up.
+- **Others the evidence must leave room for.** The field the reader locks may not track the panel
+  on HyperOS, since it takes the first of AAB's three fields. A source may stop answering partway.
+  Or the cause is one nobody has named yet.
+- **What this plan does with it.** No code here. The finding gets a DE row. Under H1 the F4
+  becomes a confirmed case of the calibration plan. Anything else gets a unit there built on the
+  trace's measured times. Timeouts are not raised without those times.
 
 ## Owner decisions (open)
 
 1. **D1. Where the setting's scale comes from.**
-   - (a) **Recommended.** 0–255 on every device, and the config lookup goes.
-     - Every device with data reads the setting on 0–255 from the app's side: the owner's OnePlus
-       (DC-017, DC-025), DE-005's Pixel and this F4. None has shown a non-255 config to be right.
+   - (a) **Recommended.** 0–255 on every device, and the config lookup goes. The review supports
+     (a), phrased as Tideo's supported API contract (DE-016).
+     - Android documents `SCREEN_BRIGHTNESS` as 0–255, and every device with data reads the
+       setting on 0–255 from the app's side: the owner's OnePlus (DC-017, DC-025), DE-005's Pixel
+       and this F4. None has shown a non-255 config to be right.
+     - This is a contract Tideo supports, not proof that every OEM build conforms.
      - The risk: a build whose framework really reads a wider scale would top out at 255 of it,
        too dim, until someone reports it, the way this report came in.
    - (b) (a), plus a "Settings scale" choice in Misc (255, or the device's config), as the
@@ -189,16 +226,20 @@ for DE-005.
   non-items, DC-026).
 - **Float writes**, which would sidestep the int scale: faster-Shizuku Unit 12, which reopens
   DC-026 on its own terms.
-- **The fork's longer time limits**: unmeasured, see H2.
+- **The fork's longer time limits**: not without the app's measured read times, see H2.
 - **The fork's workflow**, which only builds its debug APK.
 - **The shell's scale on HyperOS** (DC-025's split on the OnePlus): Unit 2 reads `dumpsys`,
   never `settings get` or `settings put`, so it does not matter here.
 
 ## Relation to other plans
 
-- **Pixel display calibration** (`DISPLAY_CALIBRATION_CEILING.md`). Under H1 its Unit 1 is the
-  F4's calibration fix too, and its Unit 3's causes would have kept this failure from blaming
-  DUMP. Whichever plan lands second rebases on the other.
+- **Display calibration** (`DISPLAY_CALIBRATION_CEILING.md`), the shared calibration plan. It
+  owns every calibration change: the trace (its Unit 1), ceiling validation and persistence, the
+  readout and HBM flag above the boundary, and the failure causes, which would have kept this
+  failure from blaming DUMP.
+  - This plan's Unit 2 needs that plan's Unit 1 in its build for step 6.
+  - The F4 is that plan's provisional case until step 6's evidence settles the cause.
+  - Whichever plan lands second rebases on the other.
 - **Faster Shizuku paths, Unit 12** (float writes). See "Deliberately left alone".
 
 ## Execution rules
@@ -211,12 +252,14 @@ for DE-005.
   - a push to the session branch.
 - **Reviews.** Unit 1 touches `:platform` and the runtime glue, so it gets the fresh-context glue
   review before its commit.
+- **Order.** Unit 2's step 6 needs the calibration plan's Unit 1 in the reporter's build. If that
+  unit has not landed, run steps 1–5 and hold step 6.
 - **Version.** Unit 1 carries the train's one bump unless another unit already has (playbook 6).
   Never bump twice in one train.
 - **Decisions reshape units.**
   - D1 (b) adds the setting, its strings and its backup handling to Unit 1.
   - D1 (c) narrows Unit 1 to the check.
-  - D1 (d) drops Unit 1 and keeps only Unit 2's calibration evidence.
+  - D1 (d) drops Unit 1 and keeps only Unit 2's calibration evidence, gathered on today's scale.
   - D2 (b) drops the clearing.
 - **Records.** Code cites DE rows, never this file.
 

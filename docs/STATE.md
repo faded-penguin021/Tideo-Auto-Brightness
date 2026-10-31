@@ -39,18 +39,21 @@ stays closed (DB-051…DB-060), and Scorecard.dev is a run-once local input.
   (owner, 2026-10-21; D1–D5 decided). Each unit runs on the owner's go-ahead.
   [x] 0 plan · [ ] 1 dimming readout · [ ] 2 brightness labels · [ ] 3 PWM dimming chart ·
   [ ] 4 `keepGlobalsFrom` · [ ] 5 formula dedups · [ ] 6 engine `dimDynamic` · [ ] 7 AGENTS.md rule · [ ] 8 close-out.
-- **Pixel display calibration** — `docs/plans/DISPLAY_CALIBRATION_CEILING.md`, spec only (owner,
-  2026-10-26; DE-005, DE-006). D1 is decided (a); D2–D3 are open (Owner queue 3), and each unit
+- **Display calibration (Pixel confirmed, HyperOS provisional)** —
+  `docs/plans/DISPLAY_CALIBRATION_CEILING.md`, spec only (owner, 2026-10-26; DE-005, revised
+  DE-015). D1 is decided (a), amended; D2–D4 are open (Owner queue 3). It and the HyperOS plan
+  are the next stage, after the codemap plan is merged to `main` (owner, 2026-10-31); each unit
   runs on the owner's go-ahead.
-  [x] 0 plan · [ ] 1 sweep accepts a ceiling · [ ] 2 readout above a ceiling · [ ] 3 failure
-  causes · [ ] 4 device checks and close-out.
+  [x] 0 plan · [ ] 1 calibration trace · [ ] 2 corroborated ceiling, stored · [ ] 3 readout and
+  HBM flag (one release with 2) · [ ] 4 failure causes · [ ] 5 device checks and close-out.
 - **Codemap, a generated feature map for agents** — `docs/plans/CODEMAP.md`, spec only (owner,
   2026-10-29; D1–D4 decided, DE-012). The owner's go-ahead covers the remaining units.
   [x] 0 plan · [x] 1 Astra review · [x] 2 placement, tokenizer, declarations · [x] 3 references ·
   [x] 4 features, queries, write and check · [x] 5 seed and measure · [ ] 6 guard (per D2) ·
   [ ] 7 agent entry points · [ ] 8 probe and close-out.
 - **HyperOS brightness scale** — `docs/plans/HYPEROS_SETTING_SCALE.md`, spec only (owner,
-  2026-10-31; DE-014). D1–D2 open (Owner queue 5); each unit runs on the owner's go-ahead.
+  2026-10-31; DE-014, revised DE-016). D1–D2 open (Owner queue 5). Next stage with the
+  calibration plan, after codemap is merged; each unit runs on the owner's go-ahead.
   [x] 0 plan · [ ] 1 one scale · [ ] 2 reporter's device checks · [ ] 3 close-out.
 
 ## Owner queue
@@ -86,16 +89,20 @@ stays closed (DB-051…DB-060), and Scorecard.dev is a run-once local input.
    redact-tool-output scripts/guards/*.sh` prints a nonzero count, or a STATE changelog line records
    (b).
 
-3. **[2026-10-26] Decide the Pixel calibration plan's two remaining questions before its Units 2
-   and 3.** A Pixel's calibration fails because manual brightness stops at 0.63, so the top
-   levels read the same, and the failure then wrongly blames DUMP (DE-005). You decided D1 (a):
-   accept that ceiling, since the value above which High Brightness Mode (HBM) is on is what
-   matters. D2: the readout in HBM on such a panel, as (a) AAB's slope, up to ~1150,
-   (b) proportional to the ceiling, up to ~405, or (c) proportional on every panel. D3: (a) a
-   message per cause, (b) one neutral message, or (c) unchanged. Recommendation: D2 (b), D3 (a);
-   reasons in the plan's Owner decisions. Unverified until you answer; settles it:
-   `grep -c '^## Owner decisions (open)' docs/plans/DISPLAY_CALIBRATION_CEILING.md` prints 0
-   (retitled once D2 and D3 are decided), or the plan is gone.
+3. **[2026-10-26] Decide the calibration plan's three open questions before its Units 2–4.** A
+   Pixel's calibration fails because manual brightness stops at 0.63, so the top levels read the
+   same, and the failure then wrongly blames DUMP (DE-005). You decided D1 (a): accept that
+   ceiling, since the value above which High Brightness Mode (HBM) is on is what matters; the
+   review you relayed on 2026-10-31 adds that a plateau counts only when the dump confirms it is
+   the HBM transition (DE-015). D2: the readout in HBM on such a panel, as (a) AAB's slope, up to
+   ~1150, (b) proportional to the ceiling, up to ~405, or (c) proportional on every panel. D3:
+   (a) a message per cause, blaming permissions only when they are shown missing, (b) one neutral
+   message, or (c) unchanged. D4: a plateau the dump does not confirm (a) fails the run with its
+   own message, or (b) is stored without ever setting the HBM flag. Recommendation: D2 (b),
+   D3 (a), D4 (a); reasons in the plan. Before Unit 2, also check whether the Pixel and F4 dumps
+   carry `brightnessMaxReason` (`grep -c brightnessMaxReason <dump>`). Unverified until you
+   answer; settles it: `grep -c '^## Owner decisions (open)' docs/plans/DISPLAY_CALIBRATION_CEILING.md`
+   prints 0 (retitled once D2–D4 are decided), or the plan is gone.
 
 4. **[2026-10-28] Watch the first release on Ubuntu 26.04; no PR can run the release workflows.**
    CI moved to `ubuntu-26.04` (DE-009), but `release.yml` runs only on a tag, so its first run
@@ -109,7 +116,8 @@ stays closed (DB-051…DB-060), and Scorecard.dev is a run-once local input.
    the setting on 0–255, so most levels show full brightness (DE-014). D1: (a) 0–255 everywhere,
    (b) that plus a scale choice in Misc, (c) a HyperOS-only check, or (d) no change (DC-026). D2:
    (a) clear override points saved under the bug once, or (b) keep them. Recommendation: D1 (a),
-   D2 (a); reasons in the plan. Unverified until you answer; settles it:
+   D2 (a); reasons in the plan. The review you relayed backs D1 (a) as Tideo's supported
+   contract, Android's documented 0–255, not proof every OEM conforms (DE-016). Unverified until you answer; settles it:
    `grep -c '^## Owner decisions (open)' docs/plans/HYPEROS_SETTING_SCALE.md` prints 0, or the
    plan is gone.
 
@@ -126,6 +134,12 @@ proposing work; changing it is legislation under RUNBOOK's rule-review protocol.
 
 Newest first; ledger rows are the durable detail.
 
+- 2026-10-31 — **Both calibration plans revised after an owner-relayed review, all six findings
+  taken: a plateau is the HBM threshold only when the dump confirms it, its key and raw-based HBM
+  flag ship in one release, permission advice only when shown, HyperOS checks split scale from
+  saturation and H1/H2 stay hypotheses until the app's read times are traced. The Pixel plan is
+  now the shared calibration plan; both run after codemap is merged (DE-015, DE-016, owner).**
+
 - 2026-10-31 — **Planned the HyperOS brightness-scale fix from a POCO F4 reporter's fork and
   dumps: Tideo trusts a 4095 config while Android reads 0–255 (DE-014); calibration there likely
   also needs the Pixel plan's Unit 1. Spec only; D1–D2 open (owner).**
@@ -136,34 +150,16 @@ Newest first; ledger rows are the durable detail.
   kept D2 (a) and D3 (b); the probe baseline already passes four of five criteria (plan Status).
   No map is committed until Unit 6 (DE-013).**
 
-- 2026-10-30 — **Codemap plan: the owner took every D1–D4 recommendation, Astra's too: D1 (a),
-  D2 (a) provisionally, D3 (b), D4 (a); Owner queue item removed (DE-012).**
-
-- 2026-10-29 — **Codemap plan revised after Astra High's review: all nine findings accepted. The
-  scanner reports lexical candidates, finds declarations by nesting across all brackets, and
-  lands its `RULE_FILES` and split-table placement with its first code; D1–D4 to the Owner queue
-  (DE-010, owner). A ChatGPT second pass found no blockers; Unit 5 now measures shared-settings
-  coupling and Unit 3's real-tree corpus covers every reference construct (DE-011).**
-- 2026-10-29 — **Planned a generated feature map so an agent finds a feature's existing owners
-  before writing new logic: hand-kept anchors, a stdlib scanner that expands them from the code,
-  live queries and a fail-closed freshness guard. DD-038's second copy of the solar math is the
-  motivating incident. Spec only; Unit 1 is the owner's Astra High review (owner).**
+- 2026-10-29..30 — **Codemap planned (DD-038's second solar-math copy the motivating incident),
+  revised after Astra High's and ChatGPT's reviews (DE-010, DE-011); the owner took every D1–D4
+  recommendation (DE-012).**
 - 2026-10-28 — **CI moves to `ubuntu-26.04`: every workflow's runner label, still an exact image,
   never `ubuntu-latest`; accepted on full CI green on its PR, and the tag, dispatch and
   `main`-only workflows first run there after the merge (DE-009, owner's queue answer (a)).**
-- 2026-10-28 — **The owner's sunlight probe settles the calibration plan's `get-brightness`
-  input: on the OnePlus, handed off above 65 000 lx, `get-brightness`, the setting and
-  BrightnessInfo stop at 4095 while the panel passes it, so `dumpsys display` stays the readout's
-  source and that plan gains no unit; faster-Shizuku Unit 7 now waits on a sunlight re-check
-  under ColorOS 17 (DE-007, DE-008, owner).**
-- 2026-10-26 — **Pixel calibration plan: D1 decided (a), the HBM threshold being what matters;
-  AdvancedAutoBrightness issue 26's dark-end gap measured on the same Pixel, setting 2 already at
-  14 % of the slider, and routed to the faster-Shizuku plan's float-write unit (DE-006); the
-  owner's `cmd display get-brightness` sunlight probe and how to read it added (owner).**
-- 2026-10-26 — **Planned the Pixel display calibration fix: a reporter's dump shows the reads
-  worked and the sweep stalled at the 0.63 manual ceiling, then blamed DUMP (DE-005); the plan
-  accepts a ceiling at the top, reads HBM above it in proportion and names each failure's cause.
-  Spec only; D1–D3 open (owner).**
+- 2026-10-26..28 — **Planned the Pixel calibration fix: the sweep stalls at the 0.63 manual
+  ceiling, then blames DUMP (DE-005); D1 decided (a); issue 26's dark-end gap routed to
+  faster-Shizuku's float writes (DE-006); the owner's sunlight probe keeps `dumpsys display` as
+  the readout's source and gates faster-Shizuku Unit 7 (DE-007, DE-008).**
 - 2026-10-20..26 — **1.15.1 / vc31: Night Light switches on after the profile's Kelvin lands,
   owner-passed on a context switch; the Privileged Display screen's service-off Apply stays
   on-device unverified (DD-090…DD-093). 1.15.2 / vc32: the Shizuku helper stays bound, owner-passed

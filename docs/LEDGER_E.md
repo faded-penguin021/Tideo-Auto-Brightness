@@ -207,3 +207,32 @@
   still fails, even with longer `dumpsys` and stable-read limits, for a reason not yet found. This
   is the hardware DC-026 called nobody's, but the reverse of DC-019's case, since the config
   overstates the scale and `context.resources` would return the same 4095.
+- DE-015: **A plan review relayed by the owner (2026-10-31), read against `c687a84`, found that a
+  plateau at the top of the display-calibration sweep proves saturation, not the High Brightness
+  Mode threshold, and both calibration plans now take all six of its findings.** A plateau above
+  level 128 that holds at 255 cannot tell an HBM transition from a device-configured thermal cap
+  or a stuck reading, and DE-005's Pixel throttling near level 98 bounds only that Pixel, so a
+  plateau becomes the threshold only when the dump shows a transition point equal to it and no
+  other cap in force. Accepting a ceiling before persisting it would let one release store ceiling
+  records that later builds read as legacy, extrapolating to about 1150 until each user
+  recalibrates, so the boundary is stored with the ceiling and its readout ships in the same
+  release. The HBM flag is set from the rounded readout, after an early return while that readout
+  is unchanged, so a raw of 0.6301 over a 0.63 boundary still shows 255 and never sets it; a
+  stored boundary must be compared with raw. A failed first level with no reading is not a
+  permission failure, since timeouts and missing or unparseable fields produce it too, so
+  permission advice needs every source shown unavailable, and readings lost midway are their own
+  cause. The Pixel plan became the shared calibration plan; the HyperOS findings are DE-016.
+- DE-016: **DE-015's review found two errors in the HyperOS scale plan, both now fixed there: its
+  scale checks contradicted its own ceiling hypothesis, and its timing argument excluded a cause
+  without measurements.** Under H1 the POCO F4's panel holds about 0.49976 from setting 128 up, so
+  a correctly scaled request of 200 fails a check expecting `(requested − 1) / 254` from
+  `mScreenBrightness`, and `mScreenBrightness × 254 + 1` cannot rebuild a setting above the clamp;
+  the scale is now judged at 25, 50 and 100, saturation separately, and above a ceiling the
+  app-facing setting is compared with the request, apart from the applied panel value. That the
+  fork's 12 s window and 15 s dump limit still failed does not clear a slow read, because nothing
+  was timed and one app read may fall through DUMP, root and Shizuku, each with its own limit,
+  which a shell `time dumpsys display` does not measure. H1 and H2 are hypotheses, not the list of
+  causes; the corrected build's trace of each read's source, field, raw and elapsed time settles
+  which, and no limit is raised without it. The review backed D1 (a), 0–255 for the app-facing
+  setting, as Tideo's supported contract and Android's documented range rather than proof that
+  every OEM build conforms.
