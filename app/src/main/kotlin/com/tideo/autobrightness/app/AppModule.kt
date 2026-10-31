@@ -82,7 +82,11 @@ class AppModule(context: Context) {
     )
 
     fun createRuntime(scope: CoroutineScope): RuntimeGraph {
-        val brightness = AndroidScreenBrightnessController(appContext)
+        // HyperOS fork: on Xiaomi/POCO (HyperOS) config_screenBrightnessSettingMaximum reports 4095,
+        // but the framework reads Settings.System.SCREEN_BRIGHTNESS on the 0-255 scale
+        // ((int-1)/254 in dumpsys). Trusting 4095 multiplied every write by ~16: domain 1 landed
+        // as 16 (~60 nits instead of ~2) and domain >= 16 clamped to full brightness.
+        val brightness = AndroidScreenBrightnessController(appContext, settingsApiMaxOverride = 255)
         val debugSink: DebugSink = ToastDebugSink(appContext)
         val handoffFlash = ToastHandoffSink(appContext)
         val displayReader = DumpsysDisplayBrightnessReader(appContext)
