@@ -6,6 +6,8 @@
   authorised **Unit 0 only**: committing this file on the session branch
   `claude/e2e-1.15.0-record`. Every later unit needs the owner's separate go-ahead.
 - No unit opens a PR, replies on an issue, tags or releases.
+- **Unit 5 gained Shizuku authorisation for an adb-elevated user** (2026-10-31, from issue #157,
+  DE-017). It stays under the device gate below unless the owner moves it.
 - **Device gate (owner, 2026-10-19).** Units 2–13 start only after the owner's OnePlus 13
   (CPH2653) has updated to **ColorOS 17 (Android 17, API 37)**. OxygenOS has reached its end of
   life, so the plan targets ColorOS 17.
@@ -204,6 +206,28 @@ becomes a new DD row in the unit that acts on it:
   row.
 
 **5. One-tap Shizuku grants and battery-optimization exemption.**
+- **Authorisation first, for an adb-elevated user too** (added 2026-10-31 from issue #157,
+  DE-017; owner: "the Shizuku stuff belongs to the privileged paths plan").
+  - The gap. Tideo asks Shizuku for authorisation only from onboarding's elevated step and
+    Privileged Display's grant card, and both show their "Use Shizuku" button only below ELEVATED
+    (`OnboardingScreen.kt:368`, `PrivilegedDisplayScreen.kt:154`). A user elevated over adb is
+    never asked, so every runtime use stays off for them with Shizuku running: the dump fallback
+    (DD-077), Night Light's binder route (DC-057), the SSID strategy and force-dark. #157's
+    POCO F4 is that case: Shizuku 13.5 running, DUMP granted, Tideo not authorised. This unit's
+    own buttons would meet the same wall.
+  - The change. While Shizuku runs and Tideo is not authorised, Privileged Display also shows
+    "Use Shizuku" at ELEVATED, and each one-tap button below asks for authorisation first.
+    Reusing `requestGrant` keeps its single flight and prompt timeout, and the existing string;
+    its WRITE_SECURE_SETTINGS grant is then a repeat, which the glue review confirms is harmless,
+    or the request is split out.
+  - The advice that sends users to Shizuku cannot be followed in the app today:
+    `flash_calibration_failed`, `handoff_calibration_failed_banner` and
+    `help_handoff_calibration` ("allow root or Shizuku"), and `pd_night_light_needs_shizuku`
+    ("Start Shizuku"). The review decides whether they change. The calibration banner is also
+    the display-calibration plan's Unit 4; whichever lands second rebases.
+  - Device: the owner removes Tideo's authorisation in the Shizuku app, then Privileged Display
+    offers "Use Shizuku" at ELEVATED; after the tap, a Shizuku use answers again (Unit 4's helper
+    card counts the call).
 - `ShizukuUserService`, in the grant process, gets three fixed operations. Each takes the package
   from its own Context (DA-031), uses argv only and bounds its output:
   - `pm grant <own> android.permission.DUMP`;

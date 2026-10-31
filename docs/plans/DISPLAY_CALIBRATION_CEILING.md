@@ -28,7 +28,7 @@
 | Case | What fails | Evidence | Standing |
 |---|---|---|---|
 | Pixel (DE-005) | the sweep stalls at the 0.63 manual ceiling, then blames DUMP | the reporter's recorded dump | **confirmed** |
-| POCO F4 on HyperOS (DE-014), once the scale is fixed | may stall at its transition point, 0.49976 | the dump's transition point; calibration also failed on the reporter's fork | **provisional**: plausible, not shown |
+| POCO F4 on HyperOS (DE-014), once the scale is fixed | may stall at its transition point, 0.49976 | the dump's transition point, with `brightnessMax` equal to it at 0 lx (#157, DE-017); calibration also failed on the reporter's fork | **provisional**: plausible, not shown |
 | The owner's OnePlus (DD-081) | nothing: it calibrates today | the owner's device | regression guard |
 
 - **The HyperOS scale fix does not fix the Pixel.** The Pixel's sweep already writes 1 to 255 on
@@ -129,13 +129,14 @@ Four gaps, in four code units:
     transition point.
 
   The dumps so far: the Pixel's transition and `brightnessMax` are both 0.63, its plateau
-  (DE-005). The F4 shows a transition of 0.49975574, but no plateau yet (DE-014). The OnePlus reads
+  (DE-005). The F4 shows a transition of 0.49975574 and, at 0 lx, `brightnessMax` equal to it,
+  but no plateau yet (DE-014, DE-017). The OnePlus reads
   `Infinity` and never plateaus (DD-083).
 - **Otherwise it is an observed ceiling** and never becomes the HBM threshold. D4 decides whether
   the run fails or stores it.
 - **Precondition.** The ledger quotes no `brightnessMaxReason` line from either reporter's dump.
   Before this unit relies on it, the owner greps the Pixel and F4 dumps for it, or Unit 1's trace
-  shows it on a ceiling panel. If it is absent, the rule uses only the fields shown, and the DE row
+  shows it on a ceiling panel. #157's excerpt omits it; the F4 reporter offers the full dump there. If it is absent, the rule uses only the fields shown, and the DE row
   says so.
 - **Store a verified boundary.**
   - Drop the last point, which already sat on the plateau, and append `255:<plateau>`. On this

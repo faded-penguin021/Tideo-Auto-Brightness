@@ -19,13 +19,18 @@
   (DE-014). Unit 1 starts by cherry-picking that commit's scale change, so the reporter's fix is
   credited. Read against `ScreenBrightnessController`, `PipelineCycleRunner`,
   `HighBrightnessUpdates` and `DisplayCalibrationRun` at `e5f6918`.
+- **The report of record is issue
+  [#157](https://github.com/faded-penguin021/Tideo-Auto-Brightness/issues/157)**, filed by the
+  same reporter on 2026-10-31 and relayed by the owner. It confirms everything the fork showed and
+  adds the facts marked *(#157)* below (DE-017). Unit 2 asks the reporter there; they offered to
+  test any debug build and said they will report back after some days of use.
 
 ## What the reporter showed
 
 The device is a POCO F4 (22021211RG) on HyperOS and Android 14, with DUMP granted over adb and
 Shizuku 13.5 running.
 
-- **Tideo converts with 4095.** On the official build, Live Debug's **Settings API max** reads
+- **Tideo converts with 4095.** On the 1.15.0 release build, Live Debug's **Settings API max** reads
   4095. That is `config_screenBrightnessSettingMaximum` on this phone.
 - **Android reads the setting on 0–255.** At 0 lx Tideo stepped down through domain 3, 2 and 1.
   What it wrote, and what `dumpsys display` showed:
@@ -45,8 +50,23 @@ Shizuku 13.5 running.
 - **The fork's build forces 255.** Live Debug then reads `Settings API max: 255`, a request of 10
   is acknowledged as 10, and the screen follows the dashboard. That is a few hours of use; the
   reporter will confirm after some days, nights included.
-- **Calibration still fails on the fork's build**, even with `dumpsys` allowed 15 s and the
-  stable-read window at 12 s. The reporter has not found why. See "Calibration on HyperOS".
+- **Calibration fails on both builds** *(#157)*. See "Calibration on HyperOS".
+  - On the 1.15.0 release build (DUMP granted and checked, after a force-stop, Shizuku running)
+    the failure says nothing about reading. Every sweep level from 25 up is written as 401 or
+    more, past the top of the scale, so the readings stop rising by level 50 whatever the read
+    path does. The reporter worked this out too.
+  - On the fork's build it still fails, even with `dumpsys` allowed 15 s and the stable-read
+    window at 12 s. The reporter has not found why.
+- **The cap below High Brightness Mode** *(#157)*. At 0 lx in manual mode the dump shows
+  `mCachedBrightnessInfo.brightnessMax=0.49975574`, equal to `hbmTransitionPoint` and to
+  `mHbmData`'s transition, with HBM enabled from 6 001 lx. That is the Pixel's shape (DE-005):
+  manual brightness capped at the transition point. It supports H1; no plateau is shown yet.
+- **The shell and the app share one scale here** *(#157)*. `adb shell settings get system
+  screen_brightness` returned 16, the value Tideo wrote. On the owner's OnePlus the shell reads
+  another scale (DC-025). Unit 2 still reads `dumpsys`.
+- **The dump's Shizuku leg never ran** *(#157)*. Shizuku 13.5 was running, but Tideo was never
+  authorised in it: an adb-elevated user is never asked. That gap belongs to the faster-Shizuku
+  plan's Unit 5. Here it only bears on H2.
 
 ## Why Tideo gets it wrong
 
@@ -155,9 +175,10 @@ Written for D1 (a) and D2 (a). Other answers reshape it (see "Execution rules").
 
 ### Unit 2. The reporter's device checks
 
-The owner has no HyperOS phone. The reporter offered to test debug builds and to open an issue
-on this repository, so this unit asks them, through the Owner queue, to run a debug build of
-Unit 1. Step 5 also needs the calibration plan's Unit 1 (its trace) in that build.
+The owner has no HyperOS phone. The reporter offered on #157 to test any debug build, so this
+unit asks them there, through the Owner queue, to run a debug build of Unit 1. Step 6 also needs
+the calibration plan's Unit 1 (its trace) in that build. One ask needs no build: the full
+`dumpsys display` they offered on #157, for Owner-queue item 3's `brightnessMaxReason` check.
 
 Two values are kept apart throughout (DE-016): the **app-facing setting**, which Live Debug's
 **Requested → acknowledged** reads back, and the **applied panel brightness**,
@@ -194,6 +215,7 @@ Two values are kept apart throughout (DE-016): the **app-facing setting**, which
 
 - Every finding has its DE row. The calibration evidence goes to its own row, and settles the
   calibration plan's provisional F4 case.
+- The owner answers #157 and decides when it closes.
 - Remove the STATE checklist and delete this file.
 
 ## Calibration on HyperOS: hypotheses, settled by the corrected build
@@ -204,11 +226,14 @@ established from the corrected build's evidence (Unit 2, step 6) before the cali
 ceiling fix is declared to apply here.
 
 - **H1, a manual ceiling (plausible).** The dump gives `hbmTransitionPoint=0.49975574`, 500 nits
-  on the spline.
+  on the spline, and at 0 lx in manual mode `brightnessMax` equals it *(#157)*, the cap the
+  Pixel shows at 0.63.
   - If manual brightness stops there, as the Pixel's stops at 0.63 (DE-005), every setting from
     128 up shows 0.49976.
   - Level 128 asks for 0.5, reads 0.49976 and still rises past level 100's 0.38976. Level 150
     repeats it, so `readStable` fails there.
+  - That would also explain the fork's failure: a plateau fails at level 150 whatever the window
+    length.
   - The calibration plan's Unit 2 accepts this only if the dump corroborates the plateau as the
     transition point. The F4's plateau would start at level 128, that unit's floor.
   - Expected: event-log entries for levels 1 to 150, then the restore. The trace shows readings at
@@ -221,6 +246,10 @@ ceiling fix is declared to apply here.
     Shizuku adds up to 4 s to bind. So one read can far outlast one `dumpsys display`.
   - The fork's 12 s window and 15 s limit did not make it pass. Without measured times that
     excludes nothing: a read that falls through two sources can still outlast 12 s.
+  - On the F4 the Shizuku leg returns without binding, since Tideo is not authorised there
+    *(#157)*, and root is not reported. One read there is then likely one DUMP-granted
+    `dumpsys display`, so H2 needs that one call to take most of the fork's 12 s. That narrows H2
+    without measuring it; the trace still decides.
   - Expected: elapsed times near the limits in the trace, and the window running out wherever
     they first add up.
 - **Others the evidence must leave room for.** The field the reader locks may not track the panel
@@ -241,13 +270,13 @@ ceiling fix is declared to apply here.
      - This is a contract Tideo supports, not proof that every OEM build conforms.
      - The risk: a build whose framework really reads a wider scale would top out at 255 of it,
        too dim, until someone reports it, the way this report came in.
-   - (b) (a), plus a "Settings scale" choice in Misc (255, or the device's config), as the
-     reporter suggested.
+   - (b) (a), plus a "Settings scale" choice in Misc (255, or the device's config), as #157
+     suggests ("Auto / 255 / 4095").
      - It covers an unseen build without a release.
      - It costs a setting, strings (Owner-queue item 1 grows), a DataStore key and backup
        handling, for hardware nobody has shown.
-     - The reporter proposed the config as the default. That default is what breaks HyperOS, so
-       it would have to be 255.
+     - #157's "Auto" is the config. That default is what breaks HyperOS, so it would have to
+       be 255.
    - (c) Keep the config, but ignore it on HyperOS only, by a manufacturer check. It is the
      narrowest change, but nothing can test it here, and it misses any other skin that ships the
      same config.
@@ -263,7 +292,8 @@ ceiling fix is declared to apply here.
 ## Deliberately left alone
 
 - **Learning the scale from the device** (`dumpsys`, the float setting): declined (Decided
-  non-items, DC-026).
+  non-items, DC-026). #157's other proposal, comparing `mScreenBrightness` with
+  `(raw − 1) / 254` and with `raw / max`, is this.
 - **Float writes**, which would sidestep the int scale: faster-Shizuku Unit 12, which reopens
   DC-026 on its own terms.
 - **The fork's longer time limits**: not without the app's measured read times, see H2. They

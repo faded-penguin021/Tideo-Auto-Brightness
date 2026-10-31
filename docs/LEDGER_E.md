@@ -236,3 +236,20 @@
   which, and no limit is raised without it. The review backed D1 (a), 0–255 for the app-facing
   setting, as Tideo's supported contract and Android's documented range rather than proof that
   every OEM build conforms.
+- DE-017: **The POCO F4 reporter filed the HyperOS scale report as issue #157 (2026-10-31, relayed
+  by the owner); it confirms DE-014 and adds four facts.** At 0 lx in manual mode its dump shows
+  `mCachedBrightnessInfo.brightnessMax=0.49975574`, equal to `hbmTransitionPoint` and to
+  `mHbmData`'s transition with HBM from 6001 lx, the cap DE-005's Pixel shows at 0.63, while the
+  excerpt carries no `brightnessMaxReason` and no sweep has shown a plateau. `adb shell settings
+  get system screen_brightness` returned 16, the value Tideo wrote, so on this phone the shell and
+  the app share one scale, unlike DC-025's OnePlus. Calibration failed on 1.15.0 with DUMP granted,
+  which proves nothing about reading, since every sweep level from 25 up is written as 401 or more
+  and the readings stop rising by level 50, while the fork's failure with 12 s and 15 s limits
+  fits a plateau from level 128, which fails at level 150 at any window length. Shizuku 13.5 ran
+  with Tideo unauthorised, because Tideo asks only from onboarding's elevated step and Privileged
+  Display's grant card, both hidden at ELEVATED (`OnboardingScreen.kt:368`,
+  `PrivilegedDisplayScreen.kt:154`), so an adb-elevated user never gets a Shizuku runtime use and
+  the dump's Shizuku leg returns without binding; the owner routed that gap to the faster-Shizuku
+  plan's one-tap-grants unit. The issue's proposals are a settings-scale choice, the HyperOS plan's
+  D1 (b), and comparing the dump against both scales, which is learning the scale from the device,
+  declined by DC-026.

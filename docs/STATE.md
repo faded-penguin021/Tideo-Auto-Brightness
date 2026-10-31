@@ -29,7 +29,8 @@ stays closed (DB-051…DB-060), and Scorecard.dev is a run-once local input.
 
 - **Faster Shizuku paths and Android 17 display APIs** — `docs/plans/PRIVILEGED_FAST_PATHS.md`,
   spec only (owner, 2026-10-19). Unit 1 is the owner's Astra review. Units 2–13 wait until the
-  owner's OnePlus 13 runs ColorOS 17, and each unit runs on the owner's go-ahead.
+  owner's OnePlus 13 runs ColorOS 17, and each unit runs on the owner's go-ahead. Unit 5 also
+  lets an adb-elevated user authorise Shizuku (#157, DE-017).
   [x] 0 plan committed · [ ] 1 Astra review · [ ] 2 ColorOS 17 baseline and facts · [ ] 3 split
   `SHIZUKU_USAGE.md` · [ ] 4 helper metrics and version bump · [ ] 5 one-tap Shizuku grants ·
   [ ] 6 resident helper · [ ] 7 BrightnessInfo readout · [ ] 8 compileSdk 36.1 · [ ] 9
@@ -52,7 +53,8 @@ stays closed (DB-051…DB-060), and Scorecard.dev is a run-once local input.
   [x] 4 features, queries, write and check · [x] 5 seed and measure · [ ] 6 guard (per D2) ·
   [ ] 7 agent entry points · [ ] 8 probe and close-out.
 - **HyperOS brightness scale** — `docs/plans/HYPEROS_SETTING_SCALE.md`, spec only (owner,
-  2026-10-31; DE-014, revised DE-016). D1–D2 open (Owner queue 5). Next stage with the
+  2026-10-31; DE-014, revised DE-016); issue #157 is the report (DE-017). D1–D2 open (Owner
+  queue 5). Next stage with the
   calibration plan, after codemap is merged; each unit runs on the owner's go-ahead.
   [x] 0 plan · [ ] 1 one scale · [ ] 2 reporter's device checks · [ ] 3 close-out.
 
@@ -100,7 +102,8 @@ stays closed (DB-051…DB-060), and Scorecard.dev is a run-once local input.
    message, or (c) unchanged. D4: a plateau the dump does not confirm (a) fails the run with its
    own message, or (b) is stored without ever setting the HBM flag. Recommendation: D2 (b),
    D3 (a), D4 (a); reasons in the plan. Before Unit 2, also check whether the Pixel and F4 dumps
-   carry `brightnessMaxReason` (`grep -c brightnessMaxReason <dump>`). Unverified until you
+   carry `brightnessMaxReason` (`grep -c brightnessMaxReason <dump>`); the F4 reporter offers
+   the full dump on #157. Unverified until you
    answer; settles it: `grep -c '^## Owner decisions (open)' docs/plans/DISPLAY_CALIBRATION_CEILING.md`
    prints 0 (retitled once D2–D4 are decided), or the plan is gone.
 
@@ -113,11 +116,12 @@ stays closed (DB-051…DB-060), and Scorecard.dev is a run-once local input.
 
 5. **[2026-10-31] Decide how Tideo gets the brightness scale; on HyperOS it writes 16× too
    bright.** A POCO F4 reports `config_screenBrightnessSettingMaximum` 4095 while Android reads
-   the setting on 0–255, so most levels show full brightness (DE-014). D1: (a) 0–255 everywhere,
-   (b) that plus a scale choice in Misc, (c) a HyperOS-only check, or (d) no change (DC-026). D2:
-   (a) clear override points saved under the bug once, or (b) keep them. Recommendation: D1 (a),
-   D2 (a); reasons in the plan. The review you relayed backs D1 (a) as Tideo's supported
-   contract, Android's documented 0–255, not proof every OEM conforms (DE-016). Unverified until you answer; settles it:
+   the setting on 0–255, so most levels show full brightness (issue #157, DE-014). D1: (a) 0–255
+   everywhere, (b) that plus a scale choice in Misc, (c) a HyperOS-only check, or (d) no change
+   (DC-026). D2: (a) clear override points saved under the bug once, or (b) keep them.
+   Recommendation: D1 (a), D2 (a); reasons in the plan. The review you relayed backs D1 (a) as
+   Tideo's supported contract, Android's documented 0–255, not proof every OEM conforms
+   (DE-016). Unverified until you answer; settles it:
    `grep -c '^## Owner decisions (open)' docs/plans/HYPEROS_SETTING_SCALE.md` prints 0, or the
    plan is gone.
 
@@ -134,18 +138,12 @@ proposing work; changing it is legislation under RUNBOOK's rule-review protocol.
 
 Newest first; ledger rows are the durable detail.
 
-- 2026-10-31 — **HyperOS plan links the reporter's fork commit, and Unit 1 opens by
-  cherry-picking its scale line with the reporter as author, leaving out its timeouts and
-  workflow, so the credit is fair (owner).**
-- 2026-10-31 — **Both calibration plans revised after an owner-relayed review, all six findings
-  taken: a plateau is the HBM threshold only when the dump confirms it, its key and raw-based HBM
-  flag ship in one release, permission advice only when shown, HyperOS checks split scale from
-  saturation and H1/H2 stay hypotheses until the app's read times are traced. The Pixel plan is
-  now the shared calibration plan; both run after codemap is merged (DE-015, DE-016, owner).**
-
-- 2026-10-31 — **Planned the HyperOS brightness-scale fix from a POCO F4 reporter's fork and
-  dumps: Tideo trusts a 4095 config while Android reads 0–255 (DE-014); calibration there likely
-  also needs the Pixel plan's Unit 1. Spec only; D1–D2 open (owner).**
+- 2026-10-31 — **HyperOS scale planned from a POCO F4 reporter's fork: Tideo trusts a 4095
+  config while Android reads 0–255 (DE-014); Unit 1 opens by cherry-picking the fork's scale line
+  with the reporter as author. Both calibration plans revised after an owner-relayed review, all
+  six findings taken; the Pixel plan is the shared calibration plan (DE-015, DE-016). The
+  reporter's issue #157 is now the report of record: the F4's manual cap equals its HBM
+  transition, and its Shizuku authorisation gap went to faster-Shizuku Unit 5 (DE-017, owner).**
 
 - 2026-10-30 — **Codemap Units 2–5: `scripts/codemap.py` scans the tracked Kotlin and answers
   `declarations`, `who-uses`, `impact`, `features`, `feature`, `suspects`, `write` and `check`
