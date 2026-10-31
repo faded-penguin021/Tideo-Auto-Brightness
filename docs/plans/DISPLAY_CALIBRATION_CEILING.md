@@ -246,6 +246,9 @@ Two defects, in three units:
   - Whichever plan lands second rebases on the other.
 - **Light refactor, Unit 1** changes what `dimming.disengage()` publishes. The sweep calls it but
   is not changed by it.
+- **HyperOS brightness scale** (`HYPEROS_SETTING_SCALE.md`, H1). If a POCO F4 caps manual
+  brightness at its transition point, 0.49976, its ceiling falls on level 128, Unit 1's lowest
+  accepted previous point. Do not raise that bound without the F4's evidence (DE-014).
 
 ## Execution rules
 

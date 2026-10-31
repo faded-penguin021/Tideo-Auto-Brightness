@@ -49,6 +49,9 @@ stays closed (DB-051…DB-060), and Scorecard.dev is a run-once local input.
   [x] 0 plan · [x] 1 Astra review · [x] 2 placement, tokenizer, declarations · [x] 3 references ·
   [x] 4 features, queries, write and check · [x] 5 seed and measure · [ ] 6 guard (per D2) ·
   [ ] 7 agent entry points · [ ] 8 probe and close-out.
+- **HyperOS brightness scale** — `docs/plans/HYPEROS_SETTING_SCALE.md`, spec only (owner,
+  2026-10-31; DE-014). D1–D2 open (Owner queue 5); each unit runs on the owner's go-ahead.
+  [x] 0 plan · [ ] 1 one scale · [ ] 2 reporter's device checks · [ ] 3 close-out.
 
 ## Owner queue
 
@@ -101,6 +104,15 @@ stays closed (DB-051…DB-060), and Scorecard.dev is a run-once local input.
    --workflow release.yml --limit 1 --json conclusion,createdAt` shows `success` dated after the
    merge, and the version appears on F-Droid as reproducible.
 
+5. **[2026-10-31] Decide how Tideo gets the brightness scale; on HyperOS it writes 16× too
+   bright.** A POCO F4 reports `config_screenBrightnessSettingMaximum` 4095 while Android reads
+   the setting on 0–255, so most levels show full brightness (DE-014). D1: (a) 0–255 everywhere,
+   (b) that plus a scale choice in Misc, (c) a HyperOS-only check, or (d) no change (DC-026). D2:
+   (a) clear override points saved under the bug once, or (b) keep them. Recommendation: D1 (a),
+   D2 (a); reasons in the plan. Unverified until you answer; settles it:
+   `grep -c '^## Owner decisions (open)' docs/plans/HYPEROS_SETTING_SCALE.md` prints 0, or the
+   plan is gone.
+
 **The tree declares `1.15.2` / vc32, this train's one bump (DE-001)**; 1.15.1 was seen tagged on
 2026-10-26 (`git ls-remote --tags --refs origin 'refs/tags/v*'`). Never bump twice in one train.
 
@@ -113,6 +125,10 @@ proposing work; changing it is legislation under RUNBOOK's rule-review protocol.
 ## Changelog
 
 Newest first; ledger rows are the durable detail.
+
+- 2026-10-31 — **Planned the HyperOS brightness-scale fix from a POCO F4 reporter's fork and
+  dumps: Tideo trusts a 4095 config while Android reads 0–255 (DE-014); calibration there likely
+  also needs the Pixel plan's Unit 1. Spec only; D1–D2 open (owner).**
 
 - 2026-10-30 — **Codemap Units 2–5: `scripts/codemap.py` scans the tracked Kotlin and answers
   `declarations`, `who-uses`, `impact`, `features`, `feature`, `suspects`, `write` and `check`
@@ -148,20 +164,11 @@ Newest first; ledger rows are the durable detail.
   worked and the sweep stalled at the 0.63 manual ceiling, then blamed DUMP (DE-005); the plan
   accepts a ceiling at the top, reads HBM above it in proportion and names each failure's cause.
   Spec only; D1–D3 open (owner).**
-- 2026-10-26 — **Shizuku helper reuse, planned, revised after Sol's review and closed: the helper
-  stays bound, so a return from a Night-Light-off profile no longer shows 4082 K for ~5 s
-  (1.15.2 / vc32, DE-001); its liveness check is a local read (Astra, DE-004); the owner passed it
-  on 1.15.2-debug vc32 (DE-003). 1.15.1's fix had missed because only the debug install was
-  checked, so device checks now give it the release install's learned facts first (DE-002,
-  owner); plan deleted.**
-- 2026-10-25 — **The session banner now fetches and warns when HEAD can fast-forward to any branch,
-  bot-only tips excluded, so a checkout behind a worktree's pushed work shows at start (owner).**
-- 2026-10-20..25 — **Night Light switch-on order, planned and closed: Night Light switches on
-  after the profile's Kelvin lands, so a switch from a Night-Light-off profile no longer flashes
-  the held (red) Kelvin, both on a context switch (1.15.1 / vc31, DD-090) and in the Privileged
-  Display screen's service-off Apply (DD-091); no shared write-order helper, since one came out
-  longer (DD-092). The owner passed the context-switch case on 1.15.1-debug vc31; the screen's
-  Apply stays on-device unverified (DD-093).**
+- 2026-10-20..26 — **1.15.1 / vc31: Night Light switches on after the profile's Kelvin lands,
+  owner-passed on a context switch; the Privileged Display screen's service-off Apply stays
+  on-device unverified (DD-090…DD-093). 1.15.2 / vc32: the Shizuku helper stays bound, owner-passed
+  (DE-001…DE-004); device checks now seed the release install's learned facts first (DE-002). The
+  session banner warns when HEAD can fast-forward (owner). Both plans closed.**
 
 - 2026-10-21 — **Duplicated logic audited: Live Debug and the Dashboard show hardware vs perceived
   brightness in PWM mode, both kept (D-109); six consolidations planned in

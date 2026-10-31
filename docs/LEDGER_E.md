@@ -192,3 +192,18 @@
   couplings a `feature` answer misses, only finding 6's sharing logic, now that `ProfileApplier`
   (finding 4, a list overlapping `mergeProfile`'s) is anchored, so the settings-field scan stays
   deferred; `check` and `--anchors-only` each take ~1.3 s.
+- DE-014: **On a POCO F4 (HyperOS, Android 14) `config_screenBrightnessSettingMaximum` reads 4095
+  while Android reads `screen_brightness` on 0–255, so Tideo writes every level about 16 times too
+  high (a reporter's fork, commit `1957d5e`, and their replies in its comments, relayed by the
+  owner, 2026-10-31).** At 0 lx Tideo's domain 3, 2 and 1 went out as 48, 32 and 16, and
+  `dumpsys display` showed 0.18503937, 0.122047246 and 0.05905512, which are 47/254, 31/254 and
+  15/254, AOSP's `(setting − 1) / 254`, where a 0–4095 reading of 16 would show about 0.0039. The
+  panel's spline (2, 500 and 900 nits at 9.7704E-4, 0.49975574 and 1.0) puts that floor at about
+  60 nits instead of 2, and from domain 16 up every write reaches 256 or more, so at about 3 800 lx
+  the dashboard's 49 went out as 787 and the screen sat near full. Tideo reads back on the same
+  wrong scale, so Live Debug's write card stays `ACKNOWLEDGED` and only `Settings API max: 4095`
+  shows it. The reporter's build with the scale forced to 255 shows `Settings API max: 255` and
+  10 → 10 with the screen following the dashboard over a few hours, while its display calibration
+  still fails, even with longer `dumpsys` and stable-read limits, for a reason not yet found. This
+  is the hardware DC-026 called nobody's, but the reverse of DC-019's case, since the config
+  overstates the scale and `context.resources` would return the same 4095.
