@@ -12,7 +12,9 @@
   calibration evidence that plan needs.
 - **Sequencing (owner, 2026-10-31).** Both plans stay open, and executing them is the next stage,
   after the codemap plan is complete and merged to `main`. No unit here starts before then.
-- D1 and D2 below are open, each with a recommendation. Unit 1 waits on both.
+- **D1 (a) and D2 (b) are decided** (owner, 2026-10-31; DE-018): 0–255 on every device, and
+  override points saved under the bug stay. Unit 1 now waits only on the sequencing above and the
+  owner's go-ahead.
 - Evidence: the fork `bnoeu/Tideo-Auto-Brightness_HyperOS`, branch `hyperos-fix`, commit
   [`1957d5e`](https://github.com/bnoeu/Tideo-Auto-Brightness_HyperOS/commit/1957d5e396c07333eea1bfef64b907611091569e)
   on top of `282c95f`, and the reporter's replies in that commit's comments, relayed by the owner
@@ -105,7 +107,7 @@ If DE-014 holds, the whole write and read path on HyperOS, not only calibration:
 
 ### Unit 1. One scale for the setting (D1, D2)
 
-Written for D1 (a) and D2 (a). Other answers reshape it (see "Execution rules").
+Written for the decided D1 (a) and D2 (b) (DE-018).
 
 - **First commit: the reporter's scale change, cherry-picked** (owner, 2026-10-31: credit where
   it is due).
@@ -162,10 +164,10 @@ Written for D1 (a) and D2 (a). Other answers reshape it (see "Execution rules").
   - the normalizing-provider tests (`normalizing(…)`, DC-002, DC-003) move to 255 and keep each
     case's intent;
   - the `settingsApiMaxOverride` seam goes once nothing uses it.
-- **Override points saved under the bug (D2 a).** They are about a sixteenth too low, and they
-  feed the curve wizard and the chart's overlay (`OverridePointStore`). The fixed build's first
-  start reads the config one last time and clears the points once, only where it is not 255. A
-  marker records that the check ran, so it never runs twice.
+- **Override points saved under the bug stay (D2 b).** They are about a sixteenth too low, and
+  they feed the curve wizard and the chart's overlay (`OverridePointStore`). The store keeps the
+  newest 50 (`MAX_POINTS`, task561's cap), so new overrides push them out, and the user can tap
+  one on the curve chart to delete it (F36). No migration, no marker, no test.
 - **Records.**
   - A DE row: the scale is fixed at 255, overruling DC-026's "the lookup stays", starting from
     the reporter's picked commit `1957d5e`.
@@ -259,9 +261,9 @@ ceiling fix is declared to apply here.
   becomes a confirmed case of the calibration plan. Anything else gets a unit there built on the
   trace's measured times. Timeouts are not raised without those times.
 
-## Owner decisions (open)
+## Owner decisions (decided 2026-10-31, DE-018)
 
-1. **D1. Where the setting's scale comes from.**
+1. **D1. Where the setting's scale comes from. Decided: (a)** (owner: "Yes d1a sounds good").
    - (a) **Recommended.** 0–255 on every device, and the config lookup goes. The review supports
      (a), phrased as Tideo's supported API contract (DE-016).
      - Android documents `SCREEN_BRIGHTNESS` as 0–255, and every device with data reads the
@@ -282,8 +284,9 @@ ceiling fix is declared to apply here.
      same config.
    - (d) No change: DC-026 stands, HyperOS stays near full brightness, and the reporter keeps the
      fork.
-2. **D2. Override points saved under the bug.**
-   - (a) **Recommended.** Clear them once on the fixed build's first start, only where the config
+2. **D2. Override points saved under the bug. Decided: (b)**, against the recommendation (owner:
+   "the override points can be removed or naturally roll out the 50 fifo window").
+   - (a) Recommended before the decision. Clear them once on the fixed build's first start, only where the config
      is not 255. They cannot be scaled back up reliably: each was saved from a value about a
      sixteenth of the real one, rounded to an integer.
    - (b) Keep them. The newest 50 replace them as the user overrides. Until then the wizard
@@ -327,14 +330,8 @@ ceiling fix is declared to apply here.
   unit has not landed, run steps 1–5 and hold step 6.
 - **Version.** Unit 1 carries the train's one bump unless another unit already has (playbook 6).
   Never bump twice in one train.
-- **Decisions reshape units.**
-  - D1 (b) adds the setting, its strings and its backup handling to Unit 1. The pick still
-    opens it, since 255 is that setting's default.
-  - D1 (c) narrows Unit 1 to the check. The pick does not fit a manufacturer check, so credit the
-    reporter with a `Co-authored-by:` trailer instead.
-  - D1 (d) drops Unit 1 and the pick, and keeps only Unit 2's calibration evidence, gathered on
-    today's scale.
-  - D2 (b) drops the clearing.
+- **Decisions.** D1 (a) and D2 (b) are decided, and Unit 1 is written for them: no Misc
+  setting, no manufacturer check, no clearing of override points.
 - **Records.** Code cites DE rows, never this file.
 
 ## Units (sequential)

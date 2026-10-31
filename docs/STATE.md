@@ -53,9 +53,9 @@ stays closed (DB-051…DB-060), and Scorecard.dev is a run-once local input.
   [x] 4 features, queries, write and check · [x] 5 seed and measure · [ ] 6 guard (per D2) ·
   [ ] 7 agent entry points · [ ] 8 probe and close-out.
 - **HyperOS brightness scale** — `docs/plans/HYPEROS_SETTING_SCALE.md`, spec only (owner,
-  2026-10-31; DE-014, revised DE-016); issue #157 is the report (DE-017). D1–D2 open (Owner
-  queue 5). Next stage with the
-  calibration plan, after codemap is merged; each unit runs on the owner's go-ahead.
+  2026-10-31; DE-014, revised DE-016); issue #157 is the report (DE-017). D1 (a) and D2 (b)
+  decided (DE-018). Next stage with the calibration plan, after codemap is merged; each unit runs
+  on the owner's go-ahead.
   [x] 0 plan · [ ] 1 one scale · [ ] 2 reporter's device checks · [ ] 3 close-out.
 
 ## Owner queue
@@ -114,17 +114,6 @@ stays closed (DB-051…DB-060), and Scorecard.dev is a run-once local input.
    --workflow release.yml --limit 1 --json conclusion,createdAt` shows `success` dated after the
    merge, and the version appears on F-Droid as reproducible.
 
-5. **[2026-10-31] Decide how Tideo gets the brightness scale; on HyperOS it writes 16× too
-   bright.** A POCO F4 reports `config_screenBrightnessSettingMaximum` 4095 while Android reads
-   the setting on 0–255, so most levels show full brightness (issue #157, DE-014). D1: (a) 0–255
-   everywhere, (b) that plus a scale choice in Misc, (c) a HyperOS-only check, or (d) no change
-   (DC-026). D2: (a) clear override points saved under the bug once, or (b) keep them.
-   Recommendation: D1 (a), D2 (a); reasons in the plan. The review you relayed backs D1 (a) as
-   Tideo's supported contract, Android's documented 0–255, not proof every OEM conforms
-   (DE-016). Unverified until you answer; settles it:
-   `grep -c '^## Owner decisions (open)' docs/plans/HYPEROS_SETTING_SCALE.md` prints 0, or the
-   plan is gone.
-
 **The tree declares `1.15.2` / vc32, this train's one bump (DE-001)**; 1.15.1 was seen tagged on
 2026-10-26 (`git ls-remote --tags --refs origin 'refs/tags/v*'`). Never bump twice in one train.
 
@@ -138,6 +127,9 @@ proposing work; changing it is legislation under RUNBOOK's rule-review protocol.
 
 Newest first; ledger rows are the durable detail.
 
+- 2026-10-31 — **HyperOS D1 (a): the setting is 0–255 on every device; D2 (b): override points
+  saved under the bug stay, rolling out of the newest-50 window or deleted on the chart; Owner
+  queue item 5 closed (DE-018, owner).**
 - 2026-10-31 — **HyperOS scale planned from a POCO F4 reporter's fork: Tideo trusts a 4095
   config while Android reads 0–255 (DE-014); Unit 1 opens by cherry-picking the fork's scale line
   with the reporter as author. Both calibration plans revised after an owner-relayed review, all

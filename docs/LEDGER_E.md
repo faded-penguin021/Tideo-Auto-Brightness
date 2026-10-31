@@ -253,3 +253,14 @@
   plan's one-tap-grants unit. The issue's proposals are a settings-scale choice, the HyperOS plan's
   D1 (b), and comparing the dump against both scales, which is learning the scale from the device,
   declined by DC-026.
+- DE-018: **The owner decided the HyperOS scale plan's D1 (a) and D2 (b) (2026-10-31): Tideo will
+  treat `Settings.System.SCREEN_BRIGHTNESS` as 0–255 on every device, and override points saved
+  under the 16-fold bug stay.** D1 (a), "Yes d1a sounds good", takes the recommendation, so the
+  scale unit drops the `config_screenBrightnessSettingMaximum` lookup that DC-026 kept, as
+  Tideo's supported contract rather than proof that every OEM build conforms (DE-016). D2 (b)
+  overrides the recommendation to clear those points once on the fixed build's first start: "the
+  override points can be removed or naturally roll out the 50 fifo window". Read at `465f7bf`,
+  `OverridePointStore` keeps the newest 50 (`MAX_POINTS`, task561's cap) and the curve chart
+  deletes one point per tap, so a HyperOS user's points about a sixteenth too low feed the curve
+  wizard and the chart's overlay until new overrides or taps remove them, and the unit carries no
+  migration or marker.
