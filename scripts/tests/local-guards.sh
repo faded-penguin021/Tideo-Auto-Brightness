@@ -2,7 +2,7 @@
 # Fixture suite for the repo-local ladder guards under scripts/guards/.
 #
 # Yours, not shipped. The AMH's own scripts/test-ladder-guards.sh covers the SHIPPED ladder;
-# nothing upstream knows these guards exist, so without this file they are eight scripts whose
+# nothing upstream knows these guards exist, so without this file they are nine scripts whose
 # failure paths have never run (docs/HARNESS_LOCAL.md). scripts/verify.sh invokes it.
 #
 # Every case builds a throwaway tree and runs the real guard against it. The point is the
@@ -1449,6 +1449,70 @@ ap_tree ap-prose \
 	"clean-dist.yml|actions/checkout@$SHA_A  # v7.0.1 - node24 runtime (see build.yml node24 policy)"
 run_guard ap-prose action-pins
 expect_pass "a marker followed by prose is read as just the version"
+
+# =============================================================================
+printf '· codemap\n'
+
+# run_guard copies only the guard, and this one runs scripts/codemap.py, so the tree carries the
+# real tool: a git repo with one anchor, one consumer and a map that tool wrote. The scan reads
+# `git ls-files`, so every Kotlin file a case adds is staged. Each failing case names its cause in
+# the expected substring, because a mutated check that let it through would still fail on the map
+# going stale, and only the substring tells those two apart.
+codemap_tree() { # <dir>
+	local d=$SANDBOX/$1
+	rm -rf "$d"
+	mkdir -p "$d/scripts" "$d/codemap" "$d/app/src/main/kotlin/a" "$d/app/src/main/kotlin/b"
+	cp "$ROOT/scripts/codemap.py" "$d/scripts/codemap.py"
+	printf 'package a\n\nobject Calc {\n    fun at() = 1\n}\n' >"$d/app/src/main/kotlin/a/Calc.kt"
+	printf 'package b\n\nimport a.Calc\n\nfun use() = Calc.at()\n' >"$d/app/src/main/kotlin/b/Use.kt"
+	printf '[sun]\nanchors = ["Calc"]\n' >"$d/codemap/features.toml"
+	git -C "$d" init -q
+	git -C "$d" add -A
+	python3 -B "$d/scripts/codemap.py" write >/dev/null
+}
+
+codemap_tree cm-ok
+run_guard cm-ok codemap
+expect_pass "a registry that resolves and a current map pass"
+
+# The tool exits 8 here; the guard must still exit 1, so no tool status can pass for a WARN.
+codemap_tree cm-stale
+printf 'package b\n\nfun more() = a.Calc.at()\n' >"$SANDBOX/cm-stale/app/src/main/kotlin/b/More.kt"
+git -C "$SANDBOX/cm-stale" add -A
+run_guard cm-stale codemap
+expect_rc "a new consumer makes the map stale, and that fails closed" 1 "codemap/map.json is stale"
+
+codemap_tree cm-missing
+rm "$SANDBOX/cm-missing/codemap/map.json"
+run_guard cm-missing codemap
+expect_fail "a missing map fails" "codemap/map.json is missing"
+
+codemap_tree cm-unresolved
+printf '[sun]\nanchors = ["Nowhere"]\n' >"$SANDBOX/cm-unresolved/codemap/features.toml"
+run_guard cm-unresolved codemap
+expect_fail "an anchor naming no symbol fails" "Nowhere: no top-level symbol"
+
+codemap_tree cm-ambiguous
+mkdir -p "$SANDBOX/cm-ambiguous/app/src/main/kotlin/c"
+printf 'package c\n\nclass Calc\n' >"$SANDBOX/cm-ambiguous/app/src/main/kotlin/c/Calc.kt"
+git -C "$SANDBOX/cm-ambiguous" add -A
+run_guard cm-ambiguous codemap
+expect_fail "an anchor two packages declare fails" "Calc is ambiguous"
+
+codemap_tree cm-malformed
+printf '[sun]\nanchors = [\n' >"$SANDBOX/cm-malformed/codemap/features.toml"
+run_guard cm-malformed codemap
+expect_fail "a malformed features.toml fails" "invalid TOML"
+
+# A PATH holding the guard's other tools and no python3. Built by hand, since run_guard's own
+# mkdir and cp would not survive that PATH.
+codemap_tree cm-nopython
+mkdir -p "$SANDBOX/cm-nopython/scripts/guards" "$SANDBOX/cm-nopath"
+cp "$ROOT/scripts/guards/codemap.sh" "$SANDBOX/cm-nopython/scripts/guards/codemap.sh"
+for t in bash dirname git; do ln -sf "$(command -v "$t")" "$SANDBOX/cm-nopath/$t"; done
+OUT=$( (cd "$SANDBOX/cm-nopython" && PATH=$SANDBOX/cm-nopath bash scripts/guards/codemap.sh 2>&1) )
+RC=$?
+expect_fail "no python3 on PATH fails and names it" "python3 is not on PATH"
 
 # Every guard AND this suite must be executable. python-edit.sh needs it because the ladder runs
 # it with bash but the PreToolUse hook does not; this suite needs it because .claude/settings.json

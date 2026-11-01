@@ -52,7 +52,7 @@ We **gained** three rungs with no local predecessor: `guard_author_identity`,
 the AMH repository now, and a stale local snapshot would read as authoritative to a future
 session while drifting against every upstream release.
 
-## The eight repo-local guards, and why each is not upstream's job
+## The nine repo-local guards, and why each is not upstream's job
 
 - **`fdroid-changelog.sh`** — F-Droid flags a `whatsNew` over 500 **characters**, and it measures
   codepoints, not bytes. `wc -c` rejects a legal note full of em dashes. Only the current
@@ -183,7 +183,18 @@ session while drifting against every upstream release.
   (DB-038), leaving the same commit labelled two ways across the tree. Both incidents were caught by
   eye, on a PR, by a reviewer who happened to look.
 
-`scripts/tests/local-guards.sh` is their fixture suite — 145 cases, run by `scripts/verify.sh`.
+- **`codemap.sh`** — runs `python3 scripts/codemap.py check`: `codemap/features.toml` parses,
+  every anchor resolves to exactly one top-level Kotlin symbol, every scanned file scans, and the
+  committed `codemap/map.json` equals a fresh generation byte for byte (DE-021). Upstream cannot
+  own this: the registry, the scanner and the map are this repository's own (DE-010), and the
+  AMH ships no Kotlin reader. The tool holds the semantics and its tests in
+  `scripts/tests/codemap/` define them; the guard only maps every non-zero status to exit 1 and
+  names a missing `python3`. **It is not a duplication detector**, and it leaves three holes for
+  review: deleting an anchor instead of updating it passes (the `features.toml` diff and the
+  members it drops from the map diff show it), a feature nobody registers is invisible to every
+  query and no check asks, and a Kotlin file not yet `git add`ed is outside the scan.
+
+`scripts/tests/local-guards.sh` is their fixture suite — 152 cases, run by `scripts/verify.sh`.
 Nothing upstream knows these guards exist, so without it their failure paths never execute. Its
 negative cases are the point: each was checked by mutating the guard it covers and confirming
 exactly one case turns red.
@@ -196,12 +207,14 @@ broken guard rather than a mild opinion. The contract is the **ladder's**: a wor
 calling a guard directly still reads any non-zero as failure, which is why nothing here invokes
 `scripts/guards/*.sh` outside `scripts/ladder.sh`.
 
-**Seven of the eight fail closed, deliberately, and `doc-facts.sh` carries the one warn branch.** A codepoint count over F-Droid's hard cap, a
+**Eight of the nine fail closed, deliberately, and `doc-facts.sh` carries the one warn branch.** A codepoint count over F-Droid's hard cap, a
 secret in the index and a misfiled ledger prefix are wrong every time they fire, so the warn tier
 — for a rule with legitimate exceptions nobody has enumerated — does not apply to them.
 `action-pins.sh` joins them on the same test: a tag ref where a SHA belongs, an unlabelled pin and
 two markers on one commit are each wrong every time, and the one judgement call it might have
 wanted — is this marker the right *tag* — is the question it deliberately does not ask.
+`codemap.sh` joins them too: a stale generated map or an anchor that resolves to nothing is wrong
+every time, and `python3 scripts/codemap.py write` fixes the map in one command.
 `comment-budget.sh` was the one real candidate for the warn tier and was refused it: a budget that
 only warns is a budget the next session spends, and warn fatigue is the documented failure mode
 for exactly this shape of rule. The escape hatch is not a warning, it is the constants in the

@@ -290,3 +290,9 @@
   optional finer-steps unit, which reopens DC-026 on its own terms; on API 36.1 and up its
   permission-free `getBrightness` could at most help a user pick DE-019's choice as a Live Debug
   readout that never feeds the conversion.
+- DE-021 [cited]: **Codemap Unit 6 wired `scripts/guards/codemap.sh` into the ladder, fail-closed,
+  running `codemap.py check` against a committed `codemap/map.json` (D2 (a)); D3 stays (b), so the
+  map carries no `unanchored` list (2026-11-01).** Every non-zero status from the tool becomes
+  exit 1, so none can read as the ladder's WARN tier, and the map is pinned LF in
+  `.gitattributes` because the comparison is byte for byte. Its holes (a deleted anchor, an
+  unregistered feature, an unstaged file) are left to review.
