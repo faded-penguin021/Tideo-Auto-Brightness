@@ -141,3 +141,170 @@
   while `fdroid-compat.yml`'s `pipx`, `docker`, `sudo` and apt run on the PR. The reproducibility
   job compares entry contents, not zip framing, which is where a host image would differ, so the
   first release's F-Droid verification is the full proof.
+- DE-010 [cited]: **Astra High reviewed the codemap plan before any code (relayed by the owner,
+  2026-10-29): two blockers and seven should-fixes, all accepted.** The blockers: brace depth 0
+  does not find top-level Kotlin declarations, since `DynamicScaleInput`'s constructor properties
+  sit at depth 0 inside its header's parentheses, so the scanner counts nesting across `()`, `[]`
+  and `{}`; and its answers are lexical reference candidates, never semantic usage, so an empty
+  one means none were found in the scanned scope, not that nothing uses a symbol. The
+  should-fixes add a byte-level determinism contract, a symbol identity of package plus name with
+  ambiguity failing closed, loud failure on malformed input, `write` and `check` built before
+  they are measured, a reproducible first-parent churn replay that reports its exclusions, ledger
+  joins that name their citing files, a probe baseline isolated from the plan, and the keyword
+  heuristic as a query first. The harness-fit finding was widened: `AGENTS.md`'s Harness section
+  already requires a new repo-local script to be named in `RULE_FILES` and the HARNESS_LOCAL split
+  table in the commit that adds it, so the scanner's first unit carries that under rule review
+  and wires its tests into `verify.sh`, which puts code units on the full ladder. Astra's D1–D4
+  recommendations match the plan's, with D3 now the query-only option, and went to the Owner
+  queue as recommendations, not decisions.
+- DE-011: **A second review of the revised codemap plan, by ChatGPT (relayed by the owner,
+  2026-10-29), found no blockers and three residual gaps, each taken as an amendment rather than
+  new machinery.** The map relates files only through anchors and references, so two readers of
+  one `AabSettings` field look unrelated; the plan had deferred a settings-field scan until its
+  seed-and-measure unit showed such a coupling, but no unit measured it, so that unit now does.
+  Two solar symbols were too easy a real-tree check, so the reference unit's corpus adds a
+  callable reference (`::hourToHhmm`, same package, no import), an extension call, a nested-type
+  import and `ThresholdConfig`'s two packages as expected non-matches, and identifiers after `.`
+  or `::` stay candidates because an extension call looks like member access. A feature nobody
+  registers stays invisible, since the guard proves only that declared anchors exist; that
+  residual is disclosed in the plan and left unguarded, as the review advised.
+- DE-012: **The owner decided the codemap plan's four questions by taking every recommendation
+  (2026-10-30), which were also Astra's.** The author regenerates the map and CI only checks it
+  (D1 (a)); the feature-level map is committed (D2 (a)), provisionally, since the plan's replay
+  can still turn it to anchors-only; the keyword heuristic is a query only (D3 (b)); and the plan
+  adds its own `AGENTS.md` sentence (D4 (a)).
+- DE-013: **Codemap Unit 5 seeded five features and measured them (2026-10-30): the map changes
+  in few merged snapshots, so D2 stays (a), and keyword leads are mostly noise, so D3 stays (b).**
+  The plan's 14 seed anchors missed owners, since an anchor is a symbol and a file reached only
+  through a co-declared type, a lambda wired in `AppModule` or an owner's own dependency stays
+  outside; the registry now holds 45 anchors (42 symbols, none qualified), circadian, contexts,
+  handoff, night-light, privilege and super-dimming have 29, 29, 23, 18, 19 and 21 member files,
+  100 in all, and `AppModule` is in all six (4, 2, 2, 6, 1 and 1 anchors), `AmbientMonitoringService`
+  in four. Four names are declared in two packages, and the tree holds 0 ambiguous candidates.
+  `suspects` gave 205 leads on the seed (contexts 80, mostly through `override`, a Kotlin
+  modifier) and 82 on the final registry (20, 5, 16, 14, 6 and 21): 1 second implementation
+  (`circadianDimMultiplier`, light-refactor finding 6), 6 missing anchors or edges and 75 noise,
+  while findings 1, 3 and 5 sit inside a feature or in a consumer, where it never looks. Over 30
+  first-parent snapshots back from `origin/main` at `282c95f` (not shallow), 6 of 29 pairs changed
+  an eligible feature, 8 of 99 eligible feature-pairs (privilege 4, super-dimming 3, night-light
+  1), with 75 excluded where an anchor did not exist yet (circadian 19, contexts 19, handoff 22,
+  night-light 15). Owners read 0–11 `AabSettings` fields and 7 of their 83 outside readers are
+  couplings a `feature` answer misses, only finding 6's sharing logic, now that `ProfileApplier`
+  (finding 4, a list overlapping `mergeProfile`'s) is anchored, so the settings-field scan stays
+  deferred; `check` and `--anchors-only` each take ~1.3 s.
+- DE-014: **On a POCO F4 (HyperOS, Android 14) `config_screenBrightnessSettingMaximum` reads 4095
+  while Android reads `screen_brightness` on 0–255, so Tideo writes every level about 16 times too
+  high (a reporter's fork, commit `1957d5e`, and their replies in its comments, relayed by the
+  owner, 2026-10-31).** At 0 lx Tideo's domain 3, 2 and 1 went out as 48, 32 and 16, and
+  `dumpsys display` showed 0.18503937, 0.122047246 and 0.05905512, which are 47/254, 31/254 and
+  15/254, AOSP's `(setting − 1) / 254`, where a 0–4095 reading of 16 would show about 0.0039. The
+  panel's spline (2, 500 and 900 nits at 9.7704E-4, 0.49975574 and 1.0) puts that floor at about
+  60 nits instead of 2, and from domain 16 up every write reaches 256 or more, so at about 3 800 lx
+  the dashboard's 49 went out as 787 and the screen sat near full. Tideo reads back on the same
+  wrong scale, so Live Debug's write card stays `ACKNOWLEDGED` and only `Settings API max: 4095`
+  shows it. The reporter's build with the scale forced to 255 shows `Settings API max: 255` and
+  10 → 10 with the screen following the dashboard over a few hours, while its display calibration
+  still fails, even with longer `dumpsys` and stable-read limits, for a reason not yet found. This
+  is the hardware DC-026 called nobody's, but the reverse of DC-019's case, since the config
+  overstates the scale and `context.resources` would return the same 4095.
+- DE-015: **A plan review relayed by the owner (2026-10-31), read against `c687a84`, found that a
+  plateau at the top of the display-calibration sweep proves saturation, not the High Brightness
+  Mode threshold, and both calibration plans now take all six of its findings.** A plateau above
+  level 128 that holds at 255 cannot tell an HBM transition from a device-configured thermal cap
+  or a stuck reading, and DE-005's Pixel throttling near level 98 bounds only that Pixel, so a
+  plateau becomes the threshold only when the dump shows a transition point equal to it and no
+  other cap in force. Accepting a ceiling before persisting it would let one release store ceiling
+  records that later builds read as legacy, extrapolating to about 1150 until each user
+  recalibrates, so the boundary is stored with the ceiling and its readout ships in the same
+  release. The HBM flag is set from the rounded readout, after an early return while that readout
+  is unchanged, so a raw of 0.6301 over a 0.63 boundary still shows 255 and never sets it; a
+  stored boundary must be compared with raw. A failed first level with no reading is not a
+  permission failure, since timeouts and missing or unparseable fields produce it too, so
+  permission advice needs every source shown unavailable, and readings lost midway are their own
+  cause. The Pixel plan became the shared calibration plan; the HyperOS findings are DE-016.
+- DE-016: **DE-015's review found two errors in the HyperOS scale plan, both now fixed there: its
+  scale checks contradicted its own ceiling hypothesis, and its timing argument excluded a cause
+  without measurements.** Under H1 the POCO F4's panel holds about 0.49976 from setting 128 up, so
+  a correctly scaled request of 200 fails a check expecting `(requested − 1) / 254` from
+  `mScreenBrightness`, and `mScreenBrightness × 254 + 1` cannot rebuild a setting above the clamp;
+  the scale is now judged at 25, 50 and 100, saturation separately, and above a ceiling the
+  app-facing setting is compared with the request, apart from the applied panel value. That the
+  fork's 12 s window and 15 s dump limit still failed does not clear a slow read, because nothing
+  was timed and one app read may fall through DUMP, root and Shizuku, each with its own limit,
+  which a shell `time dumpsys display` does not measure. H1 and H2 are hypotheses, not the list of
+  causes; the corrected build's trace of each read's source, field, raw and elapsed time settles
+  which, and no limit is raised without it. The review backed D1 (a), 0–255 for the app-facing
+  setting, as Tideo's supported contract and Android's documented range rather than proof that
+  every OEM build conforms.
+- DE-017: **The POCO F4 reporter filed the HyperOS scale report as issue #157 (2026-10-31, relayed
+  by the owner); it confirms DE-014 and adds four facts.** At 0 lx in manual mode its dump shows
+  `mCachedBrightnessInfo.brightnessMax=0.49975574`, equal to `hbmTransitionPoint` and to
+  `mHbmData`'s transition with HBM from 6001 lx, the cap DE-005's Pixel shows at 0.63, while the
+  excerpt carries no `brightnessMaxReason` and no sweep has shown a plateau. `adb shell settings
+  get system screen_brightness` returned 16, the value Tideo wrote, so on this phone the shell and
+  the app share one scale, unlike DC-025's OnePlus. Calibration failed on 1.15.0 with DUMP granted,
+  which proves nothing about reading, since every sweep level from 25 up is written as 401 or more
+  and the readings stop rising by level 50, while the fork's failure with 12 s and 15 s limits
+  fits a plateau from level 128, which fails at level 150 at any window length. Shizuku 13.5 ran
+  with Tideo unauthorised, because Tideo asks only from onboarding's elevated step and Privileged
+  Display's grant card, both hidden at ELEVATED (`OnboardingScreen.kt:368`,
+  `PrivilegedDisplayScreen.kt:154`), so an adb-elevated user never gets a Shizuku runtime use and
+  the dump's Shizuku leg returns without binding; the owner routed that gap to the faster-Shizuku
+  plan's one-tap-grants unit. The issue's proposals are a settings-scale choice, the HyperOS plan's
+  D1 (b), and comparing the dump against both scales, which is learning the scale from the device,
+  declined by DC-026.
+- DE-018: **The owner decided the HyperOS scale plan's D1 (a) and D2 (b) (2026-10-31): Tideo will
+  treat `Settings.System.SCREEN_BRIGHTNESS` as 0–255 on every device, and override points saved
+  under the 16-fold bug stay.** D1 (a), "Yes d1a sounds good", takes the recommendation, so the
+  scale unit drops the `config_screenBrightnessSettingMaximum` lookup that DC-026 kept, as
+  Tideo's supported contract rather than proof that every OEM build conforms (DE-016). D2 (b)
+  overrides the recommendation to clear those points once on the fixed build's first start: "the
+  override points can be removed or naturally roll out the 50 fifo window". Read at `465f7bf`,
+  `OverridePointStore` keeps the newest 50 (`MAX_POINTS`, task561's cap) and the curve chart
+  deletes one point per tap, so a HyperOS user's points about a sixteenth too low feed the curve
+  wizard and the chart's overlay until new overrides or taps remove them, and the unit carries no
+  migration or marker.
+- DE-019: **If a device is shown to read the app-facing `SCREEN_BRIGHTNESS` on 0–4095, as its
+  `config_screenBrightnessSettingMaximum` says, the fix is the HyperOS scale plan's D1 (b), a
+  scale choice shaped as below; the owner asked for this row (2026-11-01) so that report needs no
+  fresh decision, and D1 (a) stands until one arrives (DE-018).** A shell `settings get` reading
+  4095 is not that evidence, since DC-025's OnePlus reads 4095 there while its app reads 0–255;
+  the evidence is Tideo's own requests of 25, 50 and 100 showing about n/4095 in `dumpsys display`
+  instead of AOSP's (n − 1)/254, the inverse of DE-014's table. The choice cannot be automatic:
+  the F4 reports the same 4095 config and reads 0–255 (DE-014), learning the scale stays declined
+  (DC-026), and a model check needs a release per device and turns silently wrong once an OEM
+  update fixes the framework. Its shape is a default of 255, the other option being the device's
+  config shown with its number, offered only where that config is not 255, kept out of
+  `SettingsBackupAgent` because a 4095 choice restored onto an F4 recreates DE-014, with override
+  points saved before a switch left to roll out as D2 (b) ruled. Applying it amends DE-018's D1 to
+  (a) plus (b) in a row of its own; DisplayManager is not the fix (DE-020).
+- DE-020: **DisplayManager's `setBrightness`, public from API 36.1, is not the fix for DE-019's
+  device, read at `45c266c` against the faster-Shizuku plan's record of that API.** Its gate
+  misses every device below Android 16 QPR2, the Android 14 F4 among them, so the scale choice
+  would be needed anyway. It fixes writes only, while `read()`, which the uncalibrated hand-off
+  readout also uses, `BrightnessObserver`'s override check and the self-write echo matching
+  (DC-002…DC-008, DB-082) all read the int setting, which on such a device still needs the scale.
+  The only unit that plan records, `BRIGHTNESS_UNIT_PERCENTAGE`, is the slider's perceptual scale
+  over the current range, where Tasker's domain is a linear 0–255 int write (task696/698), so
+  converting would mean modelling an OEM-variable gamma curve. The API stays with that plan's
+  optional finer-steps unit, which reopens DC-026 on its own terms; on API 36.1 and up its
+  permission-free `getBrightness` could at most help a user pick DE-019's choice as a Live Debug
+  readout that never feeds the conversion.
+- DE-021 [cited]: **Codemap Unit 6 wired `scripts/guards/codemap.sh` into the ladder, fail-closed,
+  running `codemap.py check` against a committed `codemap/map.json` (D2 (a)); D3 stays (b), so the
+  map carries no `unanchored` list (2026-11-01).** Every non-zero status from the tool becomes
+  exit 1, so none can read as the ladder's WARN tier, and the map is pinned LF in
+  `.gitattributes` because the comparison is byte for byte. Its holes (a deleted anchor, an
+  unregistered feature, an unstaged file) are left to review.
+- DE-022: **Codemap Unit 8 probe, one run each and an anecdote, not a measure (2026-11-01): with
+  the map, a fresh Opus 5.5 subagent ran `features` and `feature` unprompted and met four of five
+  criteria, as the baseline at `282c95f` did without it; the plan is closed.** The task was to
+  plan moving Night Light's evening ramp from sunset to civil dusk. Both changed only
+  `CircadianWindowProvider` among `SolarCalculator`'s three callers, kept the context rules'
+  sunrise and sunset, and added no solar computation. The probe newly named DD-061's acquisition
+  rules as unchanged, but read `ContextSolarTimes` only by grep and never opened `CircadianChart`,
+  which the `feature` answer listed, so it failed the read-all-three-callers criterion that the
+  baseline met. Because the queries were found unaided, no session-start feature list or edit-time
+  hint was added, and the settings-field scan stays deferred (DE-013). The plan's other exclusions
+  stand with it: no parser dependency (SCIP, tree-sitter, Kotlin PSI), no CI commit of the map, no
+  committed symbol-level graph, and no LLM audit in the ladder.

@@ -35,3 +35,6 @@ gradlew                 text eol=lf
 # `python3 scripts/fdroid-check.py` never uses the shebang and CPython reads CRLF source fine,
 # so this is not the same defect — it is the same class, pinned before it becomes one.
 *.py                    text eol=lf
+
+# The codemap guard compares this generated file byte for byte, so a CRLF checkout reads as stale.
+codemap/map.json        text eol=lf

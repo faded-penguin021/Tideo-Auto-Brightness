@@ -1,0 +1,1043 @@
+{
+  "features": {
+    "circadian": {
+      "declared": [
+        {
+          "anchor": "CircadianScaleRefresh",
+          "files": [
+            "app/src/main/kotlin/com/tideo/autobrightness/app/runtime/CircadianScaleRefresh.kt"
+          ],
+          "symbol": "com.tideo.autobrightness.app.runtime.CircadianScaleRefresh"
+        },
+        {
+          "anchor": "CircadianLocationStatus",
+          "files": [
+            "app/src/main/kotlin/com/tideo/autobrightness/app/runtime/CircadianWindowProvider.kt"
+          ],
+          "symbol": "com.tideo.autobrightness.app.runtime.CircadianLocationStatus"
+        },
+        {
+          "anchor": "CircadianWindowProvider",
+          "files": [
+            "app/src/main/kotlin/com/tideo/autobrightness/app/runtime/CircadianWindowProvider.kt"
+          ],
+          "symbol": "com.tideo.autobrightness.app.runtime.CircadianWindowProvider"
+        },
+        {
+          "anchor": "CircadianWindows",
+          "files": [
+            "app/src/main/kotlin/com/tideo/autobrightness/app/runtime/CircadianWindowProvider.kt"
+          ],
+          "symbol": "com.tideo.autobrightness.app.runtime.CircadianWindows"
+        },
+        {
+          "anchor": "ContextSolarTimes",
+          "files": [
+            "app/src/main/kotlin/com/tideo/autobrightness/app/runtime/ContextSolarTimes.kt"
+          ],
+          "symbol": "com.tideo.autobrightness.app.runtime.ContextSolarTimes"
+        },
+        {
+          "anchor": "ExperimentPrefsStore",
+          "files": [
+            "app/src/main/kotlin/com/tideo/autobrightness/app/settings/ExperimentPrefsStore.kt"
+          ],
+          "symbol": "com.tideo.autobrightness.app.settings.ExperimentPrefsStore"
+        },
+        {
+          "anchor": "DynamicScaleEngine",
+          "files": [
+            "domain/src/main/kotlin/com/tideo/autobrightness/domain/circadian/DynamicScaleEngine.kt"
+          ],
+          "symbol": "com.tideo.autobrightness.domain.circadian.DynamicScaleEngine"
+        },
+        {
+          "anchor": "NightLightTemperatureRamp",
+          "files": [
+            "domain/src/main/kotlin/com/tideo/autobrightness/domain/circadian/NightLightTemperatureRamp.kt"
+          ],
+          "symbol": "com.tideo.autobrightness.domain.circadian.NightLightTemperatureRamp"
+        },
+        {
+          "anchor": "SolarCalculator",
+          "files": [
+            "domain/src/main/kotlin/com/tideo/autobrightness/domain/circadian/SolarTimes.kt"
+          ],
+          "symbol": "com.tideo.autobrightness.domain.circadian.SolarCalculator"
+        }
+      ],
+      "derived": {
+        "consumers": [
+          {
+            "ambiguous": [],
+            "anchors": [
+              "CircadianScaleRefresh",
+              "CircadianWindowProvider",
+              "ExperimentPrefsStore",
+              "NightLightTemperatureRamp"
+            ],
+            "path": "app/src/main/kotlin/com/tideo/autobrightness/app/AppModule.kt"
+          },
+          {
+            "ambiguous": [],
+            "anchors": [
+              "ContextSolarTimes",
+              "ExperimentPrefsStore"
+            ],
+            "path": "app/src/main/kotlin/com/tideo/autobrightness/app/runtime/AndroidContextSignalSource.kt"
+          },
+          {
+            "ambiguous": [],
+            "anchors": [
+              "CircadianScaleRefresh",
+              "CircadianWindows"
+            ],
+            "path": "app/src/main/kotlin/com/tideo/autobrightness/app/runtime/BrightnessPipelineController.kt"
+          },
+          {
+            "ambiguous": [],
+            "anchors": [
+              "CircadianWindows"
+            ],
+            "path": "app/src/main/kotlin/com/tideo/autobrightness/app/runtime/CircadianScaleRefresh.kt"
+          },
+          {
+            "ambiguous": [],
+            "anchors": [
+              "SolarCalculator"
+            ],
+            "path": "app/src/main/kotlin/com/tideo/autobrightness/app/runtime/CircadianWindowProvider.kt"
+          },
+          {
+            "ambiguous": [],
+            "anchors": [
+              "ExperimentPrefsStore",
+              "SolarCalculator"
+            ],
+            "path": "app/src/main/kotlin/com/tideo/autobrightness/app/runtime/ContextSolarTimes.kt"
+          },
+          {
+            "ambiguous": [],
+            "anchors": [
+              "CircadianWindows"
+            ],
+            "path": "app/src/main/kotlin/com/tideo/autobrightness/app/runtime/PipelineCycleRunner.kt"
+          },
+          {
+            "ambiguous": [],
+            "anchors": [
+              "CircadianLocationStatus",
+              "ExperimentPrefsStore"
+            ],
+            "path": "app/src/main/kotlin/com/tideo/autobrightness/app/state/CircadianExtrasViewModel.kt"
+          },
+          {
+            "ambiguous": [],
+            "anchors": [
+              "ContextSolarTimes",
+              "ExperimentPrefsStore"
+            ],
+            "path": "app/src/main/kotlin/com/tideo/autobrightness/app/state/ContextsViewModel.kt"
+          },
+          {
+            "ambiguous": [],
+            "anchors": [
+              "CircadianLocationStatus"
+            ],
+            "path": "app/src/main/kotlin/com/tideo/autobrightness/app/state/DashboardState.kt"
+          },
+          {
+            "ambiguous": [],
+            "anchors": [
+              "CircadianLocationStatus",
+              "ExperimentPrefsStore"
+            ],
+            "path": "app/src/main/kotlin/com/tideo/autobrightness/app/state/DashboardViewModel.kt"
+          },
+          {
+            "ambiguous": [],
+            "anchors": [
+              "DynamicScaleEngine",
+              "SolarCalculator"
+            ],
+            "path": "app/src/main/kotlin/com/tideo/autobrightness/app/ui/graph/CircadianChart.kt"
+          },
+          {
+            "ambiguous": [],
+            "anchors": [
+              "CircadianLocationStatus"
+            ],
+            "path": "app/src/main/kotlin/com/tideo/autobrightness/app/ui/screens/CircadianScreen.kt"
+          },
+          {
+            "ambiguous": [],
+            "anchors": [
+              "CircadianLocationStatus"
+            ],
+            "path": "app/src/main/kotlin/com/tideo/autobrightness/app/ui/screens/DashboardScreen.kt"
+          },
+          {
+            "ambiguous": [],
+            "anchors": [
+              "DynamicScaleEngine"
+            ],
+            "path": "domain/src/main/kotlin/com/tideo/autobrightness/domain/brightness/BrightnessEngine.kt"
+          }
+        ],
+        "owners": [
+          "app/src/main/kotlin/com/tideo/autobrightness/app/runtime/CircadianScaleRefresh.kt",
+          "app/src/main/kotlin/com/tideo/autobrightness/app/runtime/CircadianWindowProvider.kt",
+          "app/src/main/kotlin/com/tideo/autobrightness/app/runtime/ContextSolarTimes.kt",
+          "app/src/main/kotlin/com/tideo/autobrightness/app/settings/ExperimentPrefsStore.kt",
+          "domain/src/main/kotlin/com/tideo/autobrightness/domain/circadian/DynamicScaleEngine.kt",
+          "domain/src/main/kotlin/com/tideo/autobrightness/domain/circadian/NightLightTemperatureRamp.kt",
+          "domain/src/main/kotlin/com/tideo/autobrightness/domain/circadian/SolarTimes.kt"
+        ],
+        "tests": [
+          "app/src/test/kotlin/com/tideo/autobrightness/app/runtime/BrightnessPipelineControllerTest.kt",
+          "app/src/test/kotlin/com/tideo/autobrightness/app/runtime/CircadianWindowProviderTest.kt",
+          "app/src/test/kotlin/com/tideo/autobrightness/app/runtime/ContextSolarTimesTest.kt",
+          "app/src/test/kotlin/com/tideo/autobrightness/app/settings/ExperimentPrefsStoreTest.kt",
+          "app/src/test/kotlin/com/tideo/autobrightness/app/state/CircadianExtrasViewModelTest.kt",
+          "app/src/test/kotlin/com/tideo/autobrightness/app/ui/ScreensA11yTest.kt",
+          "domain/src/test/kotlin/com/tideo/autobrightness/domain/circadian/NightLightTemperatureRampTest.kt",
+          "domain/src/test/kotlin/com/tideo/autobrightness/domain/circadian/SolarInvariantTest.kt",
+          "domain/src/test/kotlin/com/tideo/autobrightness/domain/parity/CircadianParityTest.kt",
+          "domain/src/test/kotlin/com/tideo/autobrightness/domain/reference/TaskerReference.kt"
+        ]
+      }
+    },
+    "contexts": {
+      "declared": [
+        {
+          "anchor": "ContextEngine",
+          "files": [
+            "app/src/main/kotlin/com/tideo/autobrightness/app/runtime/ContextEngine.kt"
+          ],
+          "symbol": "com.tideo.autobrightness.app.runtime.ContextEngine"
+        },
+        {
+          "anchor": "ContextSolarTimes",
+          "files": [
+            "app/src/main/kotlin/com/tideo/autobrightness/app/runtime/ContextSolarTimes.kt"
+          ],
+          "symbol": "com.tideo.autobrightness.app.runtime.ContextSolarTimes"
+        },
+        {
+          "anchor": "ContextBaselineStore",
+          "files": [
+            "app/src/main/kotlin/com/tideo/autobrightness/app/settings/ContextBaselineStore.kt"
+          ],
+          "symbol": "com.tideo.autobrightness.app.settings.ContextBaselineStore"
+        },
+        {
+          "anchor": "ContextOverrideConfig",
+          "files": [
+            "app/src/main/kotlin/com/tideo/autobrightness/app/settings/ContextOverrideRules.kt"
+          ],
+          "symbol": "com.tideo.autobrightness.app.settings.ContextOverrideConfig"
+        },
+        {
+          "anchor": "ContextSignalTokens",
+          "files": [
+            "app/src/main/kotlin/com/tideo/autobrightness/app/settings/ContextRuleMapping.kt"
+          ],
+          "symbol": "com.tideo.autobrightness.app.settings.ContextSignalTokens"
+        },
+        {
+          "anchor": "ContextRuleStore",
+          "files": [
+            "app/src/main/kotlin/com/tideo/autobrightness/app/settings/ContextRuleStore.kt"
+          ],
+          "symbol": "com.tideo.autobrightness.app.settings.ContextRuleStore"
+        },
+        {
+          "anchor": "ProfileApplier",
+          "files": [
+            "app/src/main/kotlin/com/tideo/autobrightness/app/settings/ProfileApplier.kt"
+          ],
+          "symbol": "com.tideo.autobrightness.app.settings.ProfileApplier"
+        },
+        {
+          "anchor": "ContextMatching",
+          "files": [
+            "domain/src/main/kotlin/com/tideo/autobrightness/domain/context/ContextMatching.kt"
+          ],
+          "symbol": "com.tideo.autobrightness.domain.context.ContextMatching"
+        },
+        {
+          "anchor": "ContextOverrideResolver",
+          "files": [
+            "domain/src/main/kotlin/com/tideo/autobrightness/domain/context/ContextOverrideResolver.kt"
+          ],
+          "symbol": "com.tideo.autobrightness.domain.context.ContextOverrideResolver"
+        },
+        {
+          "anchor": "SolarTimeTokens",
+          "files": [
+            "domain/src/main/kotlin/com/tideo/autobrightness/domain/context/SolarTimeTokens.kt"
+          ],
+          "symbol": "com.tideo.autobrightness.domain.context.SolarTimeTokens"
+        },
+        {
+          "anchor": "WifiInfoReader",
+          "files": [
+            "platform/src/main/kotlin/com/tideo/autobrightness/platform/context/WifiInfoReader.kt"
+          ],
+          "symbol": "com.tideo.autobrightness.platform.context.WifiInfoReader"
+        }
+      ],
+      "derived": {
+        "consumers": [
+          {
+            "ambiguous": [],
+            "anchors": [
+              "ContextEngine",
+              "ContextRuleStore"
+            ],
+            "path": "app/src/main/kotlin/com/tideo/autobrightness/app/AppModule.kt"
+          },
+          {
+            "ambiguous": [],
+            "anchors": [
+              "ProfileApplier"
+            ],
+            "path": "app/src/main/kotlin/com/tideo/autobrightness/app/control/ControlReceiver.kt"
+          },
+          {
+            "ambiguous": [],
+            "anchors": [
+              "ContextEngine"
+            ],
+            "path": "app/src/main/kotlin/com/tideo/autobrightness/app/runtime/AmbientMonitoringService.kt"
+          },
+          {
+            "ambiguous": [],
+            "anchors": [
+              "ContextSolarTimes",
+              "WifiInfoReader"
+            ],
+            "path": "app/src/main/kotlin/com/tideo/autobrightness/app/runtime/AndroidContextSignalSource.kt"
+          },
+          {
+            "ambiguous": [],
+            "anchors": [
+              "ContextBaselineStore",
+              "ContextOverrideResolver",
+              "ContextSignalTokens"
+            ],
+            "path": "app/src/main/kotlin/com/tideo/autobrightness/app/runtime/ContextEngine.kt"
+          },
+          {
+            "ambiguous": [],
+            "anchors": [
+              "ContextOverrideConfig"
+            ],
+            "path": "app/src/main/kotlin/com/tideo/autobrightness/app/settings/ContextRuleStore.kt"
+          },
+          {
+            "ambiguous": [],
+            "anchors": [
+              "ContextOverrideConfig"
+            ],
+            "path": "app/src/main/kotlin/com/tideo/autobrightness/app/settings/ContextRulesSerializer.kt"
+          },
+          {
+            "ambiguous": [],
+            "anchors": [
+              "ContextRuleStore",
+              "ContextSolarTimes"
+            ],
+            "path": "app/src/main/kotlin/com/tideo/autobrightness/app/state/ContextsViewModel.kt"
+          },
+          {
+            "ambiguous": [],
+            "anchors": [
+              "ProfileApplier"
+            ],
+            "path": "app/src/main/kotlin/com/tideo/autobrightness/app/state/SettingsViewModel.kt"
+          },
+          {
+            "ambiguous": [],
+            "anchors": [
+              "ContextOverrideConfig"
+            ],
+            "path": "app/src/main/kotlin/com/tideo/autobrightness/app/storage/AppDataStores.kt"
+          },
+          {
+            "ambiguous": [],
+            "anchors": [
+              "SolarTimeTokens"
+            ],
+            "path": "app/src/main/kotlin/com/tideo/autobrightness/app/ui/components/TriggerEditors.kt"
+          },
+          {
+            "ambiguous": [],
+            "anchors": [
+              "SolarTimeTokens"
+            ],
+            "path": "app/src/main/kotlin/com/tideo/autobrightness/app/ui/screens/ContextsScreen.kt"
+          },
+          {
+            "ambiguous": [],
+            "anchors": [
+              "SolarTimeTokens"
+            ],
+            "path": "domain/src/main/kotlin/com/tideo/autobrightness/domain/context/ContextMatching.kt"
+          },
+          {
+            "ambiguous": [],
+            "anchors": [
+              "ContextMatching"
+            ],
+            "path": "domain/src/main/kotlin/com/tideo/autobrightness/domain/context/ContextOverrideResolver.kt"
+          }
+        ],
+        "owners": [
+          "app/src/main/kotlin/com/tideo/autobrightness/app/runtime/ContextEngine.kt",
+          "app/src/main/kotlin/com/tideo/autobrightness/app/runtime/ContextSolarTimes.kt",
+          "app/src/main/kotlin/com/tideo/autobrightness/app/settings/ContextBaselineStore.kt",
+          "app/src/main/kotlin/com/tideo/autobrightness/app/settings/ContextOverrideRules.kt",
+          "app/src/main/kotlin/com/tideo/autobrightness/app/settings/ContextRuleMapping.kt",
+          "app/src/main/kotlin/com/tideo/autobrightness/app/settings/ContextRuleStore.kt",
+          "app/src/main/kotlin/com/tideo/autobrightness/app/settings/ProfileApplier.kt",
+          "domain/src/main/kotlin/com/tideo/autobrightness/domain/context/ContextMatching.kt",
+          "domain/src/main/kotlin/com/tideo/autobrightness/domain/context/ContextOverrideResolver.kt",
+          "domain/src/main/kotlin/com/tideo/autobrightness/domain/context/SolarTimeTokens.kt",
+          "platform/src/main/kotlin/com/tideo/autobrightness/platform/context/WifiInfoReader.kt"
+        ],
+        "tests": [
+          "app/src/test/kotlin/com/tideo/autobrightness/app/runtime/AndroidContextSignalSourceTest.kt",
+          "app/src/test/kotlin/com/tideo/autobrightness/app/runtime/ContextEngineTest.kt",
+          "app/src/test/kotlin/com/tideo/autobrightness/app/runtime/ContextSolarTimesTest.kt",
+          "app/src/test/kotlin/com/tideo/autobrightness/app/settings/ContextRuleStoreTest.kt",
+          "app/src/test/kotlin/com/tideo/autobrightness/app/settings/DataStoreSchemaVersionTest.kt",
+          "app/src/test/kotlin/com/tideo/autobrightness/app/settings/ProfileApplierTest.kt",
+          "domain/src/test/kotlin/com/tideo/autobrightness/domain/context/ContextOverrideResolverTest.kt",
+          "domain/src/test/kotlin/com/tideo/autobrightness/domain/context/SolarTimeTokensTest.kt"
+        ]
+      }
+    },
+    "handoff": {
+      "declared": [
+        {
+          "anchor": "DisplayCalibrationRun",
+          "files": [
+            "app/src/main/kotlin/com/tideo/autobrightness/app/runtime/DisplayCalibrationRun.kt"
+          ],
+          "symbol": "com.tideo.autobrightness.app.runtime.DisplayCalibrationRun"
+        },
+        {
+          "anchor": "HandoffCoordinator",
+          "files": [
+            "app/src/main/kotlin/com/tideo/autobrightness/app/runtime/HandoffCoordinator.kt"
+          ],
+          "symbol": "com.tideo.autobrightness.app.runtime.HandoffCoordinator"
+        },
+        {
+          "anchor": "HighBrightnessUpdates",
+          "files": [
+            "app/src/main/kotlin/com/tideo/autobrightness/app/runtime/HighBrightnessUpdates.kt"
+          ],
+          "symbol": "com.tideo.autobrightness.app.runtime.HighBrightnessUpdates"
+        },
+        {
+          "anchor": "DisplayCalibrationStore",
+          "files": [
+            "app/src/main/kotlin/com/tideo/autobrightness/app/settings/DisplayCalibrationStore.kt"
+          ],
+          "symbol": "com.tideo.autobrightness.app.settings.DisplayCalibrationStore"
+        },
+        {
+          "anchor": "DisplayCalibration",
+          "files": [
+            "domain/src/main/kotlin/com/tideo/autobrightness/domain/brightness/DisplayCalibration.kt"
+          ],
+          "symbol": "com.tideo.autobrightness.domain.brightness.DisplayCalibration"
+        },
+        {
+          "anchor": "HandoffRules",
+          "files": [
+            "domain/src/main/kotlin/com/tideo/autobrightness/domain/brightness/HandoffRules.kt"
+          ],
+          "symbol": "com.tideo.autobrightness.domain.brightness.HandoffRules"
+        },
+        {
+          "anchor": "DisplayBrightnessDump",
+          "files": [
+            "platform/src/main/kotlin/com/tideo/autobrightness/platform/brightness/DisplayBrightnessDump.kt"
+          ],
+          "symbol": "com.tideo.autobrightness.platform.brightness.DisplayBrightnessDump"
+        },
+        {
+          "anchor": "DisplayBrightnessReader",
+          "files": [
+            "platform/src/main/kotlin/com/tideo/autobrightness/platform/brightness/DisplayBrightnessReader.kt"
+          ],
+          "symbol": "com.tideo.autobrightness.platform.brightness.DisplayBrightnessReader"
+        }
+      ],
+      "derived": {
+        "consumers": [
+          {
+            "ambiguous": [],
+            "anchors": [
+              "DisplayCalibrationStore",
+              "HighBrightnessUpdates"
+            ],
+            "path": "app/src/main/kotlin/com/tideo/autobrightness/app/AppModule.kt"
+          },
+          {
+            "ambiguous": [],
+            "anchors": [
+              "HighBrightnessUpdates"
+            ],
+            "path": "app/src/main/kotlin/com/tideo/autobrightness/app/runtime/AmbientMonitoringService.kt"
+          },
+          {
+            "ambiguous": [],
+            "anchors": [
+              "DisplayBrightnessReader",
+              "DisplayCalibrationRun",
+              "HandoffCoordinator"
+            ],
+            "path": "app/src/main/kotlin/com/tideo/autobrightness/app/runtime/BrightnessPipelineController.kt"
+          },
+          {
+            "ambiguous": [],
+            "anchors": [
+              "DisplayBrightnessReader",
+              "DisplayCalibration",
+              "HandoffCoordinator"
+            ],
+            "path": "app/src/main/kotlin/com/tideo/autobrightness/app/runtime/DisplayCalibrationRun.kt"
+          },
+          {
+            "ambiguous": [],
+            "anchors": [
+              "HandoffRules"
+            ],
+            "path": "app/src/main/kotlin/com/tideo/autobrightness/app/runtime/HandoffCoordinator.kt"
+          },
+          {
+            "ambiguous": [],
+            "anchors": [
+              "DisplayBrightnessReader",
+              "DisplayCalibration"
+            ],
+            "path": "app/src/main/kotlin/com/tideo/autobrightness/app/runtime/HighBrightnessUpdates.kt"
+          },
+          {
+            "ambiguous": [],
+            "anchors": [
+              "HandoffCoordinator"
+            ],
+            "path": "app/src/main/kotlin/com/tideo/autobrightness/app/runtime/PipelineCycleRunner.kt"
+          },
+          {
+            "ambiguous": [],
+            "anchors": [
+              "HandoffRules"
+            ],
+            "path": "app/src/main/kotlin/com/tideo/autobrightness/app/settings/AabSettingsMapper.kt"
+          },
+          {
+            "ambiguous": [],
+            "anchors": [
+              "DisplayCalibration"
+            ],
+            "path": "app/src/main/kotlin/com/tideo/autobrightness/app/settings/DisplayCalibrationStore.kt"
+          },
+          {
+            "ambiguous": [],
+            "anchors": [
+              "DisplayCalibrationStore"
+            ],
+            "path": "app/src/main/kotlin/com/tideo/autobrightness/app/state/DisplayCalibrationViewModel.kt"
+          },
+          {
+            "ambiguous": [],
+            "anchors": [
+              "HandoffRules"
+            ],
+            "path": "app/src/main/kotlin/com/tideo/autobrightness/app/ui/screens/HandoffScreen.kt"
+          },
+          {
+            "ambiguous": [],
+            "anchors": [
+              "DisplayBrightnessDump"
+            ],
+            "path": "platform/src/main/kotlin/com/tideo/autobrightness/platform/brightness/DisplayBrightnessReader.kt"
+          },
+          {
+            "ambiguous": [],
+            "anchors": [
+              "DisplayBrightnessDump"
+            ],
+            "path": "platform/src/main/kotlin/com/tideo/autobrightness/platform/privilege/ShizukuShell.kt"
+          },
+          {
+            "ambiguous": [],
+            "anchors": [
+              "DisplayBrightnessDump"
+            ],
+            "path": "platform/src/main/kotlin/com/tideo/autobrightness/platform/privilege/ShizukuUserService.kt"
+          }
+        ],
+        "owners": [
+          "app/src/main/kotlin/com/tideo/autobrightness/app/runtime/DisplayCalibrationRun.kt",
+          "app/src/main/kotlin/com/tideo/autobrightness/app/runtime/HandoffCoordinator.kt",
+          "app/src/main/kotlin/com/tideo/autobrightness/app/runtime/HighBrightnessUpdates.kt",
+          "app/src/main/kotlin/com/tideo/autobrightness/app/settings/DisplayCalibrationStore.kt",
+          "domain/src/main/kotlin/com/tideo/autobrightness/domain/brightness/DisplayCalibration.kt",
+          "domain/src/main/kotlin/com/tideo/autobrightness/domain/brightness/HandoffRules.kt",
+          "platform/src/main/kotlin/com/tideo/autobrightness/platform/brightness/DisplayBrightnessDump.kt",
+          "platform/src/main/kotlin/com/tideo/autobrightness/platform/brightness/DisplayBrightnessReader.kt"
+        ],
+        "tests": [
+          "app/src/test/kotlin/com/tideo/autobrightness/app/runtime/HandoffPipelineTest.kt",
+          "app/src/test/kotlin/com/tideo/autobrightness/app/runtime/HighBrightnessUpdatesTest.kt",
+          "app/src/test/kotlin/com/tideo/autobrightness/app/settings/SettingsValidatorTest.kt",
+          "domain/src/test/kotlin/com/tideo/autobrightness/domain/brightness/DisplayCalibrationTest.kt",
+          "domain/src/test/kotlin/com/tideo/autobrightness/domain/brightness/HandoffRulesTest.kt",
+          "platform/src/test/kotlin/com/tideo/autobrightness/platform/brightness/DisplayBrightnessReaderTest.kt"
+        ]
+      }
+    },
+    "night-light": {
+      "declared": [
+        {
+          "anchor": "DisplayTogglesCoordinator",
+          "files": [
+            "app/src/main/kotlin/com/tideo/autobrightness/app/runtime/DisplayTogglesCoordinator.kt"
+          ],
+          "symbol": "com.tideo.autobrightness.app.runtime.DisplayTogglesCoordinator"
+        },
+        {
+          "anchor": "NightLightTemperatureRoute",
+          "files": [
+            "app/src/main/kotlin/com/tideo/autobrightness/app/runtime/NightLightTemperatureRoute.kt"
+          ],
+          "symbol": "com.tideo.autobrightness.app.runtime.NightLightTemperatureRoute"
+        },
+        {
+          "anchor": "NightLightAnchorStore",
+          "files": [
+            "app/src/main/kotlin/com/tideo/autobrightness/app/settings/NightLightAnchorStore.kt"
+          ],
+          "symbol": "com.tideo.autobrightness.app.settings.NightLightAnchorStore"
+        },
+        {
+          "anchor": "NightLightVerdictStore",
+          "files": [
+            "app/src/main/kotlin/com/tideo/autobrightness/app/settings/NightLightVerdictStore.kt"
+          ],
+          "symbol": "com.tideo.autobrightness.app.settings.NightLightVerdictStore"
+        },
+        {
+          "anchor": "NightLightTemperatureRamp",
+          "files": [
+            "domain/src/main/kotlin/com/tideo/autobrightness/domain/circadian/NightLightTemperatureRamp.kt"
+          ],
+          "symbol": "com.tideo.autobrightness.domain.circadian.NightLightTemperatureRamp"
+        },
+        {
+          "anchor": "NightDisplayServiceBridge",
+          "files": [
+            "platform/src/main/kotlin/com/tideo/autobrightness/platform/display/NightDisplayServiceBridge.kt"
+          ],
+          "symbol": "com.tideo.autobrightness.platform.display.NightDisplayServiceBridge"
+        },
+        {
+          "anchor": "SecureDisplayController",
+          "files": [
+            "platform/src/main/kotlin/com/tideo/autobrightness/platform/display/SecureDisplayController.kt"
+          ],
+          "symbol": "com.tideo.autobrightness.platform.display.SecureDisplayController"
+        },
+        {
+          "anchor": "ColorDisplayBinder",
+          "files": [
+            "platform/src/main/kotlin/com/tideo/autobrightness/platform/privilege/ColorDisplayBinder.kt"
+          ],
+          "symbol": "com.tideo.autobrightness.platform.privilege.ColorDisplayBinder"
+        }
+      ],
+      "derived": {
+        "consumers": [
+          {
+            "ambiguous": [],
+            "anchors": [
+              "DisplayTogglesCoordinator",
+              "NightLightAnchorStore",
+              "NightLightTemperatureRamp",
+              "NightLightTemperatureRoute",
+              "NightLightVerdictStore",
+              "SecureDisplayController"
+            ],
+            "path": "app/src/main/kotlin/com/tideo/autobrightness/app/AppModule.kt"
+          },
+          {
+            "ambiguous": [],
+            "anchors": [
+              "DisplayTogglesCoordinator"
+            ],
+            "path": "app/src/main/kotlin/com/tideo/autobrightness/app/runtime/AmbientMonitoringService.kt"
+          },
+          {
+            "ambiguous": [],
+            "anchors": [
+              "NightLightTemperatureRoute",
+              "SecureDisplayController"
+            ],
+            "path": "app/src/main/kotlin/com/tideo/autobrightness/app/runtime/DisplayTogglesCoordinator.kt"
+          },
+          {
+            "ambiguous": [],
+            "anchors": [
+              "NightDisplayServiceBridge",
+              "SecureDisplayController"
+            ],
+            "path": "app/src/main/kotlin/com/tideo/autobrightness/app/runtime/NightLightTemperatureRoute.kt"
+          },
+          {
+            "ambiguous": [],
+            "anchors": [
+              "SecureDisplayController"
+            ],
+            "path": "app/src/main/kotlin/com/tideo/autobrightness/app/settings/AabSettingsMapper.kt"
+          },
+          {
+            "ambiguous": [],
+            "anchors": [
+              "SecureDisplayController"
+            ],
+            "path": "app/src/main/kotlin/com/tideo/autobrightness/app/settings/SettingsValidator.kt"
+          },
+          {
+            "ambiguous": [],
+            "anchors": [
+              "NightLightTemperatureRoute",
+              "SecureDisplayController"
+            ],
+            "path": "app/src/main/kotlin/com/tideo/autobrightness/app/state/DisplayTogglesViewModel.kt"
+          },
+          {
+            "ambiguous": [],
+            "anchors": [
+              "ColorDisplayBinder"
+            ],
+            "path": "platform/src/main/kotlin/com/tideo/autobrightness/platform/privilege/ShizukuUserService.kt"
+          }
+        ],
+        "owners": [
+          "app/src/main/kotlin/com/tideo/autobrightness/app/runtime/DisplayTogglesCoordinator.kt",
+          "app/src/main/kotlin/com/tideo/autobrightness/app/runtime/NightLightTemperatureRoute.kt",
+          "app/src/main/kotlin/com/tideo/autobrightness/app/settings/NightLightAnchorStore.kt",
+          "app/src/main/kotlin/com/tideo/autobrightness/app/settings/NightLightVerdictStore.kt",
+          "domain/src/main/kotlin/com/tideo/autobrightness/domain/circadian/NightLightTemperatureRamp.kt",
+          "platform/src/main/kotlin/com/tideo/autobrightness/platform/display/NightDisplayServiceBridge.kt",
+          "platform/src/main/kotlin/com/tideo/autobrightness/platform/display/SecureDisplayController.kt",
+          "platform/src/main/kotlin/com/tideo/autobrightness/platform/privilege/ColorDisplayBinder.kt"
+        ],
+        "tests": [
+          "app/src/test/kotlin/com/tideo/autobrightness/app/runtime/DisplayTogglesCoordinatorTest.kt",
+          "app/src/test/kotlin/com/tideo/autobrightness/app/runtime/NightLightTemperatureRouteTest.kt",
+          "app/src/test/kotlin/com/tideo/autobrightness/app/state/DisplayTogglesViewModelTest.kt",
+          "domain/src/test/kotlin/com/tideo/autobrightness/domain/circadian/NightLightTemperatureRampTest.kt"
+        ]
+      }
+    },
+    "privilege": {
+      "declared": [
+        {
+          "anchor": "PrivilegeManager",
+          "files": [
+            "platform/src/main/kotlin/com/tideo/autobrightness/platform/privilege/PrivilegeManager.kt"
+          ],
+          "symbol": "com.tideo.autobrightness.platform.privilege.PrivilegeManager"
+        },
+        {
+          "anchor": "ShizukuGrantGateway",
+          "files": [
+            "platform/src/main/kotlin/com/tideo/autobrightness/platform/privilege/ShizukuGrantGateway.kt"
+          ],
+          "symbol": "com.tideo.autobrightness.platform.privilege.ShizukuGrantGateway"
+        },
+        {
+          "anchor": "ShizukuShell",
+          "files": [
+            "platform/src/main/kotlin/com/tideo/autobrightness/platform/privilege/ShizukuShell.kt"
+          ],
+          "symbol": "com.tideo.autobrightness.platform.privilege.ShizukuShell"
+        },
+        {
+          "anchor": "ShizukuUserService",
+          "files": [
+            "platform/src/main/kotlin/com/tideo/autobrightness/platform/privilege/ShizukuUserService.kt"
+          ],
+          "symbol": "com.tideo.autobrightness.platform.privilege.ShizukuUserService"
+        }
+      ],
+      "derived": {
+        "consumers": [
+          {
+            "ambiguous": [],
+            "anchors": [
+              "PrivilegeManager"
+            ],
+            "path": "app/src/main/kotlin/com/tideo/autobrightness/app/AppModule.kt"
+          },
+          {
+            "ambiguous": [],
+            "anchors": [
+              "PrivilegeManager"
+            ],
+            "path": "app/src/main/kotlin/com/tideo/autobrightness/app/runtime/AmbientMonitoringService.kt"
+          },
+          {
+            "ambiguous": [],
+            "anchors": [
+              "PrivilegeManager"
+            ],
+            "path": "app/src/main/kotlin/com/tideo/autobrightness/app/state/DashboardViewModel.kt"
+          },
+          {
+            "ambiguous": [],
+            "anchors": [
+              "PrivilegeManager",
+              "ShizukuGrantGateway"
+            ],
+            "path": "app/src/main/kotlin/com/tideo/autobrightness/app/state/DisplayTogglesViewModel.kt"
+          },
+          {
+            "ambiguous": [],
+            "anchors": [
+              "PrivilegeManager"
+            ],
+            "path": "app/src/main/kotlin/com/tideo/autobrightness/app/state/DraftSettingsViewModel.kt"
+          },
+          {
+            "ambiguous": [],
+            "anchors": [
+              "PrivilegeManager"
+            ],
+            "path": "app/src/main/kotlin/com/tideo/autobrightness/app/state/SettingsViewModel.kt"
+          },
+          {
+            "ambiguous": [],
+            "anchors": [
+              "ShizukuGrantGateway"
+            ],
+            "path": "app/src/main/kotlin/com/tideo/autobrightness/app/ui/onboarding/OnboardingScreen.kt"
+          },
+          {
+            "ambiguous": [],
+            "anchors": [
+              "ShizukuShell"
+            ],
+            "path": "platform/src/main/kotlin/com/tideo/autobrightness/platform/brightness/DisplayBrightnessReader.kt"
+          },
+          {
+            "ambiguous": [],
+            "anchors": [
+              "PrivilegeManager"
+            ],
+            "path": "platform/src/main/kotlin/com/tideo/autobrightness/platform/brightness/SecureDimmingController.kt"
+          },
+          {
+            "ambiguous": [],
+            "anchors": [
+              "ShizukuShell"
+            ],
+            "path": "platform/src/main/kotlin/com/tideo/autobrightness/platform/context/WifiSsidStrategies.kt"
+          },
+          {
+            "ambiguous": [],
+            "anchors": [
+              "ShizukuShell"
+            ],
+            "path": "platform/src/main/kotlin/com/tideo/autobrightness/platform/display/ForceDarkController.kt"
+          },
+          {
+            "ambiguous": [],
+            "anchors": [
+              "ShizukuShell"
+            ],
+            "path": "platform/src/main/kotlin/com/tideo/autobrightness/platform/display/NightDisplayServiceBridge.kt"
+          },
+          {
+            "ambiguous": [],
+            "anchors": [
+              "PrivilegeManager"
+            ],
+            "path": "platform/src/main/kotlin/com/tideo/autobrightness/platform/display/SecureDisplayController.kt"
+          },
+          {
+            "ambiguous": [],
+            "anchors": [
+              "ShizukuGrantGateway"
+            ],
+            "path": "platform/src/main/kotlin/com/tideo/autobrightness/platform/privilege/PrivilegeManager.kt"
+          },
+          {
+            "ambiguous": [],
+            "anchors": [
+              "ShizukuUserService"
+            ],
+            "path": "platform/src/main/kotlin/com/tideo/autobrightness/platform/privilege/ShizukuGrantGateway.kt"
+          },
+          {
+            "ambiguous": [],
+            "anchors": [
+              "ShizukuUserService"
+            ],
+            "path": "platform/src/main/kotlin/com/tideo/autobrightness/platform/privilege/ShizukuShell.kt"
+          }
+        ],
+        "owners": [
+          "platform/src/main/kotlin/com/tideo/autobrightness/platform/privilege/PrivilegeManager.kt",
+          "platform/src/main/kotlin/com/tideo/autobrightness/platform/privilege/ShizukuGrantGateway.kt",
+          "platform/src/main/kotlin/com/tideo/autobrightness/platform/privilege/ShizukuShell.kt",
+          "platform/src/main/kotlin/com/tideo/autobrightness/platform/privilege/ShizukuUserService.kt"
+        ],
+        "tests": [
+          "platform/src/test/kotlin/com/tideo/autobrightness/platform/privilege/PrivilegeManagerTest.kt",
+          "platform/src/test/kotlin/com/tideo/autobrightness/platform/privilege/ShizukuShellTest.kt"
+        ]
+      }
+    },
+    "super-dimming": {
+      "declared": [
+        {
+          "anchor": "DimmingCoordinator",
+          "files": [
+            "app/src/main/kotlin/com/tideo/autobrightness/app/runtime/SuperDimmingCoordinator.kt"
+          ],
+          "symbol": "com.tideo.autobrightness.app.runtime.DimmingCoordinator"
+        },
+        {
+          "anchor": "SuperDimmingCoordinator",
+          "files": [
+            "app/src/main/kotlin/com/tideo/autobrightness/app/runtime/SuperDimmingCoordinator.kt"
+          ],
+          "symbol": "com.tideo.autobrightness.app.runtime.SuperDimmingCoordinator"
+        },
+        {
+          "anchor": "SoftwareDimming",
+          "files": [
+            "domain/src/main/kotlin/com/tideo/autobrightness/domain/brightness/SoftwareDimming.kt"
+          ],
+          "symbol": "com.tideo.autobrightness.domain.brightness.SoftwareDimming"
+        },
+        {
+          "anchor": "DynamicScaleEngine",
+          "files": [
+            "domain/src/main/kotlin/com/tideo/autobrightness/domain/circadian/DynamicScaleEngine.kt"
+          ],
+          "symbol": "com.tideo.autobrightness.domain.circadian.DynamicScaleEngine"
+        },
+        {
+          "anchor": "SecureDimmingController",
+          "files": [
+            "platform/src/main/kotlin/com/tideo/autobrightness/platform/brightness/SecureDimmingController.kt"
+          ],
+          "symbol": "com.tideo.autobrightness.platform.brightness.SecureDimmingController"
+        }
+      ],
+      "derived": {
+        "consumers": [
+          {
+            "ambiguous": [],
+            "anchors": [
+              "SuperDimmingCoordinator"
+            ],
+            "path": "app/src/main/kotlin/com/tideo/autobrightness/app/AppModule.kt"
+          },
+          {
+            "ambiguous": [],
+            "anchors": [
+              "DimmingCoordinator"
+            ],
+            "path": "app/src/main/kotlin/com/tideo/autobrightness/app/runtime/BrightnessPipelineController.kt"
+          },
+          {
+            "ambiguous": [],
+            "anchors": [
+              "DimmingCoordinator"
+            ],
+            "path": "app/src/main/kotlin/com/tideo/autobrightness/app/runtime/DisplayCalibrationRun.kt"
+          },
+          {
+            "ambiguous": [],
+            "anchors": [
+              "DimmingCoordinator"
+            ],
+            "path": "app/src/main/kotlin/com/tideo/autobrightness/app/runtime/HandoffCoordinator.kt"
+          },
+          {
+            "ambiguous": [],
+            "anchors": [
+              "DimmingCoordinator"
+            ],
+            "path": "app/src/main/kotlin/com/tideo/autobrightness/app/runtime/PanicHandler.kt"
+          },
+          {
+            "ambiguous": [],
+            "anchors": [
+              "DimmingCoordinator",
+              "SoftwareDimming"
+            ],
+            "path": "app/src/main/kotlin/com/tideo/autobrightness/app/runtime/PipelineCycleRunner.kt"
+          },
+          {
+            "ambiguous": [],
+            "anchors": [
+              "SecureDimmingController",
+              "SoftwareDimming"
+            ],
+            "path": "app/src/main/kotlin/com/tideo/autobrightness/app/runtime/SuperDimmingCoordinator.kt"
+          },
+          {
+            "ambiguous": [],
+            "anchors": [
+              "DynamicScaleEngine"
+            ],
+            "path": "app/src/main/kotlin/com/tideo/autobrightness/app/ui/graph/CircadianChart.kt"
+          },
+          {
+            "ambiguous": [],
+            "anchors": [
+              "SoftwareDimming"
+            ],
+            "path": "app/src/main/kotlin/com/tideo/autobrightness/app/ui/graph/DimmingChart.kt"
+          },
+          {
+            "ambiguous": [],
+            "anchors": [
+              "DynamicScaleEngine"
+            ],
+            "path": "domain/src/main/kotlin/com/tideo/autobrightness/domain/brightness/BrightnessEngine.kt"
+          }
+        ],
+        "owners": [
+          "app/src/main/kotlin/com/tideo/autobrightness/app/runtime/SuperDimmingCoordinator.kt",
+          "domain/src/main/kotlin/com/tideo/autobrightness/domain/brightness/SoftwareDimming.kt",
+          "domain/src/main/kotlin/com/tideo/autobrightness/domain/circadian/DynamicScaleEngine.kt",
+          "platform/src/main/kotlin/com/tideo/autobrightness/platform/brightness/SecureDimmingController.kt"
+        ],
+        "tests": [
+          "app/src/test/kotlin/com/tideo/autobrightness/app/runtime/BrightnessPipelineControllerTest.kt",
+          "app/src/test/kotlin/com/tideo/autobrightness/app/runtime/CircadianWindowProviderTest.kt",
+          "app/src/test/kotlin/com/tideo/autobrightness/app/runtime/HandoffPipelineTest.kt",
+          "app/src/test/kotlin/com/tideo/autobrightness/app/runtime/PanicHandlerTest.kt",
+          "app/src/test/kotlin/com/tideo/autobrightness/app/runtime/SuperDimmingCoordinatorTest.kt",
+          "domain/src/test/kotlin/com/tideo/autobrightness/domain/parity/CircadianParityTest.kt",
+          "domain/src/test/kotlin/com/tideo/autobrightness/domain/parity/CorePipelineParityTest.kt",
+          "domain/src/test/kotlin/com/tideo/autobrightness/domain/reference/TaskerReference.kt"
+        ]
+      }
+    }
+  },
+  "schema": 1
+}

@@ -153,7 +153,8 @@ It also found three over-reaches:
   the every-entry-point clause, and the same-inputs clause.
 
   > **One source for each calculation and policy.** Before adding or changing production logic,
-  > find its existing owner and callers. Reuse one implementation for the same formula, readout
+  > find its existing owner and callers (`python3 scripts/codemap.py feature <name>` and
+  > `impact <file>`, per AGENTS.md's codemap sentence). Reuse one implementation for the same formula, readout
   > selection or preserved-field policy; keep mathematics in `:domain` and presentation policy in
   > its owning layer. Consumers use the shared definition matching what they claim to show.
   > Runtime previews use the same calculation and applicable mode, inputs and rounding contract.

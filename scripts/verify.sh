@@ -36,6 +36,11 @@ else
 	bad "scripts/tests/local-guards.sh is missing — the repo-local guards under scripts/guards/ are untested"
 fi
 
+# -B keeps __pycache__ out of the tree; the suite also scans the real tree once (DE-010).
+step "codemap tests (scripts/tests/codemap)"
+python3 -B -m unittest discover -s scripts/tests/codemap -t scripts/tests/codemap -q ||
+	bad "scripts/tests/codemap"
+
 # If the session-start warm-up (D-173) is still in flight, say so: Gradle's inter-process lock
 # serializes this build behind it (total wall time ≈ one cold build — expected, not a hang).
 # Informational only — the lock IS the synchronization; no sentinel, no wait (DA-010).

@@ -20,7 +20,7 @@ any of it.
 | | Files | Rule |
 |---|---|---|
 | **Shipped** | `scripts/{ladder,session-start,command-guard,redact,redact-tool-output,test-ladder-guards}.sh`, `scripts/MANIFEST.sha256` | **Never edit.** Parameter-free, they read `amh.conf` at runtime. The ladder's integrity rung hashes them against the manifest every run, so a local edit is reported rather than discovered a year later by whoever upgrades. |
-| **Ours** | `amh.conf`, `scripts/verify.sh`, `scripts/guards/*.sh`, `scripts/bootstrap.sh`, `scripts/session-facts.sh`, `scripts/tests/local-guards.sh` | The extension points. Everything repo-specific goes in one of these — if a change fits none of them, the harness is missing an extension point; raise it upstream rather than carrying a local patch. |
+| **Ours** | `amh.conf`, `scripts/verify.sh`, `scripts/guards/*.sh`, `scripts/bootstrap.sh`, `scripts/session-facts.sh`, `scripts/codemap.py`, `scripts/tests/local-guards.sh`, `scripts/tests/codemap/` | The extension points. Everything repo-specific goes in one of these — if a change fits none of them, the harness is missing an extension point; raise it upstream rather than carrying a local patch. |
 | **Ours (prose)** | `AGENTS.md`, `CLAUDE.md`, `docs/{STATE,RUNBOOK,LEDGER*}.md`, `docs/history/` | Seeded once, ours thereafter. Upgrades arrive as hand-applied notes, never a re-sync. |
 | **Ours (config)** | `.github/workflows/*`, `.claude/settings.json`, `.codex/*` | Written only when absent. Diff each against its upstream template on an upgrade and take what applies. |
 
@@ -52,7 +52,7 @@ We **gained** three rungs with no local predecessor: `guard_author_identity`,
 the AMH repository now, and a stale local snapshot would read as authoritative to a future
 session while drifting against every upstream release.
 
-## The eight repo-local guards, and why each is not upstream's job
+## The nine repo-local guards, and why each is not upstream's job
 
 - **`fdroid-changelog.sh`** — F-Droid flags a `whatsNew` over 500 **characters**, and it measures
   codepoints, not bytes. `wc -c` rejects a legal note full of em dashes. Only the current
@@ -183,7 +183,18 @@ session while drifting against every upstream release.
   (DB-038), leaving the same commit labelled two ways across the tree. Both incidents were caught by
   eye, on a PR, by a reviewer who happened to look.
 
-`scripts/tests/local-guards.sh` is their fixture suite — 145 cases, run by `scripts/verify.sh`.
+- **`codemap.sh`** — runs `python3 scripts/codemap.py check`: `codemap/features.toml` parses,
+  every anchor resolves to exactly one top-level Kotlin symbol, every scanned file scans, and the
+  committed `codemap/map.json` equals a fresh generation byte for byte (DE-021). Upstream cannot
+  own this: the registry, the scanner and the map are this repository's own (DE-010), and the
+  AMH ships no Kotlin reader. The tool holds the semantics and its tests in
+  `scripts/tests/codemap/` define them; the guard only maps every non-zero status to exit 1 and
+  names a missing `python3`. **It is not a duplication detector**, and it leaves three holes for
+  review: deleting an anchor instead of updating it passes (the `features.toml` diff and the
+  members it drops from the map diff show it), a feature nobody registers is invisible to every
+  query and no check asks, and a Kotlin file not yet `git add`ed is outside the scan.
+
+`scripts/tests/local-guards.sh` is their fixture suite — 152 cases, run by `scripts/verify.sh`.
 Nothing upstream knows these guards exist, so without it their failure paths never execute. Its
 negative cases are the point: each was checked by mutating the guard it covers and confirming
 exactly one case turns red.
@@ -196,12 +207,14 @@ broken guard rather than a mild opinion. The contract is the **ladder's**: a wor
 calling a guard directly still reads any non-zero as failure, which is why nothing here invokes
 `scripts/guards/*.sh` outside `scripts/ladder.sh`.
 
-**Seven of the eight fail closed, deliberately, and `doc-facts.sh` carries the one warn branch.** A codepoint count over F-Droid's hard cap, a
+**Eight of the nine fail closed, deliberately, and `doc-facts.sh` carries the one warn branch.** A codepoint count over F-Droid's hard cap, a
 secret in the index and a misfiled ledger prefix are wrong every time they fire, so the warn tier
 — for a rule with legitimate exceptions nobody has enumerated — does not apply to them.
 `action-pins.sh` joins them on the same test: a tag ref where a SHA belongs, an unlabelled pin and
 two markers on one commit are each wrong every time, and the one judgement call it might have
 wanted — is this marker the right *tag* — is the question it deliberately does not ask.
+`codemap.sh` joins them too: a stale generated map or an anchor that resolves to nothing is wrong
+every time, and `python3 scripts/codemap.py write` fixes the map in one command.
 `comment-budget.sh` was the one real candidate for the warn tier and was refused it: a budget that
 only warns is a budget the next session spends, and warn fatigue is the documented failure mode
 for exactly this shape of rule. The escape hatch is not a warning, it is the constants in the
@@ -237,7 +250,7 @@ which you chose and why.
 | `VERSION_FILE` | empty | This repo's version is a Kotlin DSL assignment in `app/build.gradle.kts`, not the first line of a plain file, so the release-window banner cannot read it. `release-preflight.yml` (D-124) enforces the version invariants instead. |
 | `REQUIRED_TOOLS` | `bash git java python3` | The ladder and its fixture suites are shell/Git programs, while the Android verification set requires the JVM. `python3` is there because the output-redaction hook (AMH 15.0.0) stands down silently without it, and the banner is the only place that stand-down is reported. The session banner reports availability; nothing consumes the states. |
 | `ADAPTER_FILES` | the Claude and Codex adapter paths | Names every adapter this repository ships. `configured` reports file presence, not that an integration or hook actually ran. |
-| `RULE_FILES` | `+ CLAUDE.md`, `scripts/{guards,tests,bootstrap.sh,session-facts.sh,verify.sh}`, `scripts/{MANIFEST.sha256,redact-tool-output.sh}`, **`docs/HARNESS_LOCAL.md`** | A repo-local guard is legislation exactly as a shipped one is, and `CLAUDE.md` must never diverge from the constitution it points at. The list must name every extension point `AGENTS.md` **Harness** admits, unshipped repo-local scripts included, or the rule-review tripwire has a hole exactly where local authority is widest. **This file** joined by owner decision (2026-09-04; recorded in the STATE changelog), the fourth doc in the list and the first that is neither constitution nor playbook: it is the authority on which scripts may never be edited, the adapter table saying which rails actually run, and this very table — the last prose copy of `LEDGER_LINE_CAP`. It went uncovered through two units that corrected the Codex-rail claim everywhere else while the most detailed statement of it sat here (DC-032, DC-034). |
+| `RULE_FILES` | `+ CLAUDE.md`, `scripts/{guards,tests,bootstrap.sh,session-facts.sh,codemap.py,verify.sh}`, `scripts/{MANIFEST.sha256,redact-tool-output.sh}`, **`docs/HARNESS_LOCAL.md`** | A repo-local guard is legislation exactly as a shipped one is, and `CLAUDE.md` must never diverge from the constitution it points at. The list must name every extension point `AGENTS.md` **Harness** admits, unshipped repo-local scripts included, or the rule-review tripwire has a hole exactly where local authority is widest. **This file** joined by owner decision (2026-09-04; recorded in the STATE changelog), the fourth doc in the list and the first that is neither constitution nor playbook: it is the authority on which scripts may never be edited, the adapter table saying which rails actually run, and this very table — the last prose copy of `LEDGER_LINE_CAP`. It went uncovered through two units that corrected the Codex-rail claim everywhere else while the most detailed statement of it sat here (DC-032, DC-034). |
 
 ## Adapter and CI notes
 
@@ -309,6 +322,21 @@ binds no one; the rule-review pass rejected that, and correctly. What it prints 
 guidance every session reads before deciding whether a version is safe to work on, so wording that
 drifts changes what agents believe while producing no advisory at all. Reporting is not the same as
 harmless.
+
+**`scripts/codemap.py`** is the third unshipped repo-local script, a stdlib-only Python 3.11+
+index of the tracked Kotlin under `{app,domain,platform}/src/{main,debug,test}/kotlin`, so an
+agent can find what already owns a feature before writing a second copy (DD-038 is the incident;
+DE-010). Its answers are lexical,
+never semantic. It answers `declarations`, `who-uses`, `impact`, `features`, `feature` and
+`suspects`, and `write` regenerates `codemap/map.json` from `codemap/features.toml`; it fails
+loudly, never with a smaller answer, on a git failure, an unreadable tracked file, invalid UTF-8,
+unclosed lexical input or unsupported syntax between declarations (a statement inside a
+declaration's tail is invalid Kotlin, left to the compiler). `scripts/verify.sh` runs its tests
+in `scripts/tests/codemap/`, and `codemap.sh` runs its `check` on every ladder (DE-021). It takes
+no parser dependency, CI never commits the map (D1 (a), DE-012), no symbol-level graph is
+committed and no LLM audit joins the ladder; these decisions are held by review, not by a guard
+(DE-022). It is in `RULE_FILES` because `AGENTS.md` → Harness lists every unshipped
+repo-local script there.
 
 ## Adding an agent adapter
 
