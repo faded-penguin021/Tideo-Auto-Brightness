@@ -196,8 +196,8 @@ class SettingsScreensTest {
         val seeded = PipelineState(
             lastAppliedBrightness = 250,
             lastBrightnessWrite = BrightnessWriteResult(
-                requestedDomain = 255, requestedSettingValue = 4014, readBackSettingValue = 3083,
-                acknowledgedDomain = 196, settingsApiMax = 4095, status = WriteStatus.ACKNOWLEDGED,
+                requestedDomain = 255, requestedSettingValue = 255, readBackSettingValue = 196,
+                acknowledgedDomain = 196, settingsApiMax = 255, status = WriteStatus.ACKNOWLEDGED,
             ),
         )
         compose.setContent {
@@ -210,8 +210,8 @@ class SettingsScreensTest {
         }
         compose.onNodeWithTag("debug_write_roundtrip").performScrollTo().assertExists()
         compose.onNodeWithText("255 \u2192 196", substring = true).performScrollTo().assertExists()
-        // settingsApiMax is what Tideo converts with, so the owner can derive one domain step from it.
-        compose.onNodeWithText("4095", substring = true).performScrollTo().assertExists()
+        // settingsApiMax is what Tideo converts with: 255 on every device (DE-023).
+        compose.onNodeWithText("Settings API max: 255", substring = true).performScrollTo().assertExists()
         compose.onNodeWithTag("debug_override_disposition").assertDoesNotExist()
     }
 
@@ -243,13 +243,13 @@ class SettingsScreensTest {
     @Test
     fun liveDebug_writeCard_rendersTheOverridesOwnWrite_notOnlyTheLatestOne() {
         val seeded = PipelineState(
-            lastBrightnessWrite = BrightnessWriteResult(200, 3212, 3212, 200, 4095, WriteStatus.ACKNOWLEDGED),
+            lastBrightnessWrite = BrightnessWriteResult(200, 200, 200, 200, 255, WriteStatus.ACKNOWLEDGED),
             overrideDiagnostic = OverrideDiagnostic(
                 source = OverrideSource.OBSERVER,
                 disposition = OverrideDisposition.DISMISSED_DRIFT,
                 observed = 69, settled = 69, expected = 68, manualMode = true,
                 modeRecovered = null,
-                write = BrightnessWriteResult(100, 1606, 1573, 98, 4095, WriteStatus.ACKNOWLEDGED),
+                write = BrightnessWriteResult(100, 100, 98, 98, 255, WriteStatus.ACKNOWLEDGED),
                 timestampMs = 0L,
             ),
         )

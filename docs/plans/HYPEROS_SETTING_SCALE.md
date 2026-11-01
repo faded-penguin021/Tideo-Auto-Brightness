@@ -2,9 +2,10 @@
 
 ## Status
 
-- **Spec only. No code has changed.** On 2026-10-31 a reporter's public fork patched Tideo's
-  brightness scale for their phone, and the owner asked for a plan, not a fix. This file, ledger
-  row DE-014 and the STATE entries are **Unit 0**. Every later unit needs the owner's go-ahead.
+- **Unit 1 landed on 2026-11-01 (DE-023), 1.15.3 / vc33; Unit 2 is next.** On 2026-10-31 a
+  reporter's public fork patched Tideo's brightness scale for their phone, and the owner asked for
+  a plan, not a fix. This file, ledger row DE-014 and the STATE entries are **Unit 0**. Every
+  later unit needs the owner's go-ahead.
 - **Revised on 2026-10-31 after a review of this plan and the Pixel calibration plan, relayed by
   the owner (DE-015, DE-016).** All calibration work moved to the Pixel plan
   (`DISPLAY_CALIBRATION_CEILING.md`), now the shared calibration plan. This plan keeps the

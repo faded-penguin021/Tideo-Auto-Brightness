@@ -308,3 +308,11 @@
   hint was added, and the settings-field scan stays deferred (DE-013). The plan's other exclusions
   stand with it: no parser dependency (SCIP, tree-sitter, Kotlin PSI), no CI commit of the map, no
   committed symbol-level graph, and no LLM audit in the ladder.
+- DE-023 [cited]: **Tideo treats `Settings.System.SCREEN_BRIGHTNESS` as 0–255 on every device and no
+  longer reads `config_screenBrightnessSettingMaximum`, overruling DC-026's "the lookup stays"
+  (HyperOS scale Unit 1, 1.15.3 / vc33, 2026-11-01; D1 (a), DE-018).** It starts from the
+  reporter's fork commit `1957d5e`, cherry-picked with `bnoeu` as author and only its
+  `settingsApiMaxOverride = 255` line kept; the unit's second commit dropped that seam and the lookup, so
+  writes and reads clamp to 0–255 and Live Debug's `Settings API max` reads 255 everywhere. A
+  device whose config said 255 gets the same writes; DE-019 holds the fix for a device shown to read
+  a wider scale.

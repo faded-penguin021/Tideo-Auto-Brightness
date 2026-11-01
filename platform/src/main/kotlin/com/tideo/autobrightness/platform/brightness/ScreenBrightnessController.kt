@@ -2,7 +2,6 @@ package com.tideo.autobrightness.platform.brightness
 
 import android.content.ContentResolver
 import android.content.Context
-import android.content.res.Resources
 import android.provider.Settings
 
 // DC-002: WRITTEN_UNACKNOWLEDGED is not a failure, and DENIED is not REFUSED.
@@ -19,7 +18,7 @@ data class BrightnessWriteResult(
 )
 
 // Tasker: task696/698 write Settings.System.SCREEN_BRIGHTNESS; task554 reads it back.
-// Domain 0–255 (Tasker parity); device range may differ.
+// Domain 0–255 (Tasker parity), and the setting is 0–255 on every device, whatever its config (DE-023).
 interface ScreenBrightnessController {
     fun read(): Int
     fun write(level: Int): BrightnessWriteResult
@@ -36,23 +35,12 @@ interface ScreenBrightnessController {
 
 class AndroidScreenBrightnessController(
     private val context: Context,
-    settingsApiMaxOverride: Int? = null,
     // Test seam (DC-002): Robolectric stores what it is given; normalization/refusal/read-back failure need one.
     private val rawWrite: ((Int) -> Boolean)? = null,
     private val rawRead: (() -> Int?)? = null,
     private val rawModeWrite: ((Int) -> Boolean)? = null,
 ) : ScreenBrightnessController {
     private val resolver: ContentResolver get() = context.contentResolver
-
-    // Falls back to 255 if absent (standard Tasker parity).
-    private val settingsApiMax: Int by lazy {
-        settingsApiMaxOverride ?: run {
-            val id = Resources.getSystem().getIdentifier(
-                "config_screenBrightnessSettingMaximum", "integer", "android"
-            )
-            if (id != 0) Resources.getSystem().getInteger(id).takeIf { it > 0 } ?: 255 else 255
-        }
-    }
 
     // D-134, DD-073: saved mode and hand-off marker survive process death; commit(), never apply().
     private val prefs by lazy { context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE) }
@@ -81,17 +69,9 @@ class AndroidScreenBrightnessController(
     @Volatile
     private var selfWriteInProgress: Boolean = false
 
-    private fun toDevice(domainLevel: Int): Int {
-        val clamped = domainLevel.coerceIn(0, 255)
-        return if (settingsApiMax == 255) clamped
-        else Math.round(clamped.toDouble() / 255.0 * settingsApiMax).toInt()
-    }
+    private fun toDevice(domainLevel: Int): Int = domainLevel.coerceIn(0, SETTINGS_API_MAX)
 
-    private fun toDomain(deviceLevel: Int): Int {
-        val clamped = deviceLevel.coerceIn(0, settingsApiMax)
-        return if (settingsApiMax == 255) clamped
-        else Math.round(clamped.toDouble() / settingsApiMax * 255.0).toInt()
-    }
+    private fun toDomain(deviceLevel: Int): Int = deviceLevel.coerceIn(0, SETTINGS_API_MAX)
 
     private fun writeRaw(raw: Int): Boolean =
         rawWrite?.invoke(raw) ?: Settings.System.putInt(resolver, Settings.System.SCREEN_BRIGHTNESS, raw)
@@ -134,7 +114,7 @@ class AndroidScreenBrightnessController(
                 requestedSettingValue = requestedSettingValue,
                 readBackSettingValue = readBackSettingValue,
                 acknowledgedDomain = toDomain(readBackSettingValue),
-                settingsApiMax = settingsApiMax,
+                settingsApiMax = SETTINGS_API_MAX,
                 status = WriteStatus.ACKNOWLEDGED,
             )
         } catch (_: SecurityException) {
@@ -149,7 +129,7 @@ class AndroidScreenBrightnessController(
     }
 
     private fun unlanded(requestedDomain: Int, requestedSettingValue: Int, status: WriteStatus) =
-        BrightnessWriteResult(requestedDomain, requestedSettingValue, null, null, settingsApiMax, status)
+        BrightnessWriteResult(requestedDomain, requestedSettingValue, null, null, SETTINGS_API_MAX, status)
 
     override fun forceManualMode(): Boolean =
         runCatching {
@@ -227,6 +207,7 @@ class AndroidScreenBrightnessController(
     }
 
     companion object {
+        internal const val SETTINGS_API_MAX = 255
         internal const val PREFS_NAME = "screen_brightness_controller"
         internal const val KEY_SAVED_MODE = "saved_brightness_mode"
         internal const val KEY_HANDED_OFF = "handed_off"

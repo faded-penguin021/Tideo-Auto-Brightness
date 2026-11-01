@@ -89,8 +89,8 @@ are in `e2e/scenarios.toml`.
     halves and before 10c.
 
     **Two scales, and the shell is not on the app's (DC-025).** The card's "Settings API max" (call it M)
-    is `config_screenBrightnessSettingMaximum`, the app-facing maximum Tideo converts with, and it
-    reads **255** on the owner's phone. What `adb settings get/put` speaks is the STORED scale,
+    is the app-facing maximum Tideo converts with, fixed at **255** on every device whatever its
+    `config_screenBrightnessSettingMaximum` says (DE-023). What `adb settings get/put` speaks is the STORED scale,
     whose ceiling (call it S) is **4095** there — the same setting key, a different scale, with the
     conversion sitting below the app API. Both numbers are right (DC-017, DC-025). Measure S rather
     than assuming it equals M: drag the system brightness slider to maximum, then `adb shell

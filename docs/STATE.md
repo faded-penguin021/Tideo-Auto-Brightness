@@ -17,7 +17,7 @@ Harness AMH 15.1.0, scripts and hand-applied seed prose together (DD-066); the l
 (`scripts/session-facts.sh`, DC-030), settled by hand with
 `git ls-remote --tags --refs origin 'refs/tags/v*'`.
 
-The tree declares 1.15.2 / vc32 (the train paragraph under the Owner queue); 1.14.0's device
+The tree declares 1.15.3 / vc33 (the train paragraph under the Owner queue); 1.14.0's device
 round passed on 1.14.0-debug vc28 (DD-036), and step 38a's #145 check passed on 1.14.1-debug vc29
 with a brief warmer tint before the expected one (DD-065); DE-001's held Shizuku helper passed on
 1.15.2-debug vc32 (DE-003). The 0–4095 conversion
@@ -51,7 +51,7 @@ stays closed (DB-051…DB-060), and Scorecard.dev is a run-once local input.
   2026-10-31; DE-014, revised DE-016); issue #157 is the report (DE-017). D1 (a) and D2 (b)
   decided (DE-018). Next stage with the calibration plan, after codemap is merged; each unit runs
   on the owner's go-ahead.
-  [x] 0 plan · [ ] 1 one scale · [ ] 2 reporter's device checks · [ ] 3 close-out.
+  [x] 0 plan · [x] 1 one scale (DE-023) · [ ] 2 reporter's device checks · [ ] 3 close-out.
 
 ## Owner queue
 
@@ -109,8 +109,8 @@ stays closed (DB-051…DB-060), and Scorecard.dev is a run-once local input.
    --workflow release.yml --limit 1 --json conclusion,createdAt` shows `success` dated after the
    merge, and the version appears on F-Droid as reproducible.
 
-**The tree declares `1.15.2` / vc32, this train's one bump (DE-001)**; 1.15.1 was seen tagged on
-2026-10-26 (`git ls-remote --tags --refs origin 'refs/tags/v*'`). Never bump twice in one train.
+**The tree declares `1.15.3` / vc33, this train's one bump (DE-023)**; 1.15.2 was seen tagged on
+2026-11-01 (`git ls-remote --tags --refs origin 'refs/tags/v*'`). Never bump twice in one train.
 
 ## Decided non-items
 
@@ -121,6 +121,10 @@ proposing work; changing it is legislation under RUNBOOK's rule-review protocol.
 ## Changelog
 
 Newest first; ledger rows are the durable detail.
+
+- 2026-11-01 — **HyperOS Unit 1, 1.15.3 / vc33: the brightness setting is 0–255 on every device
+  and the config lookup is gone; the reporter's fork commit is cherry-picked under their name
+  first (DE-023). On-device behaviour waits for Unit 2's reporter checks.**
 
 - 2026-11-01 — **HyperOS plan checked against the codemap: every read and write converts in
   `ScreenBrightnessController`, so Unit 1 covers the code; it now also corrects README and
