@@ -23,6 +23,8 @@
   D1 (a), D2 (a), D3 (b) and D4 (a). Unit 5's replay kept D2 at (a) and its triage kept D3 at
   (b) (DE-013).
 - **Unit 6 is done** (2026-11-01): the guard runs `check` against the committed map (DE-021).
+- **Unit 7 is done** (2026-11-01): AGENTS.md, RUNBOOK and the light-refactor draft name the
+  queries.
 - **Probe baseline** (Unit 5, 2026-10-30): one general-purpose subagent at Opus 5.5, on a
   detached worktree at `282c95f`, with Unit 8's prompt, the path and "read-only" only. **It
   already passes four criteria, and the fifth is unestablished**, so one Unit 8 run can show the

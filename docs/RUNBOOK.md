@@ -29,6 +29,7 @@ in place: a correction is a new row plus one appended pointer on the old one.
 | Question | Doc |
 |---|---|
 | What is every Tasker artifact and how was it dispositioned? | `PARITY_CHECKLIST.md` |
+| Which files implement a feature, and what does a file touch? | `python3 scripts/codemap.py features`, `feature <name>`, `impact <file>`; registry `codemap/features.toml` |
 | End-to-end pipeline behavior (sensor→dimming) | `extraction/pipeline_spec.md` |
 | A specific profile / gate's semantics | `extraction/profiles.md`, `extraction/contexts_spec.md` |
 | A specific task's actions / curve math | `extraction/tasks/task<id>_*.md` |
@@ -97,7 +98,7 @@ Each: *when · read first · code to touch · parity obligations · acceptance �
 
 ### 4. Bug fix
 - **Read first:** the reference doc for the affected area (above) + any related
-  `docs/LEDGER.md` row.
+  `docs/LEDGER.md` row, and `python3 scripts/codemap.py impact <file>` for each Kotlin source you will edit.
 - **Steps:** reproduce → add/adjust a failing test first → fix so it conforms to the golden
   vectors (never edit a golden vector to pass; changing one needs proof the extraction was
   wrong + a `STATE.md` entry) → run the ladder → **glue-review protocol** (below) if the fix
@@ -110,6 +111,9 @@ Each: *when · read first · code to touch · parity obligations · acceptance �
 - **Record:** `STATE.md` (and `parity_gaps.md` if it was a parity gap).
 
 ### 5. Tasker-independent feature (rare — no parity source)
+- **Read first:** `python3 scripts/codemap.py feature <name>` for every registered feature the
+  change reaches (`features` lists them), so it reuses that feature's owners; a new feature is
+  added to `codemap/features.toml` (AGENTS.md → Conventions).
 - No golden reference exists; still obey the coding conventions in `CLAUDE.md` and add tests.
   The **glue-review protocol** (below) applies to any `:platform`/runtime glue it adds.
 - **Multi-session features** (pattern proven by Privileged Display, D-149–D-152): persist an

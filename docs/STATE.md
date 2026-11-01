@@ -51,7 +51,7 @@ stays closed (DB-051…DB-060), and Scorecard.dev is a run-once local input.
   2026-10-29; D1–D4 decided, DE-012). The owner's go-ahead covers the remaining units.
   [x] 0 plan · [x] 1 Astra review · [x] 2 placement, tokenizer, declarations · [x] 3 references ·
   [x] 4 features, queries, write and check · [x] 5 seed and measure · [x] 6 guard (per D2) ·
-  [ ] 7 agent entry points · [ ] 8 probe and close-out.
+  [x] 7 agent entry points · [ ] 8 probe and close-out.
 - **HyperOS brightness scale** — `docs/plans/HYPEROS_SETTING_SCALE.md`, spec only (owner,
   2026-10-31; DE-014, revised DE-016); issue #157 is the report (DE-017). D1 (a) and D2 (b)
   decided (DE-018). Next stage with the calibration plan, after codemap is merged; each unit runs
@@ -127,6 +127,9 @@ proposing work; changing it is legislation under RUNBOOK's rule-review protocol.
 
 Newest first; ledger rows are the durable detail.
 
+- 2026-11-01 — **Codemap Unit 7: AGENTS.md → Conventions tells agents to run `impact` and
+  `feature` before writing logic; RUNBOOK's index and playbooks 4 and 5 point at the queries, and
+  the light-refactor "one source" draft names them (D4 (a)).**
 - 2026-11-01 — **Codemap Unit 6: `scripts/guards/codemap.sh` runs `codemap.py check` on every
   ladder, fail-closed, against the committed `codemap/map.json` (DE-021).**
 - 2026-11-01 — **If a device ever reads the app-facing setting on 0–4095 as its config says, the

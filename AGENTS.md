@@ -168,6 +168,17 @@ Follow the naming, layout, and general style of the surrounding code. The minimu
 the target and compile SDK are 36, so do not add compatibility branches for versions below 31.
 Add a dependency only when the change clearly justifies it.
 
+**Find a feature's existing code before writing new logic.** Run
+`python3 scripts/codemap.py impact <file>` before editing a Kotlin source under `app/`, `domain/`
+or `platform/`, and `python3 scripts/codemap.py feature <name>` before adding behaviour in a
+registered feature's area (`features` lists them; other areas have no entry yet); reuse its owners and read the ledger rows it lists. When you add a class that owns
+a feature's logic, or a new feature, add it to `codemap/features.toml` and run
+`python3 scripts/codemap.py write`. The answers are lexical candidates from Kotlin sources: an
+empty one means none were found in the scanned scope, not that nothing exists (RUNBOOK Session
+discipline 9), and two files sharing a feature does not mean their behaviour must be unified.
+`scripts/guards/codemap.sh` fails the ladder on a stale `codemap/map.json` or a broken anchor;
+running the queries and registering new owners are prose-only (DE-021).
+
 Keep explanatory prose in Markdown and leave concise pointers in source code. Durable lessons
 belong in ledger rows, and architectural explanations belong in `docs/rebuild/`. A source comment
 that carries a durable lesson should be one line naming the row, for example:
