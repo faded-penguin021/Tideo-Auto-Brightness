@@ -47,11 +47,6 @@ stays closed (DB-051…DB-060), and Scorecard.dev is a run-once local input.
   runs on the owner's go-ahead.
   [x] 0 plan · [ ] 1 calibration trace · [ ] 2 corroborated ceiling, stored · [ ] 3 readout and
   HBM flag (one release with 2) · [ ] 4 failure causes · [ ] 5 device checks and close-out.
-- **Codemap, a generated feature map for agents** — `docs/plans/CODEMAP.md`, spec only (owner,
-  2026-10-29; D1–D4 decided, DE-012). The owner's go-ahead covers the remaining units.
-  [x] 0 plan · [x] 1 Astra review · [x] 2 placement, tokenizer, declarations · [x] 3 references ·
-  [x] 4 features, queries, write and check · [x] 5 seed and measure · [x] 6 guard (per D2) ·
-  [x] 7 agent entry points · [ ] 8 probe and close-out.
 - **HyperOS brightness scale** — `docs/plans/HYPEROS_SETTING_SCALE.md`, spec only (owner,
   2026-10-31; DE-014, revised DE-016); issue #157 is the report (DE-017). D1 (a) and D2 (b)
   decided (DE-018). Next stage with the calibration plan, after codemap is merged; each unit runs
@@ -127,6 +122,9 @@ proposing work; changing it is legislation under RUNBOOK's rule-review protocol.
 
 Newest first; ledger rows are the durable detail.
 
+- 2026-11-01 — **Codemap Unit 8 closes the plan: the probe found the queries unaided and met
+  four of five criteria, as the baseline did, missing one it had met; plan deleted, HARNESS_LOCAL
+  describes the tool as built (DE-022).**
 - 2026-11-01 — **Codemap Unit 7: AGENTS.md → Conventions tells agents to run `impact` and
   `feature` before writing logic; RUNBOOK's index and playbooks 4 and 5 point at the queries, and
   the light-refactor "one source" draft names them (D4 (a)).**

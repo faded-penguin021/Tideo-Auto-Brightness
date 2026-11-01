@@ -296,3 +296,15 @@
   exit 1, so none can read as the ladder's WARN tier, and the map is pinned LF in
   `.gitattributes` because the comparison is byte for byte. Its holes (a deleted anchor, an
   unregistered feature, an unstaged file) are left to review.
+- DE-022: **Codemap Unit 8 probe, one run each and an anecdote, not a measure (2026-11-01): with
+  the map, a fresh Opus 5.5 subagent ran `features` and `feature` unprompted and met four of five
+  criteria, as the baseline at `282c95f` did without it; the plan is closed.** The task was to
+  plan moving Night Light's evening ramp from sunset to civil dusk. Both changed only
+  `CircadianWindowProvider` among `SolarCalculator`'s three callers, kept the context rules'
+  sunrise and sunset, and added no solar computation. The probe newly named DD-061's acquisition
+  rules as unchanged, but read `ContextSolarTimes` only by grep and never opened `CircadianChart`,
+  which the `feature` answer listed, so it failed the read-all-three-callers criterion that the
+  baseline met. Because the queries were found unaided, no session-start feature list or edit-time
+  hint was added, and the settings-field scan stays deferred (DE-013). The plan's other exclusions
+  stand with it: no parser dependency (SCIP, tree-sitter, Kotlin PSI), no CI commit of the map, no
+  committed symbol-level graph, and no LLM audit in the ladder.

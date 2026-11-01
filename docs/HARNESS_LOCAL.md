@@ -327,13 +327,16 @@ harmless.
 index of the tracked Kotlin under `{app,domain,platform}/src/{main,debug,test}/kotlin`, so an
 agent can find what already owns a feature before writing a second copy (DD-038 is the incident;
 DE-010). Its answers are lexical,
-never semantic. Today it tokenizes, reads top-level declarations and answers `declarations
-[<path>]`; it fails loudly, never with a smaller answer, on a git failure, an unreadable tracked
-file, invalid UTF-8, unclosed lexical input or unsupported syntax between declarations (a statement
-inside a declaration's tail is invalid Kotlin, left to the compiler). `scripts/verify.sh`
-runs its tests in `scripts/tests/codemap/`. No guard calls it yet, so nothing in the ladder
-depends on its answers; it is in `RULE_FILES` because `AGENTS.md` → Harness lists every
-unshipped repo-local script there.
+never semantic. It answers `declarations`, `who-uses`, `impact`, `features`, `feature` and
+`suspects`, and `write` regenerates `codemap/map.json` from `codemap/features.toml`; it fails
+loudly, never with a smaller answer, on a git failure, an unreadable tracked file, invalid UTF-8,
+unclosed lexical input or unsupported syntax between declarations (a statement inside a
+declaration's tail is invalid Kotlin, left to the compiler). `scripts/verify.sh` runs its tests
+in `scripts/tests/codemap/`, and `codemap.sh` runs its `check` on every ladder (DE-021). It takes
+no parser dependency, CI never commits the map (D1 (a), DE-012), no symbol-level graph is
+committed and no LLM audit joins the ladder; these decisions are held by review, not by a guard
+(DE-022). It is in `RULE_FILES` because `AGENTS.md` → Harness lists every unshipped
+repo-local script there.
 
 ## Adding an agent adapter
 
