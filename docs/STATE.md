@@ -127,6 +127,9 @@ proposing work; changing it is legislation under RUNBOOK's rule-review protocol.
 
 Newest first; ledger rows are the durable detail.
 
+- 2026-11-01 — **If a device ever reads the app-facing setting on 0–4095 as its config says, the
+  fix is a scale choice defaulting to 255, never DisplayManager; recorded ahead of that report,
+  D1 (a) stands until then (DE-019, DE-020, owner).**
 - 2026-10-31 — **HyperOS D1 (a): the setting is 0–255 on every device; D2 (b): override points
   saved under the bug stay, rolling out of the newest-50 window or deleted on the chart; Owner
   queue item 5 closed (DE-018, owner).**

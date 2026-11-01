@@ -264,3 +264,29 @@
   deletes one point per tap, so a HyperOS user's points about a sixteenth too low feed the curve
   wizard and the chart's overlay until new overrides or taps remove them, and the unit carries no
   migration or marker.
+- DE-019: **If a device is shown to read the app-facing `SCREEN_BRIGHTNESS` on 0–4095, as its
+  `config_screenBrightnessSettingMaximum` says, the fix is the HyperOS scale plan's D1 (b), a
+  scale choice shaped as below; the owner asked for this row (2026-11-01) so that report needs no
+  fresh decision, and D1 (a) stands until one arrives (DE-018).** A shell `settings get` reading
+  4095 is not that evidence, since DC-025's OnePlus reads 4095 there while its app reads 0–255;
+  the evidence is Tideo's own requests of 25, 50 and 100 showing about n/4095 in `dumpsys display`
+  instead of AOSP's (n − 1)/254, the inverse of DE-014's table. The choice cannot be automatic:
+  the F4 reports the same 4095 config and reads 0–255 (DE-014), learning the scale stays declined
+  (DC-026), and a model check needs a release per device and turns silently wrong once an OEM
+  update fixes the framework. Its shape is a default of 255, the other option being the device's
+  config shown with its number, offered only where that config is not 255, kept out of
+  `SettingsBackupAgent` because a 4095 choice restored onto an F4 recreates DE-014, with override
+  points saved before a switch left to roll out as D2 (b) ruled. Applying it amends DE-018's D1 to
+  (a) plus (b) in a row of its own; DisplayManager is not the fix (DE-020).
+- DE-020: **DisplayManager's `setBrightness`, public from API 36.1, is not the fix for DE-019's
+  device, read at `45c266c` against the faster-Shizuku plan's record of that API.** Its gate
+  misses every device below Android 16 QPR2, the Android 14 F4 among them, so the scale choice
+  would be needed anyway. It fixes writes only, while `read()`, which the uncalibrated hand-off
+  readout also uses, `BrightnessObserver`'s override check and the self-write echo matching
+  (DC-002…DC-008, DB-082) all read the int setting, which on such a device still needs the scale.
+  The only unit that plan records, `BRIGHTNESS_UNIT_PERCENTAGE`, is the slider's perceptual scale
+  over the current range, where Tasker's domain is a linear 0–255 int write (task696/698), so
+  converting would mean modelling an OEM-variable gamma curve. The API stays with that plan's
+  optional finer-steps unit, which reopens DC-026 on its own terms; on API 36.1 and up its
+  permission-free `getBrightness` could at most help a user pick DE-019's choice as a Live Debug
+  readout that never feeds the conversion.
