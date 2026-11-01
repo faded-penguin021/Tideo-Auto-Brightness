@@ -158,6 +158,14 @@ Written for the decided D1 (a) and D2 (b) (DE-018).
 - **Live Debug.** `Settings API max` stays and reads 255 everywhere. Its label, its string key and
   `DEVICE_TEST_SCRIPT.md` §2's "reads 255 on the owner's phone" all stay true, so no string
   changes.
+- **Docs that name the lookup** (codemap check, 2026-11-01). `README.md:140` says the mapping "is
+  detected from `config_screenBrightnessSettingMaximum`", and `DEVICE_TEST_SCRIPT.md` §2 (:91-92)
+  defines the card's M as that config. Both become false: M is the fixed 255 of Tideo's contract.
+  Correct them in our commit.
+- **Comment budget.** The platform module also stands at its limit (338/338 on 2026-11-01), so
+  the DE pointer replaces a comment line in `ScreenBrightnessController.kt` rather than adding
+  one: `// Falls back to 255 if absent` (:47) goes with the lookup, and `device range may differ`
+  (:22) goes stale and is reworded in place.
 - **Tests** (`ScreenBrightnessControllerTest`):
   - the two 1023 conversion tests go, since no conversion is left; one test pins that a write of
     n stores n for 0 to 255 and clamps outside it;

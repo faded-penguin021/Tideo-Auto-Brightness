@@ -122,6 +122,9 @@ proposing work; changing it is legislation under RUNBOOK's rule-review protocol.
 
 Newest first; ledger rows are the durable detail.
 
+- 2026-11-01 — **HyperOS plan checked against the codemap: every read and write converts in
+  `ScreenBrightnessController`, so Unit 1 covers the code; it now also corrects README and
+  DEVICE_TEST_SCRIPT §2, and keeps the platform comment budget level.**
 - 2026-11-01 — **Codemap fixes from Astra High's PR review: a backticked `$`-template name is now
   a reference, and a debug declaration is visible to its module's unit tests; the tree's map is
   unchanged.**
