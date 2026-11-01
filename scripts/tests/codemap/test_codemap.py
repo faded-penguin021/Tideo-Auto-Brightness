@@ -90,6 +90,11 @@ class Tokens(unittest.TestCase):
     def test_nested_template(self):
         self.assertEqual(idents('"${"in ${inner} x"} $outer"'), ["inner", "outer"])
 
+    def test_backticked_template(self):
+        self.assertEqual(idents('"a $`b c` d" + """$`e`"""'), ["b c", "e"])
+        self.assertEqual(idents('"$`" + x'), ["x"])  # no closing backtick: `$` is text
+        self.assertEqual(idents('"$`a"b`" + """$`c"d`"""'), ['a"b', 'c"d'])  # a quote is name text
+
     def test_escaped_dollar_is_text(self):
         self.assertEqual(idents(r'"\$notTemplate"'), [])
 
@@ -350,6 +355,12 @@ REFS = {
     f"{MAIN}/../k3/Use.kt": "package k3\n\nfun use() = k.K2.thing\n",
     f"{MAIN}/../y/OwnDup.kt": "package y\n\nimport p2.*\n\nclass Dup\nfun use() = Dup()\n",
     f"{MAIN}/../z/DoubleStar.kt": "package z\n\nimport p2.*\nimport p2.*\n\nfun d() = Dup()\n",
+    f"{MAIN}/../bt/Setting.kt": "package bt\n\nval setting = 1\n",
+    f"{MAIN}/../bt/Show.kt": 'package bt\n\nfun show() = "v=$`setting`" + """raw $`setting`"""\n',
+    "app/src/debug/kotlin/dbg/DebugOnly.kt": "package dbg\n\nclass DebugHelper\n",
+    f"{MAIN}/../dbg/MainNoDebug.kt": "package dbg\n\nfun m() = DebugHelper()\n",
+    f"{TEST}/../dbg/UsesDebug.kt": "package dbg\n\nfun t() = DebugHelper()\n",
+    "domain/src/test/kotlin/dd/OtherModule.kt": "package dd\n\nfun o() = dbg.DebugHelper()\n",
     "codemap/features.toml": '[lib]\nanchors = ["Obj"]\n',
 }
 REFS = {os.path.normpath(k): v for k, v in REFS.items()}
@@ -441,6 +452,14 @@ class References(unittest.TestCase):
 
     def test_test_source_declaration_invisible_from_main(self):
         self.assertEqual(self.who("TestHelper"), [("p/UsesTestOnly.kt", 3, "same-package", False)])
+
+    def test_debug_declaration_visible_from_same_module_tests_only(self):
+        # Not from main (MainNoDebug.kt) nor from another module's tests (dd/OtherModule.kt).
+        self.assertEqual(self.who("DebugHelper"), [("dbg/UsesDebug.kt", 3, "same-package", False)])
+
+    def test_backticked_template_reference(self):
+        self.assertEqual(self.who("setting"), [("bt/Show.kt", 3, "same-package", False),
+                                               ("bt/Show.kt", 3, "same-package", False)])
 
     def test_ambiguous_name_then_qualified(self):
         proc = run(["--root", str(self.root), "who-uses", "Dup"])

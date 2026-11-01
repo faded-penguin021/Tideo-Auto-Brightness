@@ -122,6 +122,9 @@ proposing work; changing it is legislation under RUNBOOK's rule-review protocol.
 
 Newest first; ledger rows are the durable detail.
 
+- 2026-11-01 — **Codemap fixes from Astra High's PR review: a backticked `$`-template name is now
+  a reference, and a debug declaration is visible to its module's unit tests; the tree's map is
+  unchanged.**
 - 2026-11-01 — **Codemap Unit 8 closes the plan: the probe found the queries unaided and met
   four of five criteria, as the baseline did, missing one it had met; plan deleted, HARNESS_LOCAL
   describes the tool as built (DE-022).**

@@ -118,6 +118,7 @@ class Token:
 
 
 IDENT_RE = re.compile(r"[^\W\d]\w*")
+TEMPLATE_BACKTICK_RE = re.compile(r"`([^`\r\n]+)`")  # "$`name`", a quote inside included, as kotlinc lexes it
 NUMBER_RE = re.compile(
     r"0[xX][0-9a-fA-F_]+[uUlL]*|0[bB][01_]+[uUlL]*"
     r"|\d[\d_]*(?:\.\d[\d_]*)?(?:[eE][+-]?\d[\d_]*)?[fFdDuUlL]*"
@@ -284,6 +285,12 @@ class Tokenizer:
             line, col = self.line, self.col + 1
             self.advance(m.end() - self.i)
             self.emit("ident", m.group(), line, col, template=True)
+            return True
+        m = TEMPLATE_BACKTICK_RE.match(s, self.i + 1)
+        if m:
+            line, col = self.line, self.col + 1
+            self.advance(m.end() - self.i)
+            self.emit("qident", m.group(1), line, col, template=True)
             return True
         return False
 
@@ -768,6 +775,8 @@ class Index:
                 continue
             if decl_set == "main" or decl_set == f.source_set:
                 return True
+            if (decl_set, f.source_set) == ("debug", "test") and self.by_path[d.path].module == f.module:
+                return True  # Android unit tests compile against the debug variant
         return False
 
     def own(self, sym: Symbol, f: FileIndex) -> bool:
