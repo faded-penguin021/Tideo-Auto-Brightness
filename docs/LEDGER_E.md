@@ -316,3 +316,14 @@
   writes and reads clamp to 0–255 and Live Debug's `Settings API max` reads 255 everywhere. A
   device whose config said 255 gets the same writes; DE-019 holds the fix for a device shown to read
   a wider scale.
+- DE-024: **The owner trimmed the HyperOS scale plan's Unit 2 to the reporter's days-of-use report
+  and one slider check (2026-11-02), since the reporter's evidence already covers the rest.** On
+  the F4, Unit 1's build (DE-023) writes and reads as the reporter's fork build did: with a
+  maximum of 255 the old conversion was already the 0–255 clamp Unit 1 applies on every device,
+  and the fork's two other changes touch only calibration's dump reads. The scale needs no
+  re-test, because the release build's floats are exactly 15/254, 31/254 and 47/254 (DE-014), and
+  the floor follows from it. Nothing shown covers the read side, that HyperOS's slider writes the
+  0–255 scale, so the reporter drags the slider low and compares `settings get` with
+  `mScreenBrightness × 254 + 1`, which is safe on the F4 because its shell returned the 16 Tideo
+  wrote (DE-017), unlike DC-025's OnePlus. The F4's calibration trace and failed-run dump check
+  calibration rather than the scale, so the calibration plan's device checks ask for them instead.

@@ -122,6 +122,9 @@ proposing work; changing it is legislation under RUNBOOK's rule-review protocol.
 
 Newest first; ledger rows are the durable detail.
 
+- 2026-11-02 — **HyperOS Unit 2 trimmed to the reporter's days-of-use report and a slider check;
+  the F4's calibration evidence moves to the calibration plan's device checks (owner, DE-024).**
+
 - 2026-11-01 — **HyperOS Unit 1, 1.15.3 / vc33: the brightness setting is 0–255 on every device
   and the config lookup is gone; the reporter's fork commit is cherry-picked under their name
   first (DE-023). On-device behaviour waits for Unit 2's reporter checks.**

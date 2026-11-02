@@ -261,10 +261,16 @@ Four gaps, in four code units:
   - hand off in direct sun at 10 000 lx or more. Expect the readout above 255 and "High
     Brightness Mode activated" once, while
     `adb shell dumpsys display | grep -E 'mHbmMode|hbmMax'` shows the mode on.
-- **The POCO F4** (provisional case), through the HyperOS plan's reporter checks:
+- **The POCO F4** (provisional case), asked of its reporter on #157 through the Owner queue; the
+  HyperOS plan's reporter checks no longer carry it (DE-024):
   - first, from the corrected build (that plan's Unit 1 with this plan's Unit 1), the trace and
-    the dump of a failed run. Only if they show H1's shape (see that plan) does this plan's
-    ceiling fix apply to the F4; any other cause gets its own DE row, and a unit here if needed;
+    the dump of a failed run: start `adb logcat -s <this plan's trace tag> > trace.txt`,
+    calibrate, then at once run `adb shell dumpsys display > display.txt`, and attach both. The
+    trace gives the failing level, each read's source, field, raw samples and elapsed time; the
+    dump's event log gives each level's `brt` and `unclampedBrt`. A shell
+    `time dumpsys display` is not asked for: it times one call, not the app's read path. Only if
+    they show H1's shape (see that plan) does this plan's ceiling fix apply to the F4; any other
+    cause gets its own DE row, and a unit here if needed;
   - then, with Units 2 and 3, calibrate and expect "Calibrated" with the boundary 0.49975574.
 - **Close out.**
   - Every unit has its DE row.
@@ -355,9 +361,9 @@ Four gaps, in four code units:
 
 - **HyperOS brightness scale** (`HYPEROS_SETTING_SCALE.md`). It owns the setting's scale and the
   override points; this plan owns every calibration change.
-  - Its reporter checks need this plan's Unit 1 in their build, so that unit should land before
-    them. The HyperOS cause is settled from that build before this plan's fix is declared to
-    apply to the F4 (Unit 5).
+  - The F4's calibration evidence is asked here (Unit 5), from a build with this plan's Unit 1
+    and that plan's Unit 1; that plan's reporter checks no longer carry it (DE-024). The HyperOS
+    cause is settled from that build before this plan's fix is declared to apply to the F4.
   - Under H1 the F4's plateau starts at level 128, Unit 2's floor. Do not raise that floor without
     the F4's evidence (DE-014).
   - Whichever plan lands second rebases on the other.
@@ -403,5 +409,6 @@ Four gaps, in four code units:
 2. The sweep accepts a corroborated ceiling, and stores it (D1, D4).
 3. The readout and the HBM flag above the boundary (D2), in the same release as Unit 2.
 4. The real cause of a failed calibration (D3).
-5. Device checks on the owner's OnePlus, the Pixel request queued for the reporter, the F4 once
-   the HyperOS evidence settles its cause, then close out and delete this file.
+5. Device checks on the owner's OnePlus, the Pixel request queued for the reporter, the F4's
+   trace and dump asked of its reporter and its calibration once they settle the cause, then
+   close out and delete this file.
