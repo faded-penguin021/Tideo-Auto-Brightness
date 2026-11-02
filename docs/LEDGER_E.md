@@ -327,3 +327,12 @@
   `mScreenBrightness × 254 + 1`, which is safe on the F4 because its shell returned the 16 Tideo
   wrote (DE-017), unlike DC-025's OnePlus. The F4's calibration trace and failed-run dump check
   calibration rather than the scale, so the calibration plan's device checks ask for them instead.
+- DE-025: **RUNBOOK playbook 9 on 1.15.3-debug vc33 (2fefbbe, owner's CPH2653, 2026-11-01..02):
+  17 of 20 auto rows pass or skip by rule, s02_10b is open on timing, and the wake pair was not
+  run; no Tideo defect found.** The first run failed six rows while the owner used the phone and
+  a crowded shade pushed Tideo's actions off screen; reruns untouched passed five, one failing
+  once on a uiautomator2 HTTP 500 first. s02_10b failed twice when the ambient light moved Tideo's
+  target mid-step (expected 33 against a settled 29); it needs steady light the owner could not
+  give. Step 7 found context rules, a baseline, daltonizer 13 → 11 and Night Light 4082 → 1133
+  from a day of the owner's use after the run, so the closing preflight skips 18 rows until
+  `contexts` is confirmed.
