@@ -57,11 +57,11 @@ jobs:
       # Wrapper-jar checksum gate; rationale in build.yml. Validates the wrapper as checked out at
       # the RELEASE TAG, before the Gradle runs that build and sign the shipped APK.
       - name: Validate Gradle wrapper
-        uses: gradle/actions/wrapper-validation@3f5f9adaf7d9fecd50b5935e54106014257a94e6  # v6.4.0
+        uses: gradle/actions/wrapper-validation@8da46b539cd8fe6ab27ca75128919a18d757604c  # v6.4.1
 
       # JDK 21: Robolectric 4.16+ needs it to run tests under SDK 36 (app still targets 17 bytecode).
       - name: Set up JDK 21
-        uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6  # v6.0.1
+        uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad  # v6.1.0
         with:
           distribution: temurin
           java-version: '21'
