@@ -336,3 +336,17 @@
   give. Step 7 found context rules, a baseline, daltonizer 13 → 11 and Night Light 4082 → 1133
   from a day of the owner's use after the run, so the closing preflight skips 18 rows until
   `contexts` is confirmed.
+- DE-026: **RUNBOOK playbook 8 gains step 5: a bumped action line in a workflow no PR runs
+  automatically is covered at PR time only by a step using the same SHA that ran, not skipped,
+  in a job the PR's checks list, and a pin no PR-run workflow carries goes to the Owner queue
+  with the check that settles its first run (owner, 2026-11-03).** Running the playbook on
+  Dependabot's #159 found that "full CI green on the PR" never executed its bumped lines in
+  `release.yml` and `release-signing.yml`; the same three SHAs had run in `build` and
+  `fdroid-compat` steps, so the step records which job covered each line rather than calling the
+  file validated. The fresh-context rule review added that a dispatch runs the file at the ref it
+  is dispatched on, so `release-signing.yml`, which only signs and uploads an artifact, can be run
+  on the PR branch, while `release.yml` attaches to a real release and `redirect-external-prs.yml`
+  waits for an outside contributor's PR. The step's commands run on the PR's head tree and match
+  only a two-space `pull_request:` line, so a filter or `if:` that skipped a PR is settled against
+  its checks by hand; `actions/github-script` and `softprops/action-gh-release` were the two pins
+  they listed on 2026-11-03.

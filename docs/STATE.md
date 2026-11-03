@@ -98,8 +98,9 @@ investigation stays closed (DB-051…DB-060), and Scorecard.dev is a run-once lo
 4. **[2026-10-28] Watch the first release on Ubuntu 26.04; no PR can run the release workflows.**
    CI moved to `ubuntu-26.04` (DE-009), but `release.yml` runs only on a tag, so its first run
    there is the next release. If Dependabot's #159 merges first, that run is also the first of its
-   new pins in `release.yml`, and `release-signing.yml` runs them only on a dispatch; the same SHAs
-   passed `build` and `fdroid-compat` on #159 (2026-11-01). Check that it attaches a signed APK,
+   new pins in `release.yml`, and `release-signing.yml` runs them only on a dispatch, which you
+   can fire on #159's branch (playbook 8 step 5); the same SHAs passed `build` and `fdroid-compat`
+   on #159 (2026-11-01). Check that it attaches a signed APK,
    that its changelog block appears once, and that F-Droid's rebuild of that release matches ours. Settles it: `gh run list
    --workflow release.yml --limit 1 --json conclusion,createdAt` shows `success` dated after the
    merge, and the version appears on F-Droid as reproducible.
@@ -117,6 +118,10 @@ proposing work; changing it is legislation under RUNBOOK's rule-review protocol.
 
 Newest first; ledger rows are the durable detail.
 
+- 2026-11-03 — **Playbook 8 gains step 5, rule-reviewed: name the bumped lines no PR runs
+  automatically, and route a pin no PR job carries to the Owner queue with its check (DE-026,
+  owner); on #159 its three release-workflow SHAs ran in `build`'s steps, and it bumps neither pin
+  step 5 lists.**
 - 2026-11-03 — **Playbook 8 on Dependabot #159, six github-actions bumps in one grouped PR: each
   pin is its tag's commit, resolved by hand; no old SHA is left and `action-pins.sh` passes on its
   tree; every new pin still declares `node24`, so `build.yml`'s policy block needs no edit; its CI
