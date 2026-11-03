@@ -17,13 +17,11 @@ Harness AMH 15.1.0, scripts and hand-applied seed prose together (DD-066); the l
 (`scripts/session-facts.sh`, DC-030), settled by hand with
 `git ls-remote --tags --refs origin 'refs/tags/v*'`.
 
-The tree declares 1.15.3 / vc33 (the train paragraph under the Owner queue); 1.14.0's device
-round passed on 1.14.0-debug vc28 (DD-036), and step 38a's #145 check passed on 1.14.1-debug vc29
-with a brief warmer tint before the expected one (DD-065); DE-001's held Shizuku helper passed on
-1.15.2-debug vc32 (DE-003). The 0–4095 conversion
-path stays frozen as built (DC-011…DC-013, DC-025…DC-028, DB-083), the light-stall findings H1/H2
-are DD-003/DD-002, no round script is alive (RUNBOOK §6, DB-010), the force-stop investigation
-stays closed (DB-051…DB-060), and Scorecard.dev is a run-once local input.
+The tree declares 1.15.3 / vc33 (the train paragraph under the Owner queue). Tideo reads and
+writes the brightness setting as 0–255 on every device, with no config lookup (DE-023, overruling
+DC-026); DE-019 holds the fix if a device is ever shown to read 0–4095. The light-stall findings
+H1/H2 are DD-003/DD-002, no round script is alive (RUNBOOK §6, DB-010), the force-stop
+investigation stays closed (DB-051…DB-060), and Scorecard.dev is a run-once local input.
 
 ## Active work
 
@@ -43,14 +41,12 @@ stays closed (DB-051…DB-060), and Scorecard.dev is a run-once local input.
 - **Display calibration (Pixel confirmed, HyperOS provisional)** —
   `docs/plans/DISPLAY_CALIBRATION_CEILING.md`, spec only (owner, 2026-10-26; DE-005, revised
   DE-015). D1 is decided (a), amended; D2–D4 are open (Owner queue 3). It and the HyperOS plan
-  are the next stage, after the codemap plan is merged to `main` (owner, 2026-10-31); each unit
-  runs on the owner's go-ahead.
+  are the current stage; each unit runs on the owner's go-ahead.
   [x] 0 plan · [ ] 1 calibration trace · [ ] 2 corroborated ceiling, stored · [ ] 3 readout and
   HBM flag (one release with 2) · [ ] 4 failure causes · [ ] 5 device checks and close-out.
-- **HyperOS brightness scale** — `docs/plans/HYPEROS_SETTING_SCALE.md`, spec only (owner,
-  2026-10-31; DE-014, revised DE-016); issue #157 is the report (DE-017). D1 (a) and D2 (b)
-  decided (DE-018). Next stage with the calibration plan, after codemap is merged; each unit runs
-  on the owner's go-ahead.
+- **HyperOS brightness scale** — `docs/plans/HYPEROS_SETTING_SCALE.md` (owner, 2026-10-31;
+  DE-014, revised DE-016); issue #157 is the report (DE-017). D1 (a) and D2 (b) decided (DE-018);
+  each unit runs on the owner's go-ahead.
   [x] 0 plan · [x] 1 one scale (DE-023) · [ ] 2 reporter's device checks · [ ] 3 close-out.
 
 ## Owner queue
@@ -67,13 +63,12 @@ stays closed (DB-051…DB-060), and Scorecard.dev is a run-once local input.
 > fork, options, recommendation (D-167), dated (DA-006); credential leaks and external-content
 > escalations land here too.
 
-1. **[2026-10-04] Get 65 Chinese strings translated; they show in English until then.** Four
-   changed meaning and lost their old Chinese (DD-026); the rest are new: the rule editor's
-   offsets, the extended Night Light range and the bright-light hand-off (DD-035, DD-047, DD-050,
-   DD-071…DD-077). #143 asks for all 65; missing keys fall back to English, so it does not block a
+1. **[2026-10-04] Get 65 Chinese strings translated; they show in English until then.** #143 asks
+   for all 65 — four changed meaning and lost their old Chinese, the rest are new (DD-026, DD-035,
+   DD-047, DD-050, DD-071…DD-077); missing keys fall back to English, so it does not block a
    release (owner, 2026-10-08). Paste translations replied there into the file. Settles it: `comm -23 <(grep -v 'translatable="false"' app/src/main/res/values/strings.xml |
    grep -o 'name="[^"]*"' | sort) <(grep -o 'name="[^"]*"'
-   app/src/main/res/values-b+zh+Hans/strings.xml | sort) | wc -l` prints 0 (65 on 2026-10-18).
+   app/src/main/res/values-b+zh+Hans/strings.xml | sort) | wc -l` prints 0 (65 on 2026-11-03).
 
 2. **[2026-10-13] Decide whether to add a check that the output-redaction hook is still wired.**
    Since AMH 15.0.0 both adapters run `scripts/redact-tool-output.sh` after every tool call, but
@@ -88,19 +83,17 @@ stays closed (DB-051…DB-060), and Scorecard.dev is a run-once local input.
 
 3. **[2026-10-26] Decide the calibration plan's three open questions before its Units 2–4.** A
    Pixel's calibration fails because manual brightness stops at 0.63, so the top levels read the
-   same, and the failure then wrongly blames DUMP (DE-005). You decided D1 (a): accept that
-   ceiling, since the value above which High Brightness Mode (HBM) is on is what matters; the
-   review you relayed on 2026-10-31 adds that a plateau counts only when the dump confirms it is
-   the HBM transition (DE-015). D2: the readout in HBM on such a panel, as (a) AAB's slope, up to
-   ~1150, (b) proportional to the ceiling, up to ~405, or (c) proportional on every panel. D3:
-   (a) a message per cause, blaming permissions only when they are shown missing, (b) one neutral
-   message, or (c) unchanged. D4: a plateau the dump does not confirm (a) fails the run with its
-   own message, or (b) is stored without ever setting the HBM flag. Recommendation: D2 (b),
-   D3 (a), D4 (a); reasons in the plan. Before Unit 2, also check whether the Pixel and F4 dumps
-   carry `brightnessMaxReason` (`grep -c brightnessMaxReason <dump>`); the F4 reporter offers
-   the full dump on #157. Unverified until you
-   answer; settles it: `grep -c '^## Owner decisions (open)' docs/plans/DISPLAY_CALIBRATION_CEILING.md`
-   prints 0 (retitled once D2–D4 are decided), or the plan is gone.
+   same, and the failure then wrongly blames DUMP (DE-005); D1 is decided (DE-015). D2: the
+   readout in High Brightness Mode (HBM) on such a panel, as (a) AAB's slope, up to ~1150, (b)
+   proportional to the ceiling, up to ~405, or (c) proportional on every panel. D3: (a) a message
+   per cause, blaming permissions only when they are shown missing, (b) one neutral message, or
+   (c) unchanged. D4: a plateau the dump does not confirm (a) fails the run with its own message,
+   or (b) is stored without ever setting the HBM flag. Recommendation: D2 (b), D3 (a), D4 (a);
+   reasons in the plan. Before Unit 2, also check whether the Pixel and F4 dumps carry
+   `brightnessMaxReason` (`grep -c brightnessMaxReason <dump>`); the F4 reporter offers the full
+   dump on #157. Unverified until you answer; settles it: `grep -c '^## Owner decisions (open)'
+   docs/plans/DISPLAY_CALIBRATION_CEILING.md` prints 0 (retitled once D2–D4 are decided), or the
+   plan is gone.
 
 4. **[2026-10-28] Watch the first release on Ubuntu 26.04; no PR can run the release workflows.**
    CI moved to `ubuntu-26.04` (DE-009), but `release.yml` runs only on a tag, so its first run
@@ -122,78 +115,16 @@ proposing work; changing it is legislation under RUNBOOK's rule-review protocol.
 
 Newest first; ledger rows are the durable detail.
 
-- 2026-11-02 — **E2E on 1.15.3 / vc33: 17/20 pass or skip by rule, no Tideo defect; s02_10b
-  open on moving light and the wake pair not run (DE-025).**
-- 2026-11-02 — **HyperOS Unit 2 trimmed to the reporter's days-of-use report and a slider check;
-  the F4's calibration evidence moves to the calibration plan's device checks (owner, DE-024).**
-
-- 2026-11-01 — **HyperOS Unit 1, 1.15.3 / vc33: the brightness setting is 0–255 on every device
-  and the config lookup is gone; the reporter's fork commit is cherry-picked under their name
-  first (DE-023). On-device behaviour waits for Unit 2's reporter checks.**
-
-- 2026-11-01 — **HyperOS plan checked against the codemap: every read and write converts in
-  `ScreenBrightnessController`, so Unit 1 covers the code; it now also corrects README and
-  DEVICE_TEST_SCRIPT §2, and keeps the platform comment budget level.**
-- 2026-11-01 — **Codemap fixes from Astra High's PR review: a backticked `$`-template name is now
-  a reference, and a debug declaration is visible to its module's unit tests; the tree's map is
-  unchanged.**
-- 2026-11-01 — **Codemap Unit 8 closes the plan: the probe found the queries unaided and met
-  four of five criteria, as the baseline did, missing one it had met; plan deleted, HARNESS_LOCAL
-  describes the tool as built (DE-022).**
-- 2026-11-01 — **Codemap Unit 7: AGENTS.md → Conventions tells agents to run `impact` and
-  `feature` before writing logic; RUNBOOK's index and playbooks 4 and 5 point at the queries, and
-  the light-refactor "one source" draft names them (D4 (a)).**
-- 2026-11-01 — **Codemap Unit 6: `scripts/guards/codemap.sh` runs `codemap.py check` on every
-  ladder, fail-closed, against the committed `codemap/map.json` (DE-021).**
-- 2026-11-01 — **If a device ever reads the app-facing setting on 0–4095 as its config says, the
-  fix is a scale choice defaulting to 255, never DisplayManager; recorded ahead of that report,
-  D1 (a) stands until then (DE-019, DE-020, owner).**
-- 2026-10-31 — **HyperOS D1 (a): the setting is 0–255 on every device; D2 (b): override points
-  saved under the bug stay, rolling out of the newest-50 window or deleted on the chart; Owner
-  queue item 5 closed (DE-018, owner).**
-- 2026-10-31 — **HyperOS scale planned from a POCO F4 reporter's fork: Tideo trusts a 4095
-  config while Android reads 0–255 (DE-014); Unit 1 opens by cherry-picking the fork's scale line
-  with the reporter as author. Both calibration plans revised after an owner-relayed review, all
-  six findings taken; the Pixel plan is the shared calibration plan (DE-015, DE-016). The
-  reporter's issue #157 is now the report of record: the F4's manual cap equals its HBM
-  transition, and its Shizuku authorisation gap went to faster-Shizuku Unit 5 (DE-017, owner).**
-
-- 2026-10-30 — **Codemap Units 2–5: `scripts/codemap.py` scans the tracked Kotlin and answers
-  `declarations`, `who-uses`, `impact`, `features`, `feature`, `suspects`, `write` and `check`
-  (DE-010); `codemap/features.toml` holds six features, 45 anchors. Unit 5's replay and triage
-  kept D2 (a) and D3 (b); the probe baseline already passes four of five criteria (plan Status).
-  No map is committed until Unit 6 (DE-013).**
-
-- 2026-10-29..30 — **Codemap planned (DD-038's second solar-math copy the motivating incident),
-  revised after Astra High's and ChatGPT's reviews (DE-010, DE-011); the owner took every D1–D4
-  recommendation (DE-012).**
-- 2026-10-28 — **CI moves to `ubuntu-26.04`: every workflow's runner label, still an exact image,
-  never `ubuntu-latest`; accepted on full CI green on its PR, and the tag, dispatch and
-  `main`-only workflows first run there after the merge (DE-009, owner's queue answer (a)).**
-- 2026-10-26..28 — **Planned the Pixel calibration fix: the sweep stalls at the 0.63 manual
-  ceiling, then blames DUMP (DE-005); D1 decided (a); issue 26's dark-end gap routed to
-  faster-Shizuku's float writes (DE-006); the owner's sunlight probe keeps `dumpsys display` as
-  the readout's source and gates faster-Shizuku Unit 7 (DE-007, DE-008).**
-- 2026-10-20..26 — **1.15.1 / vc31: Night Light switches on after the profile's Kelvin lands,
-  owner-passed on a context switch; the Privileged Display screen's service-off Apply stays
-  on-device unverified (DD-090…DD-093). 1.15.2 / vc32: the Shizuku helper stays bound, owner-passed
-  (DE-001…DE-004); device checks now seed the release install's learned facts first (DE-002). The
-  session banner warns when HEAD can fast-forward (owner). Both plans closed.**
-
-- 2026-10-21 — **Duplicated logic audited: Live Debug and the Dashboard show hardware vs perceived
-  brightness in PWM mode, both kept (D-109); six consolidations planned in
-  `docs/plans/LIGHT_REFACTOR_CONSOLIDATION.md`, spec only.**
-- 2026-10-19 — **Dark-room jitter closed with curve settings, no code (DD-088, DD-089); the
-  faster-Shizuku and Android 17 plan committed as `docs/plans/PRIVILEGED_FAST_PATHS.md`, spec
-  only.**
-- 2026-10-13..18 — **1.15.0 / vc30: the bright-light hand-off (#136) with the HBM readout and display
-  calibration, owner-passed in sunlight (DD-070…DD-085); E2E 17/20 on vc30 (DD-086, DD-087); #143
-  asks for all 65 strings. CI: a test-only DataStore hang fix (DD-069), runners pinned to
-  `ubuntu-24.04` (DD-068), fixture suites only after a failed ladder (DD-067). Harness AMH 14.1.0 →
-  15.1.0 (DD-066).**
-- 2026-10-01..10 — **1.14.0 / vc28 and 1.14.1 / vc29: E2E S1–S9 (DD-015…DD-044), Night Light's
-  device range, extended range and circadian fixes, owner-verified (DD-045…DD-065; plan archived as
-  `docs/history/NIGHT_LIGHT_CIRCADIAN_FIX.md`), translations and badges (DD-023…DD-028), the
-  owner's first-launch defaults (DD-030, DD-031), AAB's solar offsets (DD-035).**
-- 2026-06-23..09-28 — **v1.0.0 → v1.12.0 (D-096…DD-012); #133 and #134 owner-passed on
-  1.12.0-debug vc26.**
+- 2026-11-03 — **STATE compressed by stage; `Current state` corrected to DE-023's 0–255 scale,
+  and DC-026 gains its pointer to DE-023.**
+- 2026-10-31..11-02 — **HyperOS scale planned and decided from a POCO F4 reporter's fork and #157
+  (DE-014…DE-020); Unit 1, 1.15.3 / vc33, the setting 0–255 everywhere with the reporter's commit
+  first under their name (DE-023); Unit 2 trimmed to the reporter's checks (DE-024); E2E on vc33
+  found no Tideo defect, s02_10b open on moving light, the wake pair not run (DE-025).**
+- 2026-10-29..11-01 — **Codemap planned, built and closed (DE-010…DE-013, DE-021, DE-022).**
+- 2026-10-26..28 — **Calibration planned (DE-005…DE-008); CI on `ubuntu-26.04` (DE-009).**
+- 2026-10-19..26 — **Dark-room jitter closed with curve settings (DD-088, DD-089); 1.15.1 / vc31
+  and 1.15.2 / vc32 owner-passed, except the screen's service-off Apply, still unverified on
+  device (DD-090…DD-093, DE-001…DE-004); faster-Shizuku and light-refactor plans committed.**
+- 2026-06-23..10-18 — **v1.0.0 → 1.15.0 / vc30 (D-096…DD-087); the 1.14.x Night Light plan is
+  archived as `docs/history/NIGHT_LIGHT_CIRCADIAN_FIX.md`.**
