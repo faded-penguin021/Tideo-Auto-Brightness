@@ -379,3 +379,8 @@
   plateau, while `brightnessMax` and `brightnessMaxReason`, spaced `=` included, are checked only
   where the dump prints them, so the Pixel's unchecked dump cannot block it. A plateau first seen
   at 255 still gets its own window at 255 (Sol).
+- DE-031 [cited]: **With a stored `display_calibration_hbm` boundary, the hand-off's HBM flag follows
+  `raw > boundary` on every read, even when the rounded readout is unchanged; a record without it
+  keeps AAB's `level > 255` (calibration plan Unit 3, D2 (a), 2026-11-04).** AAB's slope rounds raw
+  just past a 0.63 boundary to 255, so the rounded test would never fire there (DE-015). The readout
+  formula is unchanged, so this Pixel's 1.0 reads about 1150; Units 2 and 3 ship in one release.

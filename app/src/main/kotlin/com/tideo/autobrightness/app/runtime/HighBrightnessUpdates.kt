@@ -45,17 +45,20 @@ class HighBrightnessUpdates(
             }
     }
 
-    // Tasker: "_ReadBrightness" (AAB hand-off export, DD-077).
+    // Tasker: "_ReadBrightness" (AAB hand-off export, DD-077); a stored boundary flags from raw (DE-031).
     internal suspend fun read() {
         val record = calibration()
-        val level = if (record == null) {
-            settingBrightness()
-        } else {
-            reader.read(record.field)?.let { record.calibration.levelFor(it.raw) }
-        } ?: return
-        if (level == _readout.value) return
+        if (record == null) {
+            show(settingBrightness() ?: return, rawAbove = null)
+            return
+        }
+        val raw = reader.read(record.field)?.raw ?: return
+        show(record.calibration.levelFor(raw) ?: return, record.hbmBoundary?.let { raw > it })
+    }
+
+    private fun show(level: Int, rawAbove: Boolean?) {
         _readout.value = level
-        val above = level > DisplayCalibration.HBM_ABOVE
+        val above = rawAbove ?: (level > DisplayCalibration.HBM_ABOVE)
         if (above != hbm) {
             hbm = above
             sink.onHighBrightness(above)

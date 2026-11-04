@@ -39,11 +39,11 @@ investigation stays closed (DB-051…DB-060), and Scorecard.dev is a run-once lo
   [x] 0 plan · [ ] 1 dimming readout · [ ] 2 brightness labels · [ ] 3 PWM dimming chart ·
   [ ] 4 `keepGlobalsFrom` · [ ] 5 formula dedups · [ ] 6 engine `dimDynamic` · [ ] 7 AGENTS.md rule · [ ] 8 close-out.
 - **Display calibration (Pixel and HyperOS confirmed)** —
-  `docs/plans/DISPLAY_CALIBRATION_CEILING.md`, Units 1–2 in code (owner, 2026-10-26; DE-005, revised
+  `docs/plans/DISPLAY_CALIBRATION_CEILING.md`, Units 1–3 in code (owner, 2026-10-26; DE-005, revised
   DE-015). D1 (a), amended; D2 (a), D3 (a), D4 (a) (DE-027); battery saver refuses a run
   (DE-028). It and the HyperOS plan are the current stage; each unit runs on the owner's go-ahead.
-  [x] 0 plan · [x] 1 calibration trace (DE-029) · [x] 2 corroborated ceiling, stored (DE-030) · [ ] 3 readout and
-  HBM flag (one release with 2) · [ ] 4 failure causes · [ ] 5 device checks and close-out.
+  [x] 0 plan · [x] 1 calibration trace (DE-029) · [x] 2 corroborated ceiling, stored (DE-030) · [x] 3 readout and
+  HBM flag (DE-031) · [ ] 4 failure causes · [ ] 5 device checks and close-out.
 - **HyperOS brightness scale** — `docs/plans/HYPEROS_SETTING_SCALE.md` (owner, 2026-10-31;
   DE-014, revised DE-016); issue #157 is the report (DE-017). D1 (a) and D2 (b) decided (DE-018);
   each unit runs on the owner's go-ahead.
@@ -104,6 +104,9 @@ proposing work; changing it is legislation under RUNBOOK's rule-review protocol.
 
 Newest first; ledger rows are the durable detail.
 
+- 2026-11-04 — **Calibration Unit 3: with a stored boundary the hand-off's HBM flag follows raw
+  above it on every read, so a crossing that still rounds to 255 turns it on; no readout formula
+  change (D2 (a), DE-031). Units 2 and 3 are now in one train for one release.**
 - 2026-11-04 — **Calibration Unit 2: a plateau at level 128 or above is confirmed at 255 and stored
   as `255:<plateau>` with `display_calibration_hbm` only when the dump's transition point matches;
   an uncorroborated one fails (DE-030). Owner queue item 3, the Pixel-dump grep, is closed: the rule

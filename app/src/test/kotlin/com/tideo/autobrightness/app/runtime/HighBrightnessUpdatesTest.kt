@@ -74,6 +74,53 @@ class HighBrightnessUpdatesTest {
     }
 
     @Test
+    fun aStoredBoundaryFlagsFromRaw_whileTheRoundedReadoutStaysAt255_DE031() = runTest {
+        val pixel = DisplayCalibrationRecord(
+            DisplayCalibration.of(
+                DisplayCalibration.LEVELS.filter { it <= 150 }.map { Point(it, (it - 1) / 254.0) } + Point(255, 0.63),
+            )!!,
+            "mScreenBrightness",
+            0.63,
+        )
+        val rig = Rig(pixel)
+        rig.panel.raw = 0.62
+        rig.updates.read()
+        assertEquals(231, rig.updates.readout.value)
+        assertEquals(emptyList(), rig.flashes)
+
+        rig.panel.raw = 0.6301
+        rig.updates.read()
+        assertEquals(255, rig.updates.readout.value, "AAB's slope rounds just past the boundary to 255")
+        assertEquals(listOf(true), rig.flashes, "the raw crossing turns the flag on")
+        rig.panel.raw = 0.6302
+        rig.updates.read()
+        assertEquals(255, rig.updates.readout.value)
+        assertEquals(listOf(true), rig.flashes, "reported once")
+
+        rig.panel.raw = 0.63
+        rig.updates.read()
+        assertEquals(255, rig.updates.readout.value)
+        assertEquals(listOf(true, false), rig.flashes, "back on the boundary turns it off, readout unchanged")
+
+        val atTop = Rig(pixel)
+        atTop.panel.raw = 0.63
+        atTop.updates.read()
+        atTop.panel.raw = 0.6301
+        atTop.updates.read()
+        assertEquals(255, atTop.updates.readout.value)
+        assertEquals(listOf(true), atTop.flashes, "crossing while already showing 255")
+    }
+
+    @Test
+    fun withoutABoundary_theFlagStillFollowsTheRoundedReadout() = runTest {
+        val rig = Rig(linear)
+        rig.panel.raw = 4_080.1
+        rig.updates.read()
+        assertEquals(255, rig.updates.readout.value)
+        assertEquals(emptyList(), rig.flashes, "past the 255 point's raw, but rounds to 255: AAB's level > 255 keeps it off")
+    }
+
+    @Test
     fun aFailedReadKeepsTheLastValue() = runTest {
         val rig = Rig(linear)
         rig.updates.read()
