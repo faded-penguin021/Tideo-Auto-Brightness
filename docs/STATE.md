@@ -38,10 +38,10 @@ investigation stays closed (DB-051…DB-060), and Scorecard.dev is a run-once lo
   (owner, 2026-10-21; D1–D5 decided). Each unit runs on the owner's go-ahead.
   [x] 0 plan · [ ] 1 dimming readout · [ ] 2 brightness labels · [ ] 3 PWM dimming chart ·
   [ ] 4 `keepGlobalsFrom` · [ ] 5 formula dedups · [ ] 6 engine `dimDynamic` · [ ] 7 AGENTS.md rule · [ ] 8 close-out.
-- **Display calibration (Pixel confirmed, HyperOS provisional)** —
+- **Display calibration (Pixel and HyperOS confirmed)** —
   `docs/plans/DISPLAY_CALIBRATION_CEILING.md`, spec only (owner, 2026-10-26; DE-005, revised
-  DE-015). D1 is decided (a), amended; D2–D4 are open (Owner queue 3). It and the HyperOS plan
-  are the current stage; each unit runs on the owner's go-ahead.
+  DE-015). D1 (a), amended; D2 (a), D3 (a), D4 (a) (DE-027); battery saver is open (Owner queue
+  3). It and the HyperOS plan are the current stage; each unit runs on the owner's go-ahead.
   [x] 0 plan · [ ] 1 calibration trace · [ ] 2 corroborated ceiling, stored · [ ] 3 readout and
   HBM flag (one release with 2) · [ ] 4 failure causes · [ ] 5 device checks and close-out.
 - **HyperOS brightness scale** — `docs/plans/HYPEROS_SETTING_SCALE.md` (owner, 2026-10-31;
@@ -81,19 +81,18 @@ investigation stays closed (DB-051…DB-060), and Scorecard.dev is a run-once lo
    redact-tool-output scripts/guards/*.sh` prints a nonzero count, or a STATE changelog line records
    (b).
 
-3. **[2026-10-26] Decide the calibration plan's three open questions before its Units 2–4.** A
-   Pixel's calibration fails because manual brightness stops at 0.63, so the top levels read the
-   same, and the failure then wrongly blames DUMP (DE-005); D1 is decided (DE-015). D2: the
-   readout in High Brightness Mode (HBM) on such a panel, as (a) AAB's slope, up to ~1150, (b)
-   proportional to the ceiling, up to ~405, or (c) proportional on every panel. D3: (a) a message
-   per cause, blaming permissions only when they are shown missing, (b) one neutral message, or
-   (c) unchanged. D4: a plateau the dump does not confirm (a) fails the run with its own message,
-   or (b) is stored without ever setting the HBM flag. Recommendation: D2 (b), D3 (a), D4 (a);
-   reasons in the plan. Before Unit 2, also check whether the Pixel and F4 dumps carry
-   `brightnessMaxReason` (`grep -c brightnessMaxReason <dump>`); the F4 reporter offers the full
-   dump on #157. Unverified until you answer; settles it: `grep -c '^## Owner decisions (open)'
-   docs/plans/DISPLAY_CALIBRATION_CEILING.md` prints 0 (retitled once D2–D4 are decided), or the
-   plan is gone.
+3. **[2026-11-04] Decide what display calibration does under battery saver, before calibration
+   Unit 2.** The F4 reporter's readings under battery saver are all 0.9 times the normal ones, so
+   its ceiling reads 0.44978 instead of 0.49976 and no longer matches the transition point the
+   dump prints (DE-027). A panel calibrated under battery saver also stores its points 10 % low,
+   so later normal readings run above them. Options: (a) refuse to calibrate while battery saver
+   is on, with its own message (one more Unit 4 cause and one string); (b) divide the factor back
+   out, read from the dump's `screenLowPowerBrightnessFactor`; (c) leave it: under D4 (a) the F4
+   fails as an unconfirmed ceiling, and a rising panel stores low points. Recommendation (a): the
+   factor is vendor configuration and (b) trusts one more dump field. Unverified until you
+   answer; settles it: `grep -c 'Battery saver (open' docs/plans/DISPLAY_CALIBRATION_CEILING.md`
+   prints 0, or the plan is gone. Before Unit 2, also grep the Pixel reporter's dump for
+   `brightnessMaxReason`; the F4's has it.
 
 4. **[2026-10-28] Watch the first release on Ubuntu 26.04; no PR can run the release workflows.**
    CI moved to `ubuntu-26.04` (DE-009), but `release.yml` runs only on a tag, so its first run
@@ -118,6 +117,9 @@ proposing work; changing it is legislation under RUNBOOK's rule-review protocol.
 
 Newest first; ledger rows are the durable detail.
 
+- 2026-11-04 — **Calibration D2 (a), D3 (a), D4 (a) decided; the F4 is a confirmed ceiling case
+  from the reporter's #157 sweep, and battery saver's 0.9 factor is a new Owner queue item 3
+  (DE-027, owner).**
 - 2026-11-03 — **Playbook 8 gains step 5, rule-reviewed: name the bumped lines no PR runs
   automatically, and route a pin no PR job carries to the Owner queue with its check (DE-026,
   owner); on #159 its three release-workflow SHAs ran in `build`'s steps, and it bumps neither pin

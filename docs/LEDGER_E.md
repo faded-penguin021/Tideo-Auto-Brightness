@@ -350,3 +350,11 @@
   only a two-space `pull_request:` line, so a filter or `if:` that skipped a PR is settled against
   its checks by hand; `actions/github-script` and `softprops/action-gh-release` were the two pins
   they listed on 2026-11-03.
+- DE-027: **Calibration D2 (a), D3 (a) and D4 (a) are decided (owner, 2026-11-04): above a
+  verified boundary the readout keeps AAB's slope, each failure cause gets its own message, and a
+  plateau the dump does not corroborate fails the run.** D2 (a) was chosen over the recommended
+  (b) on purpose, so the calibration plan's Unit 3 keeps only the raw-based HBM flag. The F4
+  reporter's manual sweep on #157 holds 0.49975574 from setting 128 up, its dump's transition
+  point, with `brightnessMaxReason =0`, so the F4 is a confirmed ceiling case. That dump ran under
+  battery saver, where every reading is 0.9 times the normal one (`screenLowPowerBrightnessFactor`)
+  and the plateau no longer equals the printed transition point.

@@ -14,10 +14,9 @@
 - **Sequencing (owner, 2026-10-31).** This plan and the HyperOS plan stay open, and executing
   them is the next stage, after the codemap plan is complete and merged to `main`. No unit here
   starts before then.
-- **D1 is decided: (a)** (owner, 2026-10-26), amended by the review: a plateau becomes the HBM
-  threshold only when the dump corroborates it. D2, D3 and the new D4 are open, each with a
-  recommendation. Once that stage opens, Unit 1 waits only on the go-ahead; Unit 2 on D4 and a
-  field check; Unit 3 on D2; Unit 4 on D3.
+- **D1–D4 are decided** (owner; DE-027): D1 (a), amended by the review so a plateau becomes the
+  HBM threshold only when the dump corroborates it; D2 (a), against the recommendation, on
+  purpose; D3 (a); D4 (a). Unit 1 has the owner's go-ahead (2026-11-04).
 - Evidence: a reporter's `dumpsys display`, relayed by the owner, read against
   `DisplayCalibrationRun`, `DisplayCalibration` and `DisplayBrightnessDump` at `3512908`
   (DE-005); the review checked against `HighBrightnessUpdates` and `DumpsysDisplayBrightnessReader`
@@ -28,13 +27,13 @@
 | Case | What fails | Evidence | Standing |
 |---|---|---|---|
 | Pixel (DE-005) | the sweep stalls at the 0.63 manual ceiling, then blames DUMP | the reporter's recorded dump | **confirmed** |
-| POCO F4 on HyperOS (DE-014), once the scale is fixed | may stall at its transition point, 0.49976 | the dump's transition point, with `brightnessMax` equal to it at 0 lx (#157, DE-017); calibration also failed on the reporter's fork | **provisional**: plausible, not shown |
+| POCO F4 on HyperOS (DE-014), once the scale is fixed | stalls at its transition point, 0.49976 | the reporter's manual sweep holds 0.49975574 from setting 128 up, the dump's transition point, with `brightnessMaxReason =0` (#157, DE-027) | **confirmed** by the sweep; the app's read path is still unshown |
 | The owner's OnePlus (DD-081) | nothing: it calibrates today | the owner's device | regression guard |
 
 - **The HyperOS scale fix does not fix the Pixel.** The Pixel's sweep already writes 1 to 255 on
   the right scale; its failure is the ceiling.
-- **This plan's ceiling work may fix both**, but the F4 joins it only once the corrected build's
-  evidence shows the ceiling there (Unit 5).
+- **This plan's ceiling work should fix both.** The F4's sweep shows the ceiling; Unit 5's trace
+  still has to show the app reading it.
 
 ## What the Pixel dump shows
 
@@ -90,8 +89,10 @@ Four gaps, in four code units:
   Each attempt carries its elapsed time. The reader still returns the first sample, as today.
 - **The filter keeps the corroboration lines** that Unit 2 needs: AOSP's
   `mCachedBrightnessInfo.hbmTransitionPoint`, `.brightnessMax` and `.brightnessMaxReason`, and
-  `mHbmData`. `DisplayBrightnessDump.filter` also runs inside the Shizuku user service, so check
-  whether its `version(4)` must move with it (DE-001).
+  `mHbmData`, plus `mAppliedLowPower`, since battery saver scales every reading (DE-027). The F4
+  prints `brightnessMaxReason =0`, with a space before `=`. `DisplayBrightnessDump.filter` also
+  runs inside the Shizuku user service, so check whether its `version(4)` must move with it
+  (DE-001).
 - **The sweep logs one line per level**: the level written; each read's source, status, field, raw
   and elapsed ms; and how the window ended. It also logs the corroboration lines once per run, and
   a summary line.
@@ -134,10 +135,12 @@ Four gaps, in four code units:
   `Infinity` and never plateaus (DD-083).
 - **Otherwise it is an observed ceiling** and never becomes the HBM threshold. D4 decides whether
   the run fails or stores it.
-- **Precondition.** The ledger quotes no `brightnessMaxReason` line from either reporter's dump.
-  Before this unit relies on it, the owner greps the Pixel and F4 dumps for it, or Unit 1's trace
-  shows it on a ceiling panel. #157's excerpt omits it; the F4 reporter offers the full dump there. If it is absent, the rule uses only the fields shown, and the DE row
-  says so.
+- **Precondition.** The F4's full dump carries `brightnessMaxReason =0` (#157, DE-027). The
+  Pixel's is unchecked: before this unit relies on the field, the owner greps that dump for it,
+  or Unit 1's trace shows it on the Pixel. If it is absent there, the rule uses only the fields
+  shown on that panel, and the DE row says so.
+- **Battery saver (open, Owner queue).** The F4's plateau under battery saver is 0.44978, 0.9 times
+  the printed transition point, so the corroboration above fails there (DE-027).
 - **Store a verified boundary.**
   - Drop the last point, which already sat on the plateau, and append `255:<plateau>`. On this
     Pixel that is `1:0.0,5:0.015748031,…,150:0.5866142,255:0.63`, still strictly rising, so
@@ -186,14 +189,12 @@ Four gaps, in four code units:
 - **The readout after Unit 2.** `levelFor` extrapolates past the last point with the last
   segment's slope (AAB, DD-078). On a ceiling calibration that segment is 150 → 255 over 0.043
   of raw, so the panel's top, 1.0, reads **1150**. A raw step of 0.01 moves the readout by 24.
-- **Recommended change (D2 b).** Above a stored boundary, read `255 × raw / boundary`. This
-  Pixel's 1.0 then reads **405**, about 159 % of the normal maximum.
-  - The owner's OnePlus calibration is a line through about zero (`1:16.0` to `255:4095.0`). On
-    it, AAB's slope already gives the same number: 4171 reads 260 either way (DD-081).
+- **Decided: no formula change (D2 a, DE-027).** The readout keeps AAB's slope, so this Pixel's
+  1.0 reads about 1150. The proportional `255 × raw / boundary` (about 405) was declined.
 - **The HBM flag reads raw, not the rounded readout** (DE-015). Today `read()` sets the flag from
   `level > 255` and returns early while the rounded readout is unchanged
-  (`HighBrightnessUpdates.kt:56-58`). Just above the boundary every D2 option rounds to 255: 0.6301
-  is 255.04 under (b) and about 255.2 under (a). So the flag would never turn on there.
+  (`HighBrightnessUpdates.kt:56-58`). Just above the boundary AAB's slope rounds to 255: 0.6301
+  is about 255.2. So the flag would never turn on there.
   - With a stored boundary, the flag follows `raw > boundary`, evaluated on every read, apart from
     the readout and before its early return.
   - A record without the key keeps AAB's `level > 255` (DD-077). The uncalibrated setting path
@@ -202,7 +203,7 @@ Four gaps, in four code units:
   ceiling and still reads it with AAB's slope or the rounded flag. Unit 2 already writes the key,
   so no recalibration is owed when this unit lands.
 - **Tests.**
-  - `DisplayCalibrationTest`: extrapolation with and without a boundary; `encode` unchanged.
+  - `DisplayCalibrationTest`: extrapolation past a boundary keeps AAB's slope; `encode` unchanged.
   - `HighBrightnessUpdatesTest`: on a boundary of 0.63, raw 0.6301 and then 0.6302 both display
     255, the flag turns on at the first and is reported once, and 0.63 turns it off, still
     displaying 255. A record without the key keeps `level > 255`.
@@ -261,8 +262,9 @@ Four gaps, in four code units:
   - hand off in direct sun at 10 000 lx or more. Expect the readout above 255 and "High
     Brightness Mode activated" once, while
     `adb shell dumpsys display | grep -E 'mHbmMode|hbmMax'` shows the mode on.
-- **The POCO F4** (provisional case), asked of its reporter on #157 through the Owner queue; the
-  HyperOS plan's reporter checks no longer carry it (DE-024):
+- **The POCO F4** (confirmed by the sweep, DE-027), asked of its reporter on #157 through the
+  Owner queue, with battery saver off; the HyperOS plan's reporter checks no longer carry it
+  (DE-024):
   - first, from the corrected build (that plan's Unit 1 with this plan's Unit 1), the trace and
     the dump of a failed run: start `adb logcat -s <this plan's trace tag> > trace.txt`,
     calibrate, then at once run `adb shell dumpsys display > display.txt`, and attach both. The
@@ -271,7 +273,10 @@ Four gaps, in four code units:
     `time dumpsys display` is not asked for: it times one call, not the app's read path. Only if
     they show H1's shape (see that plan) does this plan's ceiling fix apply to the F4; any other
     cause gets its own DE row, and a unit here if needed;
-  - then, with Units 2 and 3, calibrate and expect "Calibrated" with the boundary 0.49975574.
+  - then, with Units 2 and 3, calibrate and expect "Calibrated" with the boundary 0.49975574;
+  - the reporter saw the screen brighter than the dashboard after strong sunlight (#157). Manual
+    mode stops at about 500 nits there, so ask for the lux, the readout and the brightness mode
+    when it recurs, and compare with the hand-off readout once Units 2 and 3 are in.
 - **Close out.**
   - Every unit has its DE row.
   - "Deliberately left alone" has a lasting home: DE-005 already holds the curve-ceiling fact.
@@ -304,7 +309,7 @@ Four gaps, in four code units:
   brightness steps", which reopens DC-026). DE-006 is the measurement that unit's first step asks
   for, on a Pixel.
 
-## Owner decisions (open)
+## Owner decisions (decided; D2–D4 on 2026-11-04, DE-027)
 
 1. **D1. Accept a ceiling at the top of the sweep?** **Decided: (a)** (owner, 2026-10-26:
    repeated 0.63 readings break the rising-readings assumption, "That's fine. As long as we know
@@ -320,22 +325,24 @@ Four gaps, in four code units:
      on the owner's OnePlus the transition point reads `Infinity`, with AOSP's High Brightness
      Mode controller idle (DD-083). The amendment uses those lines only to corroborate a measured
      plateau, never as its source, so the OnePlus's `Infinity` is no obstacle: it never plateaus.
-2. **D2. The readout above a boundary.** Unit 3's raw-based HBM flag applies under every option.
+2. **D2. The readout above a boundary. Decided: (a)**, against the recommendation, on purpose
+   (owner: "Deliberately chose D2a instead of b, not a typo"). Unit 3's raw-based HBM flag
+   applies under every option.
    - (a) Keep AAB's slope. No formula change, but this Pixel reads up to about 1150.
-   - (b) **Recommended.** Proportional above a stored boundary only. It uses Unit 2's key, and
+   - (b) Recommended before the decision. Proportional above a stored boundary only. It uses Unit 2's key, and
      AAB's rule stays wherever it applies today.
    - (c) Proportional for every calibration. It gives the OnePlus the same numbers, but it departs
      from `_ReadBrightness` on every panel.
-3. **D3. The failure message.**
-   - (a) **Recommended.** One message per cause (Unit 4), with permission advice only where a
+3. **D3. The failure message. Decided: (a).**
+   - (a) Recommended. One message per cause (Unit 4), with permission advice only where a
      missing permission is established. This report went down the wrong path because of the
      message.
    - (b) One neutral message for every failure. It needs fewer new strings, but it still leaves
      the user guessing, and three existing strings lose their Chinese.
    - (c) Keep it as it is (AAB parity). Every failure keeps blaming DUMP, the defect the review's
      sixth finding names.
-4. **D4. A plateau the dump does not corroborate** (new, 2026-10-31).
-   - (a) **Recommended.** Fail the run with its own cause (`CEILING_UNCONFIRMED`). Nothing is
+4. **D4. A plateau the dump does not corroborate** (new, 2026-10-31). **Decided: (a).**
+   - (a) Recommended. Fail the run with its own cause (`CEILING_UNCONFIRMED`). Nothing is
      stored, so a temporary cap cannot become permanent, and a retry once it lifts can succeed.
      It needs one string.
    - (b) Store it as an observed ceiling, with its own marker: the readout holds 255 above it, the
@@ -394,11 +401,9 @@ Four gaps, in four code units:
 - **Version.** The train's first code unit, here or in the HyperOS plan, carries its one version
   bump by playbook 6: a patch, expected to be 1.15.3 / vc33. Check the live tags first, and never
   bump twice in one train.
-- **Decisions reshape units.**
-  - D2 (a) or (c) changes only Unit 3's formula; its HBM flag stays.
-  - D3 (b) keeps Unit 4's causes and shows one neutral message; D3 (c) drops Unit 4, and Unit 1's
-    trace stays.
-  - D4 (b) adds the observed marker and its string to Unit 2, and drops `CEILING_UNCONFIRMED`.
+- **Decisions shape units** (DE-027). D2 (a): Unit 3 changes no formula and adds only the
+  raw-based HBM flag. D3 (a): Unit 4 as written. D4 (a): Unit 2 fails an uncorroborated plateau
+  with `CEILING_UNCONFIRMED`.
 - **Comment budget.** A raise is a rule change and is asked for first.
 
 ## Units (sequential)

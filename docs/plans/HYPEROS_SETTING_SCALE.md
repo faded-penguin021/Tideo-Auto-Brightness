@@ -315,7 +315,7 @@ before that plan's ceiling fix is declared to apply here.
   failure from blaming DUMP.
   - That plan's device checks ask the reporter for the F4's calibration evidence, from a build
     with its Unit 1; this plan's Unit 2 no longer carries it (DE-024).
-  - The F4 is that plan's provisional case until that evidence settles the cause.
+  - The F4 is a confirmed ceiling case there, from the reporter's sweep on #157 (DE-027).
   - Whichever plan lands second rebases on the other.
 - **Faster Shizuku paths, Unit 12** (float writes). See "Deliberately left alone".
 
