@@ -1,6 +1,10 @@
 package com.tideo.autobrightness.app.ui
 
+import android.content.Context
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.SemanticsMatcher
@@ -8,6 +12,7 @@ import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertTextContains
+import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onAllNodesWithText
@@ -16,6 +21,9 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.unit.dp
+import androidx.test.core.app.ApplicationProvider
+import com.tideo.autobrightness.R
+import com.tideo.autobrightness.app.runtime.CalibrationFailure
 import com.tideo.autobrightness.app.runtime.PipelineState
 import com.tideo.autobrightness.app.settings.AabSettings
 import com.tideo.autobrightness.app.settings.ExperimentDateLocation
@@ -384,6 +392,40 @@ class SettingsScreensTest {
         compose.onNodeWithTag("calibration_error").performScrollTo().assertExists()
         compose.onNodeWithTag("calibration_service_off").assertExists()
         compose.onNodeWithTag("calibration_button").assertTextContains("Retry calibration").assertIsNotEnabled()
+    }
+
+    @Test
+    fun handoff_calibration_failed_namesItsCause_andBlamesPermissionsOnlyForNoAccess_DE032() {
+        var failure: CalibrationFailure? by mutableStateOf(CalibrationFailure.NO_ACCESS)
+        compose.setContent {
+            MaterialTheme {
+                HandoffContent(
+                    AabSettings(), AabSettings(), epoch = 0, dirty = false, onEdit = {}, onApply = {}, onDiscard = {}, onBack = {},
+                    calibration = DisplayCalibrationUi(CalibrationBadge.FAILED, serviceRunning = true, failure), onCalibrate = {},
+                )
+            }
+        }
+        val res = ApplicationProvider.getApplicationContext<Context>().resources
+        val expected = mapOf(
+            CalibrationFailure.NO_ACCESS to R.string.calibration_failed_no_access,
+            CalibrationFailure.NO_READING to R.string.calibration_failed_no_reading,
+            CalibrationFailure.READING_LOST to R.string.calibration_failed_reading_lost,
+            CalibrationFailure.ADAPTIVE to R.string.calibration_failed_adaptive,
+            CalibrationFailure.UNSTEADY to R.string.calibration_failed_unsteady,
+            CalibrationFailure.CEILING_UNCONFIRMED to R.string.calibration_failed_ceiling_unconfirmed,
+            CalibrationFailure.INTERRUPTED to R.string.calibration_failed_interrupted,
+            CalibrationFailure.BATTERY_SAVER to R.string.calibration_failed_battery_saver,
+        )
+        assertEquals(CalibrationFailure.entries.toSet(), expected.keys)
+        compose.onNodeWithTag("calibration_note").performScrollTo().assertTextEquals("The last calibration failed.")
+        for ((cause, message) in expected) {
+            failure = cause
+            val text = res.getString(message)
+            compose.onNodeWithTag("calibration_error").performScrollTo().assertTextEquals(text)
+            assertEquals(cause == CalibrationFailure.NO_ACCESS, "DUMP" in text, cause.name)
+        }
+        failure = null
+        compose.onNodeWithTag("calibration_error").assertTextEquals(res.getString(R.string.calibration_failed_no_reading))
     }
 
     @Test

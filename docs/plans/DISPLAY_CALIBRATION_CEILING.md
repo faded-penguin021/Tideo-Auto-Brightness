@@ -2,7 +2,7 @@
 
 ## Status
 
-- **Units 1–3 are code (DE-029, DE-030, DE-031); the rest is spec.** On 2026-10-26 the owner asked for the best way forward on
+- **Units 1–4 are code (DE-029…DE-032); Unit 5 is spec.** On 2026-10-26 the owner asked for the best way forward on
   the Pixel whose display calibration fails with "grant the DUMP permission", and authorised
   **Unit 0 only**: this file, ledger row DE-005 and the STATE entries. Every later unit needs the
   owner's go-ahead.
@@ -17,7 +17,7 @@
 - **D1–D4 are decided** (owner; DE-027): D1 (a), amended by the review so a plateau becomes the
   HBM threshold only when the dump corroborates it; D2 (a), against the recommendation, on
   purpose; D3 (a); D4 (a). Unit 1 landed on 2026-11-04 (DE-029): logcat tag `TideoCalibration`.
-  Unit 2 landed on 2026-11-04 (DE-030), and Unit 3 the same day in the same train (DE-031).
+  Unit 2 landed on 2026-11-04 (DE-030), and Unit 3 the same day in the same train (DE-031), then Unit 4 (DE-032).
 - Evidence: a reporter's `dumpsys display`, relayed by the owner, read against
   `DisplayCalibrationRun`, `DisplayCalibration` and `DisplayBrightnessDump` at `3512908`
   (DE-005); the review checked against `HighBrightnessUpdates` and `DumpsysDisplayBrightnessReader`

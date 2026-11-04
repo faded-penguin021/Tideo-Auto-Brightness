@@ -71,7 +71,7 @@ class HighBrightnessUpdates(
 }
 
 class StoredDisplayCalibrationSink(
-    private val write: suspend (DisplayCalibrationRecord?) -> Unit,
+    private val write: suspend (DisplayCalibrationOutcome) -> Unit,
     private val flash: ToastHandoffSink,
 ) : DisplayCalibrationSink {
     override suspend fun started() {
@@ -79,12 +79,17 @@ class StoredDisplayCalibrationSink(
         flash.flash(R.string.flash_calibration_start)
     }
 
-    override suspend fun finished(record: DisplayCalibrationRecord?) {
+    override suspend fun finished(outcome: DisplayCalibrationOutcome) {
         try {
-            write(record)
+            write(outcome)
         } finally {
             LiveRuntimeState.setCalibrating(false)
-            flash.flash(if (record != null) R.string.flash_calibration_ok else R.string.flash_calibration_failed)
+            flash.flash(
+                when (outcome) {
+                    is DisplayCalibrationOutcome.Calibrated -> R.string.flash_calibration_ok
+                    is DisplayCalibrationOutcome.Failed -> outcome.cause.message
+                },
+            )
         }
     }
 }

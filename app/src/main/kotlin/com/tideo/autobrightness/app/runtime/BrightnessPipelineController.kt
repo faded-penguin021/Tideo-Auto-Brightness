@@ -47,6 +47,7 @@ class BrightnessPipelineController(
     displayReader: DisplayBrightnessReader = NoDisplayBrightnessReader,
     calibrationSink: DisplayCalibrationSink = NoOpDisplayCalibrationSink,
     calibrationTrace: (String) -> Unit = DisplayCalibrationTrace::logcat,
+    batterySaver: () -> Boolean = { false },
 ) : ControllerHook, PipelineRuntimeContext {
 
     private val engine = BrightnessEngine()
@@ -69,7 +70,7 @@ class BrightnessPipelineController(
     private val panicHandler = PanicHandler(brightness, dimming)
     private val handoff = HandoffCoordinator(this, brightness, dimming, clock, handoffSink)
     private val calibration =
-        DisplayCalibrationRun(this, brightness, dimming, handoff, displayReader, calibrationSink, clock, calibrationTrace)
+        DisplayCalibrationRun(this, brightness, dimming, handoff, displayReader, calibrationSink, clock, calibrationTrace, batterySaver)
     private val cycleRunner = PipelineCycleRunner(
         ctx = this,
         engine = engine,
@@ -247,7 +248,7 @@ class BrightnessPipelineController(
 
     /** `_CalibrateDisplayRange` toggles AAB off and on; Tideo re-runs Set Initial Brightness instead (DD-077). */
     private suspend fun calibrateDisplayInternal() {
-        calibration.run()
+        if (!calibration.run()) return
         val settings = settingsProvider().also { cachedSettings = it }
         if (!_state.value.paused && !_state.value.hibernated) cycleRunner.setInitialBrightness(settings)
     }

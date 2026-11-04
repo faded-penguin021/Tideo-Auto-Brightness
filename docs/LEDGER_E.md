@@ -384,3 +384,10 @@
   keeps AAB's `level > 255` (calibration plan Unit 3, D2 (a), 2026-11-04).** AAB's slope rounds raw
   just past a 0.63 boundary to 255, so the rounded test would never fire there (DE-015). The readout
   formula is unchanged, so this Pixel's 1.0 reads about 1150; Units 2 and 3 ship in one release.
+- DE-032 [cited]: **A failed display calibration stores and shows its cause, one message each,
+  with DUMP, root and Shizuku advice only when every source was unavailable at the first level;
+  battery saver refuses the run before anything is written (calibration plan Unit 4, D3 (a),
+  DE-028, 2026-11-04).** `display_calibration` keeps AAB's `error` (DD-078), and the new
+  `display_calibration_error` holds the cause; an `error` stored without one reads as the neutral
+  `NO_READING`, since its cause was never established. The battery-saver refusal also skips the
+  Set Initial Brightness that follows a run (Sol).

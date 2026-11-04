@@ -2,6 +2,8 @@ package com.tideo.autobrightness.app.runtime
 
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.datastore.preferences.core.doublePreferencesKey
+import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.stringPreferencesKey
 import com.tideo.autobrightness.app.settings.DisplayCalibrationStore
 import com.tideo.autobrightness.domain.brightness.DisplayCalibration
 import com.tideo.autobrightness.domain.brightness.DisplayCalibration.Point
@@ -194,18 +196,47 @@ class HighBrightnessUpdatesTest {
         )
         try {
             runBlocking {
-                store.write(ceiling)
+                store.write(DisplayCalibrationOutcome.Calibrated(ceiling))
                 val stored = assertNotNull(store.current())
                 assertEquals(ceiling.calibration.encode(), stored.calibration.encode())
                 assertEquals(0.63, stored.hbmBoundary)
 
-                store.write(null)
-                assertEquals(DisplayCalibrationStore.Status.Failed, store.status.first())
+                store.write(DisplayCalibrationOutcome.Failed(CalibrationFailure.CEILING_UNCONFIRMED))
+                assertEquals(DisplayCalibrationStore.Status.Failed(CalibrationFailure.CEILING_UNCONFIRMED), store.status.first())
+                assertEquals("error", prefs.data.first()[stringPreferencesKey("display_calibration")], "AAB's sentinel stays")
                 assertNull(prefs.data.first()[doublePreferencesKey("display_calibration_hbm")], "a failure removes the key")
 
-                store.write(ceiling)
-                store.write(linear)
+                store.write(DisplayCalibrationOutcome.Calibrated(ceiling))
+                store.write(DisplayCalibrationOutcome.Calibrated(linear))
                 assertNull(assertNotNull(store.current()).hbmBoundary, "a rising panel's success removes it")
+            }
+        } finally {
+            scope.cancel()
+            file.delete()
+        }
+    }
+
+    @Test
+    fun aFailureKeepsItsCause_aSuccessDropsIt_andALegacyErrorReadsNeutral_DE032() {
+        val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+        val file = File.createTempFile("display_prefs_test", ".preferences_pb").apply { delete() }
+        val prefs = PreferenceDataStoreFactory.create(scope = scope) { file }
+        val store = DisplayCalibrationStore(prefs, "build-1")
+        val cause = stringPreferencesKey("display_calibration_error")
+        try {
+            runBlocking {
+                for (failure in CalibrationFailure.entries) {
+                    store.write(DisplayCalibrationOutcome.Failed(failure))
+                    assertEquals(DisplayCalibrationStore.Status.Failed(failure), store.status.first())
+                }
+                store.write(DisplayCalibrationOutcome.Calibrated(linear))
+                assertNull(prefs.data.first()[cause], "a success removes the cause")
+                assertNotNull(store.current())
+
+                prefs.edit { it[stringPreferencesKey("display_calibration")] = "error" }
+                assertEquals(DisplayCalibrationStore.Status.Failed(CalibrationFailure.NO_READING), store.status.first(), "an earlier build's error")
+                prefs.edit { it[cause] = "SOMETHING_NEWER" }
+                assertEquals(DisplayCalibrationStore.Status.Failed(CalibrationFailure.NO_READING), store.status.first(), "an unknown cause")
             }
         } finally {
             scope.cancel()

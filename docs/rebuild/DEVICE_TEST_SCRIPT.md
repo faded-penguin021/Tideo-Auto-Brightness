@@ -843,6 +843,12 @@ N lx". Watch Live Debug's Light Sensor card for smoothed lux.
     shows a last point `255:` at the dump's `hbmTransitionPoint` plus `display_calibration_hbm`;
     `adb logcat -s TideoCalibration` names the plateau. A plateau the dump does not match fails
     the run and stores no boundary (DE-030).
+    **Failures name their cause** (DE-032), on the card's banner and in the flash, and the
+    summary line ends `cause <NAME>`: with DUMP revoked
+    (`adb shell pm revoke com.tideo.autobrightness.debug android.permission.DUMP`), Shizuku stopped
+    and no root, the message asks for DUMP, root or Shizuku; paused under Adaptive Brightness, it
+    asks to turn Adaptive Brightness off; with battery saver on, it says the calibration was not
+    started, and the screen does not change at all. No other cause mentions DUMP.
 
 ---
 

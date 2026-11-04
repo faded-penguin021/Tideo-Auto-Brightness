@@ -2,6 +2,7 @@ package com.tideo.autobrightness.app
 
 import android.content.Context
 import android.os.Build
+import android.os.PowerManager
 import com.tideo.autobrightness.app.runtime.AndroidContextSignalSource
 import com.tideo.autobrightness.app.runtime.AppProfileCatalog
 import com.tideo.autobrightness.app.runtime.BrightnessPipelineController
@@ -144,6 +145,7 @@ class AppModule(context: Context) {
             handoffSink = handoffFlash,
             displayReader = displayReader,
             calibrationSink = StoredDisplayCalibrationSink(displayCalibrationStore::write, handoffFlash),
+            batterySaver = { appContext.getSystemService(PowerManager::class.java)?.isPowerSaveMode == true },
         )
         controllerHook.hook = controller
         // D-110: recompute when circadian location resolves late.

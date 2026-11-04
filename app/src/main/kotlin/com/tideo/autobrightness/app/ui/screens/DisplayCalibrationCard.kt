@@ -21,6 +21,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.tideo.autobrightness.R
+import com.tideo.autobrightness.app.runtime.CalibrationFailure
 import com.tideo.autobrightness.app.state.CalibrationBadge
 import com.tideo.autobrightness.app.state.DisplayCalibrationUi
 import com.tideo.autobrightness.app.ui.components.AabCard
@@ -61,7 +62,7 @@ internal fun DisplayCalibrationCard(state: DisplayCalibrationUi, onCalibrate: ()
             Note(stringResource(noteText(badge)), "calibration_note")
             if (badge == CalibrationBadge.FAILED) {
                 Text(
-                    stringResource(R.string.handoff_calibration_failed_banner),
+                    stringResource((state.failure ?: CalibrationFailure.NO_READING).message),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.error,
                     modifier = Modifier.testTag("calibration_error"),

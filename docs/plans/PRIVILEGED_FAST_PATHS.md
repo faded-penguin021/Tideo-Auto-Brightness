@@ -221,10 +221,10 @@ becomes a new DD row in the unit that acts on it:
     its WRITE_SECURE_SETTINGS grant is then a repeat, which the glue review confirms is harmless,
     or the request is split out.
   - The advice that sends users to Shizuku cannot be followed in the app today:
-    `flash_calibration_failed`, `handoff_calibration_failed_banner` and
-    `help_handoff_calibration` ("allow root or Shizuku"), and `pd_night_light_needs_shizuku`
-    ("Start Shizuku"). The review decides whether they change. The calibration banner is also
-    the display-calibration plan's Unit 4; whichever lands second rebases.
+    `calibration_failed_no_access` and `help_handoff_calibration` ("allow root or Shizuku"),
+    and `pd_night_light_needs_shizuku` ("Start Shizuku"). The review decides whether they
+    change. The display-calibration plan's Unit 4 already limits that advice to the cause where
+    every source was unavailable (DE-032).
   - Device: the owner removes Tideo's authorisation in the Shizuku app, then Privileged Display
     offers "Use Shizuku" at ELEVATED; after the tap, a Shizuku use answers again (Unit 4's helper
     card counts the call).
