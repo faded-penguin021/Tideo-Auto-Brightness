@@ -139,8 +139,9 @@ Four gaps, in four code units:
   Pixel's is unchecked: before this unit relies on the field, the owner greps that dump for it,
   or Unit 1's trace shows it on the Pixel. If it is absent there, the rule uses only the fields
   shown on that panel, and the DE row says so.
-- **Battery saver (open, Owner queue).** The F4's plateau under battery saver is 0.44978, 0.9 times
-  the printed transition point, so the corroboration above fails there (DE-027).
+- **Battery saver: refused, decided (owner, 2026-11-04; DE-028).** The F4's plateau under battery
+  saver is 0.44978, 0.9 times the printed transition point, so the corroboration above would fail
+  there (DE-027). Unit 4 refuses to start a calibration while battery saver is on.
 - **Store a verified boundary.**
   - Drop the last point, which already sat on the plateau, and append `255:<plateau>`. On this
     Pixel that is `1:0.0,5:0.015748031,…,150:0.5866142,255:0.63`, still strictly rising, so
@@ -223,6 +224,7 @@ Four gaps, in four code units:
   | `UNSTEADY` | readings came but did not settle, did not rise, or failed the 255 confirmation | keep the screen on and untouched, then retry |
   | `CEILING_UNCONFIRMED` | D4 (a) only: a plateau confirmed at 255 but not corroborated | brightness stopped rising early and Tideo could not confirm that High Brightness Mode starts there; retry later, with the phone cool |
   | `INTERRUPTED` | a brightness write was refused, the restore failed, or Disable or panic stopped it | retry |
+  | `BATTERY_SAVER` | `PowerManager.isPowerSaveMode` was true when the run was asked for; checked before the first write, so nothing is written (DE-028) | an explicit refusal that says why: battery saver dims every brightness reading, so a calibration taken now would be wrong; turn battery saver off and retry |
 
   - A superuser manager that denies `su` makes it exit non-zero. That reads as *failed*, not as
     *unavailable*, so it lands in the neutral wording rather than claiming a missing grant.
@@ -239,7 +241,8 @@ Four gaps, in four code units:
   that item's count.
 - **Tests.**
   - `HandoffPipelineTest`: every cause above, including a source that times out with DUMP
-    granted (`NO_READING`, not `NO_ACCESS`), and readings that stop after level 50.
+    granted (`NO_READING`, not `NO_ACCESS`), readings that stop after level 50, and battery
+    saver on at the start (`BATTERY_SAVER`, no write).
   - `SettingsScreensTest`: the banner per cause, and the legacy `error`.
   - A store round trip.
 - **Records.** A DE row, glue review, and step 61's failure expectations in both device files.
@@ -359,6 +362,8 @@ Four gaps, in four code units:
   which on a ceiling panel is 12. Longer windows or dump limits wait for Unit 1's measured times;
   the HyperOS fork raised them without measurements and still failed (DE-016).
 - **Calibrating under Adaptive Brightness.** No: the sweep never writes the mode (DD-079).
+- **Battery saver switched on during a sweep, or during a later hand-off readout.** Only the
+  start is checked (DE-028); a readout under battery saver reads 10 % low until it is turned off.
 - **The interpolation between the last rising point and the boundary** (Unit 2, "Known
   approximation").
 - **Low-brightness resolution** (DE-006). It belongs to faster-Shizuku Unit 12; see "Inputs that

@@ -358,3 +358,8 @@
   point, with `brightnessMaxReason =0`, so the F4 is a confirmed ceiling case. That dump ran under
   battery saver, where every reading is 0.9 times the normal one (`screenLowPowerBrightnessFactor`)
   and the plateau no longer equals the printed transition point.
+- DE-028: **Display calibration refuses to start while battery saver is on, with a message that
+  says why (owner, 2026-11-04).** Battery saver scales every reading (DE-027), so a sweep under it
+  would store points 10 % low or fail an honest ceiling's corroboration. The check runs once,
+  before the first write; switching battery saver on mid-sweep or during a later readout is
+  accepted, not checked.
