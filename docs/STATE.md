@@ -42,7 +42,7 @@ investigation stays closed (DB-051…DB-060), and Scorecard.dev is a run-once lo
   `docs/plans/DISPLAY_CALIBRATION_CEILING.md`, spec only (owner, 2026-10-26; DE-005, revised
   DE-015). D1 (a), amended; D2 (a), D3 (a), D4 (a) (DE-027); battery saver refuses a run
   (DE-028). It and the HyperOS plan are the current stage; each unit runs on the owner's go-ahead.
-  [x] 0 plan · [ ] 1 calibration trace · [ ] 2 corroborated ceiling, stored · [ ] 3 readout and
+  [x] 0 plan · [x] 1 calibration trace (DE-029) · [ ] 2 corroborated ceiling, stored · [ ] 3 readout and
   HBM flag (one release with 2) · [ ] 4 failure causes · [ ] 5 device checks and close-out.
 - **HyperOS brightness scale** — `docs/plans/HYPEROS_SETTING_SCALE.md` (owner, 2026-10-31;
   DE-014, revised DE-016); issue #157 is the report (DE-017). D1 (a) and D2 (b) decided (DE-018);
@@ -110,6 +110,9 @@ proposing work; changing it is legislation under RUNBOOK's rule-review protocol.
 
 Newest first; ledger rows are the durable detail.
 
+- 2026-11-04 — **Calibration Unit 1: the sweep logs each level's reads, sources, statuses and
+  times, the dump's ceiling lines and a summary under logcat tag `TideoCalibration`; behaviour
+  unchanged, Shizuku helper version 5 (DE-029).**
 - 2026-11-04 — **Calibration refuses to start under battery saver, saying why; Unit 4 carries it
   as the `BATTERY_SAVER` cause, and Owner queue item 3 now holds only the Pixel-dump grep (DE-028,
   owner).**

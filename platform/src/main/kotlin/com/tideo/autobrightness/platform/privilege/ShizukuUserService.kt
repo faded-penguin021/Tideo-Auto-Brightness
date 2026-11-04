@@ -2,6 +2,7 @@ package com.tideo.autobrightness.platform.privilege
 
 import android.content.Context
 import com.tideo.autobrightness.platform.brightness.DisplayBrightnessDump
+import com.tideo.autobrightness.platform.brightness.DumpOutput
 import java.io.InputStream
 import java.util.concurrent.TimeUnit
 import kotlin.concurrent.thread
@@ -29,7 +30,7 @@ class ShizukuUserService(private val context: Context) : IShizukuUserService.Stu
         return readForceDark()
     }
 
-    override fun displayBrightnessLines(): String? = DisplayBrightnessDump.run(arrayOf("dumpsys", "display"))
+    override fun displayBrightnessLines(): String? = (DisplayBrightnessDump.run(arrayOf("dumpsys", "display")) as? DumpOutput.Lines)?.text
 
     override fun readNightDisplayTemperature(): Int = ColorDisplayBinder.readKelvin() ?: -1
 

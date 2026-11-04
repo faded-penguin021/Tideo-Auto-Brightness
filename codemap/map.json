@@ -428,6 +428,13 @@
           "symbol": "com.tideo.autobrightness.app.runtime.DisplayCalibrationRun"
         },
         {
+          "anchor": "DisplayCalibrationTrace",
+          "files": [
+            "app/src/main/kotlin/com/tideo/autobrightness/app/runtime/DisplayCalibrationTrace.kt"
+          ],
+          "symbol": "com.tideo.autobrightness.app.runtime.DisplayCalibrationTrace"
+        },
+        {
           "anchor": "HandoffCoordinator",
           "files": [
             "app/src/main/kotlin/com/tideo/autobrightness/app/runtime/HandoffCoordinator.kt"
@@ -499,6 +506,7 @@
             "anchors": [
               "DisplayBrightnessReader",
               "DisplayCalibrationRun",
+              "DisplayCalibrationTrace",
               "HandoffCoordinator"
             ],
             "path": "app/src/main/kotlin/com/tideo/autobrightness/app/runtime/BrightnessPipelineController.kt"
@@ -508,6 +516,7 @@
             "anchors": [
               "DisplayBrightnessReader",
               "DisplayCalibration",
+              "DisplayCalibrationTrace",
               "HandoffCoordinator"
             ],
             "path": "app/src/main/kotlin/com/tideo/autobrightness/app/runtime/DisplayCalibrationRun.kt"
@@ -586,6 +595,7 @@
         ],
         "owners": [
           "app/src/main/kotlin/com/tideo/autobrightness/app/runtime/DisplayCalibrationRun.kt",
+          "app/src/main/kotlin/com/tideo/autobrightness/app/runtime/DisplayCalibrationTrace.kt",
           "app/src/main/kotlin/com/tideo/autobrightness/app/runtime/HandoffCoordinator.kt",
           "app/src/main/kotlin/com/tideo/autobrightness/app/runtime/HighBrightnessUpdates.kt",
           "app/src/main/kotlin/com/tideo/autobrightness/app/settings/DisplayCalibrationStore.kt",

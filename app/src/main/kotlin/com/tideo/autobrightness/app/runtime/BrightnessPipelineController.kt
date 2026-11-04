@@ -46,6 +46,7 @@ class BrightnessPipelineController(
     handoffSink: HandoffSink = NoOpHandoffSink,
     displayReader: DisplayBrightnessReader = NoDisplayBrightnessReader,
     calibrationSink: DisplayCalibrationSink = NoOpDisplayCalibrationSink,
+    calibrationTrace: (String) -> Unit = DisplayCalibrationTrace::logcat,
 ) : ControllerHook, PipelineRuntimeContext {
 
     private val engine = BrightnessEngine()
@@ -67,7 +68,8 @@ class BrightnessPipelineController(
     private val debugEmitter = PipelineDebugEmitter(debugSink)
     private val panicHandler = PanicHandler(brightness, dimming)
     private val handoff = HandoffCoordinator(this, brightness, dimming, clock, handoffSink)
-    private val calibration = DisplayCalibrationRun(this, brightness, dimming, handoff, displayReader, calibrationSink, clock)
+    private val calibration =
+        DisplayCalibrationRun(this, brightness, dimming, handoff, displayReader, calibrationSink, clock, calibrationTrace)
     private val cycleRunner = PipelineCycleRunner(
         ctx = this,
         engine = engine,

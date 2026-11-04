@@ -5,6 +5,9 @@ import com.tideo.autobrightness.domain.brightness.DisplayCalibration
 import com.tideo.autobrightness.domain.brightness.DisplayCalibration.Point
 import com.tideo.autobrightness.platform.brightness.DisplayBrightnessReader
 import com.tideo.autobrightness.platform.brightness.DisplayBrightnessSample
+import com.tideo.autobrightness.platform.brightness.DisplayBrightnessRead
+import com.tideo.autobrightness.platform.brightness.DumpAttempt
+import com.tideo.autobrightness.platform.brightness.DumpStatus
 import com.tideo.autobrightness.platform.brightness.BrightnessWriteResult
 import com.tideo.autobrightness.platform.brightness.ScreenBrightnessController
 import com.tideo.autobrightness.platform.observe.BrightnessObserver
@@ -104,6 +107,12 @@ class HandoffPipelineTest {
         var raw: (Int) -> Double = { it * 16.0 }
         override suspend fun read(field: String?): DisplayBrightnessSample? =
             if (answers) DisplayBrightnessSample("mScreenBrightness", raw(brightness.current)) else null
+
+        override suspend fun trace(field: String?): DisplayBrightnessRead {
+            val sample = read(field)
+            val status = if (sample == null) DumpStatus.UNAVAILABLE else DumpStatus.SAMPLE
+            return DisplayBrightnessRead(sample, listOf(DumpAttempt("DUMP", status, sample, 0)), listOf("mAppliedLowPower=false"))
+        }
     }
 
     private class Calibrations : DisplayCalibrationSink {
@@ -136,6 +145,7 @@ class HandoffPipelineTest {
         val flashes = mutableListOf<Boolean>()
         val display = Display(brightness)
         val calibrations = Calibrations()
+        val traces = mutableListOf<String>()
         var settings = initial
         var settingsReadMs = 0L
         var nowMs = 1_000L
@@ -151,6 +161,7 @@ class HandoffPipelineTest {
             handoffSink = { flashes += it },
             displayReader = display,
             calibrationSink = calibrations,
+            calibrationTrace = { traces += it },
         )
         val state: PipelineState get() = controller.state.value
 
@@ -202,6 +213,41 @@ class HandoffPipelineTest {
     }
 
     @Test
+    fun calibration_tracesEachLevel_theDumpsCeilingLines_andASummary() = runTest {
+        val rig = Rig(this)
+        rig.controller.start()
+        rig.reading(500.0)
+
+        rig.controller.calibrateDisplay()
+        advanceUntilIdle()
+        assertNotNull(rig.calibrations.finished.single())
+        val levels = rig.traces.filter { it.startsWith("level ") }
+        assertEquals(DisplayCalibration.LEVELS.map { "level $it" }, levels.map { it.substringBefore(":") })
+        assertTrue(levels.all { "stable at" in it && "DUMP:sample:mScreenBrightness=" in it }, levels.toString())
+        assertEquals("dump: mAppliedLowPower=false", rig.traces[rig.traces.size - 2])
+        assertTrue(rig.traces.last().startsWith("summary: calibrated, 13 points, field mScreenBrightness, restore landed"), rig.traces.last())
+
+        rig.traces.clear()
+        rig.display.raw = { minOf(it, 100) * 16.0 }
+        rig.controller.calibrateDisplay()
+        advanceUntilIdle()
+        val stalled = DisplayCalibration.LEVELS.first { it > 100 }
+        assertTrue(rig.traces.single { it.startsWith("level $stalled:") }.startsWith("level $stalled: poll limit"))
+        assertTrue(rig.traces.last().startsWith("summary: failed (level $stalled: no stable reading), restore landed"), rig.traces.last())
+
+        rig.traces.clear()
+        rig.display.answers = false
+        rig.controller.calibrateDisplay()
+        advanceUntilIdle()
+        val first = DisplayCalibration.LEVELS.first()
+        val unread = rig.traces.single { it.startsWith("level ") }
+        assertTrue(unread.startsWith("level $first: poll limit") && "DUMP:unavailable:0ms" in unread, unread)
+        assertTrue(rig.traces.none { it.startsWith("dump:") }, "no read, so no dump lines from an earlier run")
+        assertTrue(rig.traces.last().startsWith("summary: failed (level $first: no stable reading)"), rig.traces.last())
+        rig.close()
+    }
+
+    @Test
     fun calibration_whileHandedOff_handsBackSilently_andTheCurveHandsOffAgain_DD077() = runTest {
         val rig = Rig(this)
         rig.handedOffAt(30_000.0)
@@ -234,6 +280,7 @@ class HandoffPipelineTest {
         assertEquals(listOf<DisplayCalibrationRecord?>(null), rig.calibrations.finished)
         assertEquals(writes, rig.brightness.writes.size)
         assertEquals(forced, rig.brightness.manualForced, "never forces MANUAL")
+        assertEquals(listOf("refused: brightness mode is not manual"), rig.traces)
         assertTrue(rig.brightness.automatic)
         rig.brightness.automatic = false
         rig.close()

@@ -16,7 +16,7 @@
   starts before then.
 - **D1–D4 are decided** (owner; DE-027): D1 (a), amended by the review so a plateau becomes the
   HBM threshold only when the dump corroborates it; D2 (a), against the recommendation, on
-  purpose; D3 (a); D4 (a). Unit 1 has the owner's go-ahead (2026-11-04).
+  purpose; D3 (a); D4 (a). Unit 1 landed on 2026-11-04 (DE-029): logcat tag `TideoCalibration`.
 - Evidence: a reporter's `dumpsys display`, relayed by the owner, read against
   `DisplayCalibrationRun`, `DisplayCalibration` and `DisplayBrightnessDump` at `3512908`
   (DE-005); the review checked against `HighBrightnessUpdates` and `DumpsysDisplayBrightnessReader`
@@ -91,8 +91,7 @@ Four gaps, in four code units:
   `mCachedBrightnessInfo.hbmTransitionPoint`, `.brightnessMax` and `.brightnessMaxReason`, and
   `mHbmData`, plus `mAppliedLowPower`, since battery saver scales every reading (DE-027). The F4
   prints `brightnessMaxReason =0`, with a space before `=`. `DisplayBrightnessDump.filter` also
-  runs inside the Shizuku user service, so check whether its `version(4)` must move with it
-  (DE-001).
+  runs inside the Shizuku user service, so the helper's version moved from 4 to 5 (DE-029).
 - **The sweep logs one line per level**: the level written; each read's source, status, field, raw
   and elapsed ms; and how the window ended. It also logs the corroboration lines once per run, and
   a summary line.
@@ -269,7 +268,7 @@ Four gaps, in four code units:
   Owner queue, with battery saver off; the HyperOS plan's reporter checks no longer carry it
   (DE-024):
   - first, from the corrected build (that plan's Unit 1 with this plan's Unit 1), the trace and
-    the dump of a failed run: start `adb logcat -s <this plan's trace tag> > trace.txt`,
+    the dump of a failed run: start `adb logcat -s TideoCalibration > trace.txt`,
     calibrate, then at once run `adb shell dumpsys display > display.txt`, and attach both. The
     trace gives the failing level, each read's source, field, raw samples and elapsed time; the
     dump's event log gives each level's `brt` and `unclampedBrt`. A shell

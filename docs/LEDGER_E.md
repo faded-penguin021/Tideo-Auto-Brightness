@@ -350,7 +350,7 @@
   only a two-space `pull_request:` line, so a filter or `if:` that skipped a PR is settled against
   its checks by hand; `actions/github-script` and `softprops/action-gh-release` were the two pins
   they listed on 2026-11-03.
-- DE-027: **Calibration D2 (a), D3 (a) and D4 (a) are decided (owner, 2026-11-04): above a
+- DE-027 [cited]: **Calibration D2 (a), D3 (a) and D4 (a) are decided (owner, 2026-11-04): above a
   verified boundary the readout keeps AAB's slope, each failure cause gets its own message, and a
   plateau the dump does not corroborate fails the run.** D2 (a) was chosen over the recommended
   (b) on purpose, so the calibration plan's Unit 3 keeps only the raw-based HBM flag. The F4
@@ -363,3 +363,10 @@
   would store points 10 % low or fail an honest ceiling's corroboration. The check runs once,
   before the first write; switching battery saver on mid-sweep or during a later readout is
   accepted, not checked.
+- DE-029: **A display calibration logs what it saw under logcat tag `TideoCalibration`: one line per
+  level with each read's source, status, field, raw and elapsed ms, the answering dump's ceiling
+  lines, and a summary (calibration plan Unit 1, 2026-11-04).** Sources now report unavailable,
+  failed, no field or a sample, so a later unit can tell a missing grant from a slow or empty
+  read; reads, sources, windows and outcomes are unchanged. The filter keeps up to 8 ceiling
+  lines apart from the 32 brightness lines, so the Shizuku helper's version moved from 4 to 5.
+  Shizuku turning unusable still releases the held helper (DE-001).
