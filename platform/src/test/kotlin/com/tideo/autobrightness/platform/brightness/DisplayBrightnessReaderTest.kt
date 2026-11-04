@@ -2,7 +2,9 @@ package com.tideo.autobrightness.platform.brightness
 
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class DisplayBrightnessReaderTest {
@@ -72,6 +74,28 @@ class DisplayBrightnessReaderTest {
         assertEquals(f4Ceiling.lines() + "  mScreenBrightness=9.7704E-4", kept.lines())
         assertEquals(f4Ceiling.lines().map { it.trim() }, DisplayBrightnessDump.corroboration(kept))
         assertEquals(DisplayBrightnessSample("mScreenBrightness", 9.7704E-4), DisplayBrightnessDump.parse(kept, null))
+    }
+
+    @Test
+    fun theF4sCeilingLines_verifyItsTransitionPoint_withTheSpacedMaxReason() {
+        val lines = DisplayBrightnessDump.corroboration(f4Ceiling)
+        assertTrue(DisplayBrightnessDump.isHbmBoundary(lines, 0.49975574))
+        assertFalse("battery saver's 0.9 plateau (DE-027)", DisplayBrightnessDump.isHbmBoundary(lines, 0.44978))
+    }
+
+    @Test
+    fun aBoundaryNeedsAPrintedTransition_andNoOtherCapThatIsPrinted() {
+        fun verified(vararg lines: String) = DisplayBrightnessDump.isHbmBoundary(lines.toList(), 0.63)
+        assertTrue(verified("mHbmData=HBM{minLux: 10000.0, transition: 0.63, timeWindow: 0ms}"))
+        assertTrue(verified("mCachedBrightnessInfo.hbmTransitionPoint=0.63", "mCachedBrightnessInfo.brightnessMax=0.63"))
+        assertFalse(verified("mAppliedLowPower=false"))
+        assertFalse(verified("mCachedBrightnessInfo.brightnessMax=0.63"))
+        assertFalse(verified("mCachedBrightnessInfo.hbmTransitionPoint=Infinity", "mCachedBrightnessInfo.brightnessMax=0.63"))
+        assertFalse(verified("mCachedBrightnessInfo.hbmTransitionPoint=0.63", "mHbmData=HBM{minLux: 10000.0, transition: 0.7, timeWindow: 0ms}"))
+        assertFalse(verified("hbmTransitionPoint=0.63 mHbmData=HBM{minLux: 10000.0, transition: 0.7, timeWindow: 0ms}"))
+        assertFalse(verified("mCachedBrightnessInfo.hbmTransitionPoint=0.63", "mCachedBrightnessInfo.brightnessMax=0.5"))
+        assertFalse(verified("mCachedBrightnessInfo.hbmTransitionPoint=0.63", "mCachedBrightnessInfo.brightnessMaxReason =1"))
+        assertFalse(verified("mCachedBrightnessInfo.hbmTransitionPoint=0.63", "mCachedBrightnessInfo.brightnessMaxReason=THERMAL"))
     }
 
     @Test

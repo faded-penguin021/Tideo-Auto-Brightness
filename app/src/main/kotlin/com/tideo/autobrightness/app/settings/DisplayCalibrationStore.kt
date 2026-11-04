@@ -2,6 +2,7 @@ package com.tideo.autobrightness.app.settings
 
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.doublePreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import com.tideo.autobrightness.app.runtime.DisplayCalibrationRecord
@@ -29,7 +30,7 @@ class DisplayCalibrationStore(
         if (prefs[BUILD] != build) return@map Status.Needed
         val calibration = DisplayCalibration.decode(encoded)
         val field = prefs[FIELD]
-        if (calibration == null || field == null) Status.Uncalibrated else Status.Calibrated(DisplayCalibrationRecord(calibration, field))
+        if (calibration == null || field == null) Status.Uncalibrated else Status.Calibrated(DisplayCalibrationRecord(calibration, field, prefs[HBM]))
     }
 
     suspend fun current(): DisplayCalibrationRecord? = (status.first() as? Status.Calibrated)?.record
@@ -39,10 +40,13 @@ class DisplayCalibrationStore(
             if (record == null) {
                 it[CALIBRATION] = FAILED
                 it.remove(FIELD)
+                it.remove(HBM)
             } else {
                 it[CALIBRATION] = record.calibration.encode()
                 it[FIELD] = record.field
                 it[BUILD] = build
+                val boundary = record.hbmBoundary
+                if (boundary != null) it[HBM] = boundary else it.remove(HBM)
             }
         }
     }
@@ -51,6 +55,7 @@ class DisplayCalibrationStore(
         const val FAILED = "error"
         val CALIBRATION = stringPreferencesKey("display_calibration")
         val FIELD = stringPreferencesKey("display_calibration_field")
+        val HBM = doublePreferencesKey("display_calibration_hbm")
         val BUILD = stringPreferencesKey("display_calibration_build")
     }
 }

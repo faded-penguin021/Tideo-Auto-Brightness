@@ -39,10 +39,10 @@ investigation stays closed (DB-051…DB-060), and Scorecard.dev is a run-once lo
   [x] 0 plan · [ ] 1 dimming readout · [ ] 2 brightness labels · [ ] 3 PWM dimming chart ·
   [ ] 4 `keepGlobalsFrom` · [ ] 5 formula dedups · [ ] 6 engine `dimDynamic` · [ ] 7 AGENTS.md rule · [ ] 8 close-out.
 - **Display calibration (Pixel and HyperOS confirmed)** —
-  `docs/plans/DISPLAY_CALIBRATION_CEILING.md`, spec only (owner, 2026-10-26; DE-005, revised
+  `docs/plans/DISPLAY_CALIBRATION_CEILING.md`, Units 1–2 in code (owner, 2026-10-26; DE-005, revised
   DE-015). D1 (a), amended; D2 (a), D3 (a), D4 (a) (DE-027); battery saver refuses a run
   (DE-028). It and the HyperOS plan are the current stage; each unit runs on the owner's go-ahead.
-  [x] 0 plan · [x] 1 calibration trace (DE-029) · [ ] 2 corroborated ceiling, stored · [ ] 3 readout and
+  [x] 0 plan · [x] 1 calibration trace (DE-029) · [x] 2 corroborated ceiling, stored (DE-030) · [ ] 3 readout and
   HBM flag (one release with 2) · [ ] 4 failure causes · [ ] 5 device checks and close-out.
 - **HyperOS brightness scale** — `docs/plans/HYPEROS_SETTING_SCALE.md` (owner, 2026-10-31;
   DE-014, revised DE-016); issue #157 is the report (DE-017). D1 (a) and D2 (b) decided (DE-018);
@@ -81,13 +81,7 @@ investigation stays closed (DB-051…DB-060), and Scorecard.dev is a run-once lo
    redact-tool-output scripts/guards/*.sh` prints a nonzero count, or a STATE changelog line records
    (b).
 
-3. **[2026-11-04] Before calibration Unit 2, grep the Pixel reporter's dump for
-   `brightnessMaxReason`.** Unit 2's corroboration needs it to rule out other caps; the F4's dump
-   has it (`brightnessMaxReason =0`, DE-027), the Pixel's was never checked. Settles it:
-   `grep -c brightnessMaxReason <the Pixel dump>` prints 1 or more, or prints 0 and Unit 2's DE
-   row says the rule uses only the fields shown on that panel.
-
-4. **[2026-10-28] Watch the first release on Ubuntu 26.04; no PR can run the release workflows.**
+3. **[2026-10-28] Watch the first release on Ubuntu 26.04; no PR can run the release workflows.**
    CI moved to `ubuntu-26.04` (DE-009), but `release.yml` runs only on a tag, so its first run
    there is the next release. If Dependabot's #159 merges first, that run is also the first of its
    new pins in `release.yml`, and `release-signing.yml` runs them only on a dispatch, which you
@@ -110,6 +104,10 @@ proposing work; changing it is legislation under RUNBOOK's rule-review protocol.
 
 Newest first; ledger rows are the durable detail.
 
+- 2026-11-04 — **Calibration Unit 2: a plateau at level 128 or above is confirmed at 255 and stored
+  as `255:<plateau>` with `display_calibration_hbm` only when the dump's transition point matches;
+  an uncorroborated one fails (DE-030). Owner queue item 3, the Pixel-dump grep, is closed: the rule
+  checks `brightnessMaxReason` only where printed. Unit 3 must ship in the same release.**
 - 2026-11-04 — **Calibration Unit 1: the sweep logs each level's reads, sources, statuses and
   times, the dump's ceiling lines and a summary under logcat tag `TideoCalibration`; behaviour
   unchanged, Shizuku helper version 5 (DE-029).**
@@ -126,7 +124,7 @@ Newest first; ledger rows are the durable detail.
 - 2026-11-03 — **Playbook 8 on Dependabot #159, six github-actions bumps in one grouped PR: each
   pin is its tag's commit, resolved by hand; no old SHA is left and `action-pins.sh` passes on its
   tree; every new pin still declares `node24`, so `build.yml`'s policy block needs no edit; its CI
-  was green on 2026-11-01, `fdroid-compat` included (Owner queue 4 for the release workflows).**
+  was green on 2026-11-01, `fdroid-compat` included (the Owner queue's Ubuntu 26.04 release item).**
 - 2026-11-03 — **STATE compressed by stage; `Current state` corrected to DE-023's 0–255 scale,
   and DC-026 gains its pointer to DE-023.**
 - 2026-10-31..11-02 — **HyperOS scale planned and decided from a POCO F4 reporter's fork and #157

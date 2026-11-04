@@ -2,7 +2,7 @@
 
 ## Status
 
-- **Spec only. No code has changed.** On 2026-10-26 the owner asked for the best way forward on
+- **Units 1 and 2 are code (DE-029, DE-030); the rest is spec.** On 2026-10-26 the owner asked for the best way forward on
   the Pixel whose display calibration fails with "grant the DUMP permission", and authorised
   **Unit 0 only**: this file, ledger row DE-005 and the STATE entries. Every later unit needs the
   owner's go-ahead.
@@ -17,6 +17,7 @@
 - **D1–D4 are decided** (owner; DE-027): D1 (a), amended by the review so a plateau becomes the
   HBM threshold only when the dump corroborates it; D2 (a), against the recommendation, on
   purpose; D3 (a); D4 (a). Unit 1 landed on 2026-11-04 (DE-029): logcat tag `TideoCalibration`.
+  Unit 2 landed on 2026-11-04 (DE-030); Unit 3 must follow it in the same release.
 - Evidence: a reporter's `dumpsys display`, relayed by the owner, read against
   `DisplayCalibrationRun`, `DisplayCalibration` and `DisplayBrightnessDump` at `3512908`
   (DE-005); the review checked against `HighBrightnessUpdates` and `DumpsysDisplayBrightnessReader`
@@ -130,14 +131,15 @@ Four gaps, in four code units:
 
   The dumps so far: the Pixel's transition and `brightnessMax` are both 0.63, its plateau
   (DE-005). The F4 shows a transition of 0.49975574 and, at 0 lx, `brightnessMax` equal to it,
-  but no plateau yet (DE-014, DE-017). The OnePlus reads
+  and the reporter's manual sweep plateaus there (DE-014, DE-017, DE-027). The OnePlus reads
   `Infinity` and never plateaus (DD-083).
 - **Otherwise it is an observed ceiling** and never becomes the HBM threshold. D4 decides whether
   the run fails or stores it.
-- **Precondition.** The F4's full dump carries `brightnessMaxReason =0` (#157, DE-027). The
-  Pixel's is unchecked: before this unit relies on the field, the owner greps that dump for it,
-  or Unit 1's trace shows it on the Pixel. If it is absent there, the rule uses only the fields
-  shown on that panel, and the DE row says so.
+- **Precondition, settled by the rule (DE-030).** The F4's full dump carries
+  `brightnessMaxReason =0` (#157, DE-027); the Pixel's is unchecked. The rule therefore requires
+  only a printed transition point, and checks `brightnessMax` and `brightnessMaxReason` where the
+  dump prints them, so it never relies on a field the Pixel may lack. Unit 5's Pixel trace shows
+  which lines that panel prints.
 - **Battery saver: refused, decided (owner, 2026-11-04; DE-028).** The F4's plateau under battery
   saver is 0.44978, 0.9 times the printed transition point, so the corroboration above would fail
   there (DE-027). Unit 4 refuses to start a calibration while battery saver is on.
@@ -159,13 +161,14 @@ Four gaps, in four code units:
   points and no key. The non-plateau path of `readStable` is untouched, including DD-079's "a
   point whose last read ends past the 3 s window still counts".
 - **Cost.** On a ceiling panel the sweep takes about 15 s, not 8 s: one full window on the
-  plateau, one at 255. It writes 12 levels, not 13.
+  plateau, one at 255. It writes 12 levels, not 13, or 14 when the plateau first shows at 255,
+  which is written again for its own window.
 - **Known approximation.** Between the last rising point and the boundary the readout is
   interpolated toward 255. On this Pixel 0.61 reads 207, where setting 156 produces it. The
   setting cannot express the jump from 161 to 255, so this is accepted (see "Deliberately left
   alone").
 - **Tests** (`HandoffPipelineTest`, `DisplayCalibrationTest`, a store round trip):
-  - a Pixel-shaped panel, `raw = (min(level, 161) − 1) / 254`, whose dump shows a transition
+  - a Pixel-shaped panel, `raw = min((level − 1) / 254, 0.63)`, whose dump shows a transition
     point of 0.63, calibrates with the points above and stores the boundary 0.63. The writes are
     1…200, 255, then the restore;
   - **a temporary cap above level 128**: flat at 0.7 from about level 179, while the dump shows a

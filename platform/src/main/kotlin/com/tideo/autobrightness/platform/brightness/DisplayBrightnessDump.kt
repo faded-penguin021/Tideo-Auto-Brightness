@@ -89,4 +89,17 @@ object DisplayBrightnessDump {
 
     fun corroboration(output: String): List<String> =
         output.lineSequence().filter { !FIELD.containsMatchIn(it) && CORROBORATION.containsMatchIn(it) }.map { it.trim() }.toList()
+
+    private val TRANSITION = Regex("""(?:hbmTransitionPoint\s*=|(?<![A-Za-z])transition:)\s*([^\s,}]+)""")
+    private val MAX = Regex("""brightnessMax\s*=\s*([^\s,}]+)""")
+    private val MAX_REASON = Regex("""brightnessMaxReason\s*=\s*(\S+)""")
+
+    fun isHbmBoundary(corroboration: List<String>, plateau: Double): Boolean {
+        fun values(regex: Regex) = corroboration.flatMap { line -> regex.findAll(line).map { it.groupValues[1] } }
+        val transitions = values(TRANSITION)
+        return transitions.isNotEmpty() &&
+            transitions.all { it.toDoubleOrNull() == plateau } &&
+            values(MAX).all { it.toDoubleOrNull() == plateau } &&
+            values(MAX_REASON).all { it == "0" }
+    }
 }

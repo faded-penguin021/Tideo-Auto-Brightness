@@ -370,3 +370,12 @@
   read; reads, sources, windows and outcomes are unchanged. The filter keeps up to 8 ceiling
   lines apart from the 32 brightness lines, so the Shizuku helper's version moved from 4 to 5.
   Shizuku turning unusable still releases the held helper (DE-001).
+- DE-030 [cited]: **A display calibration whose readings hold on the previous point for a whole
+  window, at level 128 or above, writes 255 for one more window and stores `255:<plateau>` with
+  `display_calibration_hbm` only when the dump corroborates it; otherwise it fails (calibration
+  plan Unit 2, D1, D4 (a), 2026-11-04).** This departs from `_CalibrateDisplayRange`, which fails
+  every plateau (DD-078). Corroboration needs at least one printed transition point
+  (`hbmTransitionPoint`, or `mHbmData`'s `transition:`) and every printed one equal to the
+  plateau, while `brightnessMax` and `brightnessMaxReason`, spaced `=` included, are checked only
+  where the dump prints them, so the Pixel's unchecked dump cannot block it. A plateau first seen
+  at 255 still gets its own window at 255 (Sol).

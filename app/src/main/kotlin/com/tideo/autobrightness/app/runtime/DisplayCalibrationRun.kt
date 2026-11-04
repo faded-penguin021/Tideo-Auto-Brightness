@@ -2,6 +2,7 @@ package com.tideo.autobrightness.app.runtime
 
 import com.tideo.autobrightness.domain.brightness.DisplayCalibration
 import com.tideo.autobrightness.domain.brightness.DisplayCalibration.Point
+import com.tideo.autobrightness.platform.brightness.DisplayBrightnessDump
 import com.tideo.autobrightness.platform.brightness.DisplayBrightnessReader
 import com.tideo.autobrightness.platform.brightness.DisplayBrightnessSample
 import com.tideo.autobrightness.platform.brightness.ScreenBrightnessController
@@ -10,7 +11,7 @@ import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 
-data class DisplayCalibrationRecord(val calibration: DisplayCalibration, val field: String)
+data class DisplayCalibrationRecord(val calibration: DisplayCalibration, val field: String, val hbmBoundary: Double? = null)
 
 interface DisplayCalibrationSink {
     suspend fun started()
@@ -89,11 +90,27 @@ internal class DisplayCalibrationRun(
             if (!brightness.write(level).landed()) return fail("level $level: write refused")
             if (i == 0) delay(FIRST_POINT_SETTLE_MS)
             val raw = readStable(level, previous) ?: return fail("level $level: no stable reading")
+            if (raw == previous) {
+                if (points.last().level < PLATEAU_FLOOR) return fail("level $level: no stable reading")
+                return ceiling(points, raw)
+            }
             points += Point(level, raw)
             previous = raw
         }
+        return record(points, null)
+    }
+
+    private suspend fun ceiling(points: MutableList<Point>, plateau: Double): DisplayCalibrationRecord? {
+        if (!brightness.write(TOP).landed()) return fail("level $TOP: write refused")
+        if (readStable(TOP, plateau) != plateau) return fail("level $TOP: left the plateau at $plateau")
+        if (!DisplayBrightnessDump.isHbmBoundary(corroboration, plateau)) return fail("plateau at $plateau not corroborated by the dump")
+        points[points.lastIndex] = Point(TOP, plateau)
+        return record(points, plateau)
+    }
+
+    private fun record(points: List<Point>, hbmBoundary: Double?): DisplayCalibrationRecord? {
         val field = lockedField ?: return fail("no field locked")
-        return DisplayCalibration.of(points)?.let { DisplayCalibrationRecord(it, field) } ?: fail("readings did not rise")
+        return DisplayCalibration.of(points)?.let { DisplayCalibrationRecord(it, field, hbmBoundary) } ?: fail("readings did not rise")
     }
 
     private fun fail(reason: String): DisplayCalibrationRecord? {
@@ -104,16 +121,19 @@ internal class DisplayCalibrationRun(
     private fun summarize(record: DisplayCalibrationRecord?, restored: Boolean, elapsedMs: Long) {
         if (corroboration.isNotEmpty()) trace("dump: " + corroboration.joinToString(" | "))
         val outcome = when {
-            record != null -> "calibrated, ${record.calibration.points.size} points, field ${record.field}"
+            record != null -> "calibrated, ${record.calibration.points.size} points, field ${record.field}" +
+                record.hbmBoundary?.let { ", hbm boundary $it" }.orEmpty()
             !restored -> "failed (restore refused)"
             else -> "failed (${failure ?: "interrupted"})"
         }
         trace("summary: $outcome, restore ${if (restored) "landed" else "refused"}, ${elapsedMs}ms")
     }
 
-    /** Waits until the reading stops ramping, has left the previous point, and repeats. */
+    /** A repeated reading that left [previous]; [previous] itself when the whole window held on it (DE-030). */
     private suspend fun readStable(level: Int, previous: Double): Double? {
         var last: Double? = null
+        var held = 0
+        var differed = false
         val start = clock()
         val polls = ArrayList<String>(MAX_POLLS)
         var end = "poll limit"
@@ -130,7 +150,13 @@ internal class DisplayCalibrationRun(
                 end = "stable at $raw"
                 break
             }
+            if (raw != null && raw != previous) differed = true
+            held = if (raw == previous) held + 1 else 0
             last = raw
+        }
+        if (accepted == null && !differed && held >= 2) {
+            accepted = previous
+            end += ", plateau at $previous"
         }
         trace("level $level: $end after ${clock() - start}ms; polls: ${polls.joinToString(" | ")}")
         return accepted
@@ -141,7 +167,7 @@ internal class DisplayCalibrationRun(
         polls += DisplayCalibrationTrace.poll(read)
         val sample: DisplayBrightnessSample = read.sample ?: return null
         if (lockedField == null) lockedField = sample.field
-        if (read.corroboration.isNotEmpty()) corroboration = read.corroboration
+        corroboration = read.corroboration
         return sample.raw
     }
 
@@ -153,5 +179,7 @@ internal class DisplayCalibrationRun(
         const val POLL_MS = 150L
         const val STABLE_WINDOW_MS = 3_000L
         const val MAX_POLLS = (STABLE_WINDOW_MS / POLL_MS).toInt()
+        const val PLATEAU_FLOOR = 128
+        val TOP = DisplayCalibration.LEVELS.last()
     }
 }

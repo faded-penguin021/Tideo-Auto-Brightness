@@ -837,6 +837,12 @@ N lx". Watch Live Debug's Light Sensor card for smoothed lux.
     Android's brightness, above 255 when the OEM boosts past its normal maximum (`adb shell
     dumpsys display | grep mScreenBrightness` above `mScreenBrightnessNormalMaximum`), with "High
     Brightness Mode activated" flashed once. Uncalibrated, the readout stops at 255.
+    **Ceiling panel** (a Pixel, the POCO F4; battery saver off): the sweep stops rising below the
+    top, then jumps to 255 for one more window, about 15 s in all. **Expected:** "Calibrated", and
+    `adb shell run-as com.tideo.autobrightness.debug cat files/datastore/display_prefs.preferences_pb | grep -a display_calibration`
+    shows a last point `255:` at the dump's `hbmTransitionPoint` plus `display_calibration_hbm`;
+    `adb logcat -s TideoCalibration` names the plateau. A plateau the dump does not match fails
+    the run and stores no boundary (DE-030).
 
 ---
 

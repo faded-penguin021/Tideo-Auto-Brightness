@@ -105,13 +105,14 @@ class HandoffPipelineTest {
     private class Display(private val brightness: ModeBrightness) : DisplayBrightnessReader {
         var answers = true
         var raw: (Int) -> Double = { it * 16.0 }
+        var ceilingLines = listOf("mAppliedLowPower=false")
         override suspend fun read(field: String?): DisplayBrightnessSample? =
             if (answers) DisplayBrightnessSample("mScreenBrightness", raw(brightness.current)) else null
 
         override suspend fun trace(field: String?): DisplayBrightnessRead {
             val sample = read(field)
             val status = if (sample == null) DumpStatus.UNAVAILABLE else DumpStatus.SAMPLE
-            return DisplayBrightnessRead(sample, listOf(DumpAttempt("DUMP", status, sample, 0)), listOf("mAppliedLowPower=false"))
+            return DisplayBrightnessRead(sample, listOf(DumpAttempt("DUMP", status, sample, 0)), ceilingLines)
         }
     }
 
@@ -205,6 +206,7 @@ class HandoffPipelineTest {
         assertEquals(1, rig.calibrations.started)
         assertEquals("mScreenBrightness", record.field)
         assertEquals(DisplayCalibration.LEVELS.map { Point(it, it * 16.0) }, record.calibration.points)
+        assertNull(record.hbmBoundary, "a rising panel stores no boundary")
         val writes = rig.brightness.writes.drop(before)
         assertEquals(DisplayCalibration.LEVELS + applied, writes.take(14), "13 levels, then the level found")
         assertEquals(applied, rig.brightness.current, "Set Initial Brightness runs again afterwards")
@@ -244,6 +246,76 @@ class HandoffPipelineTest {
         assertTrue(unread.startsWith("level $first: poll limit") && "DUMP:unavailable:0ms" in unread, unread)
         assertTrue(rig.traces.none { it.startsWith("dump:") }, "no read, so no dump lines from an earlier run")
         assertTrue(rig.traces.last().startsWith("summary: failed (level $first: no stable reading)"), rig.traces.last())
+        rig.close()
+    }
+
+    private val pixelCeiling = listOf(
+        "mCachedBrightnessInfo.brightnessMax=0.63",
+        "mCachedBrightnessInfo.hbmTransitionPoint=0.63",
+        "mCachedBrightnessInfo.brightnessMaxReason =0",
+        "mHbmData=HBM{minLux: 10000.0, transition: 0.63, timeWindow: 0ms}",
+    )
+
+    private fun cappedAt(cap: Double): (Int) -> Double = { minOf((it - 1) / 254.0, cap) }
+
+    @Test
+    fun calibration_onAPixelShapedCeiling_confirmsAt255_andStoresTheCorroboratedBoundary_DE030() = runTest {
+        val rig = Rig(this)
+        rig.controller.start()
+        rig.reading(500.0)
+        val applied = rig.brightness.current
+        val before = rig.brightness.writes.size
+        rig.display.raw = cappedAt(0.63)
+        rig.display.ceilingLines = pixelCeiling
+
+        rig.controller.calibrateDisplay()
+        advanceUntilIdle()
+
+        val record = assertNotNull(rig.calibrations.finished.single())
+        val rising = DisplayCalibration.LEVELS.filter { it <= 150 }
+        assertEquals(rising.map { Point(it, (it - 1) / 254.0) } + Point(255, 0.63), record.calibration.points)
+        assertEquals(0.63, record.hbmBoundary)
+        val writes = rig.brightness.writes.drop(before)
+        assertEquals(DisplayCalibration.LEVELS.filter { it <= 200 } + 255 + applied, writes.take(13), "12 levels, then the level found")
+        assertTrue("plateau at 0.63" in rig.traces.single { it.startsWith("level 200:") })
+        assertTrue(rig.traces.last().startsWith("summary: calibrated, 10 points, field mScreenBrightness, hbm boundary 0.63"), rig.traces.last())
+
+        val top = (225 - 1) / 254.0
+        rig.display.raw = cappedAt(top)
+        rig.display.ceilingLines = listOf("mCachedBrightnessInfo.hbmTransitionPoint=$top")
+        val again = rig.brightness.writes.size
+        rig.controller.calibrateDisplay()
+        advanceUntilIdle()
+        assertEquals(Point(255, top), assertNotNull(rig.calibrations.finished.last()).calibration.points.last())
+        assertEquals(DisplayCalibration.LEVELS + 255, rig.brightness.writes.drop(again).take(14), "a plateau first seen at 255 is written again")
+        assertEquals(2, rig.traces.count { it.startsWith("level 255:") && "plateau at $top" in it }, "and gets its own window")
+        rig.close()
+    }
+
+    @Test
+    fun calibration_failsAPlateauTheDumpDoesNotCorroborate_orThatLeavesItAt255_DE030() = runTest {
+        val rig = Rig(this)
+        rig.controller.start()
+        rig.reading(500.0)
+        val applied = rig.brightness.current
+        suspend fun calibrate(raw: (Int) -> Double, lines: List<String>, reason: String) {
+            rig.traces.clear()
+            rig.display.raw = raw
+            rig.display.ceilingLines = lines
+            rig.controller.calibrateDisplay()
+            advanceUntilIdle()
+            assertNull(rig.calibrations.finished.last(), reason)
+            assertTrue(rig.traces.last().startsWith("summary: failed ($reason)"), rig.traces.last())
+            assertEquals(applied, rig.brightness.current)
+        }
+
+        val notCorroborated = "plateau at 0.7 not corroborated by the dump"
+        calibrate(cappedAt(0.7), listOf("mCachedBrightnessInfo.hbmTransitionPoint=Infinity"), notCorroborated)
+        calibrate(cappedAt(0.7), listOf("mCachedBrightnessInfo.hbmTransitionPoint=0.7", "mCachedBrightnessInfo.brightnessMaxReason =1"), notCorroborated)
+        val stuck = (150 - 1) / 254.0
+        calibrate({ (minOf(it, 150) - 1) / 254.0 }, listOf("mAppliedLowPower=false"), "plateau at $stuck not corroborated by the dump")
+        calibrate({ if (it == 255) 0.9 else cappedAt(0.63)(it) }, pixelCeiling, "level 255: left the plateau at 0.63")
+        assertEquals(4, rig.calibrations.finished.size)
         rig.close()
     }
 

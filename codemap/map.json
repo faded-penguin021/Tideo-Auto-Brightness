@@ -514,6 +514,7 @@
           {
             "ambiguous": [],
             "anchors": [
+              "DisplayBrightnessDump",
               "DisplayBrightnessReader",
               "DisplayCalibration",
               "DisplayCalibrationTrace",
