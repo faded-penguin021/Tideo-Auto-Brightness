@@ -426,3 +426,19 @@
   conclusion stands: the read side, the override check and the echo matching all read the int
   setting, so DisplayManager is still not the fix for DE-019's device. The faster-Shizuku plan's
   finer-steps unit carries the option behind its device gate.
+- DE-036: **A re-read of the light-refactor plan against `2ccac7e`, three weeks after it was
+  written, found its seven findings still true and three of its statements wrong; the owner
+  accepted the corrections (2026-11-11).** It called the brightness conversion path frozen and
+  cited DC-011, an unrelated row: the freeze was DC-019's, it ended with DC-026's ruling, and
+  DE-023 has since overruled part of that ruling, so its Decided non-items entry would have
+  declined what DE-019 already authorises and now says only that the three brightness APIs keep
+  separate contracts. Its hand-off unit proposed a new helper where
+  `HandoffRules.effectiveThreshold` already sat in `:domain`, tested and with no production
+  caller, and its shared global-fields helper was listed as no behaviour change although manual
+  load and import take `setupTitle` and `schemaVersion` from the incoming profile where a context
+  swap keeps the current ones. Two design changes came with it: the dimming coordinator publishes
+  its own readout, because `PanicHandler` holds no pipeline state and eight call sites would each
+  have had to zero it, and it takes the dim multiplier as its input so the engine-sourced unit
+  changes no signature. A spec-only plan's retained-decision list is a claim about the ledger on
+  the day it was written, so re-read it against the tree and the rows it cites before its first
+  unit runs.

@@ -35,7 +35,8 @@ investigation stays closed (DB-051…DB-060), and Scorecard.dev is a run-once lo
   event-driven readout · [ ] 10 push foreground app · [ ] 11 live HDR · [ ] 12 finer steps
   (optional) · [ ] 13 close-out.
 - **Light refactor of duplicated logic** — `docs/plans/LIGHT_REFACTOR_CONSOLIDATION.md`, spec only
-  (owner, 2026-10-21; D1–D5 decided). Each unit runs on the owner's go-ahead.
+  (owner, 2026-10-21; D1–D5 decided; re-read and corrected 2026-11-11, DE-036). Each unit runs on
+  the owner's go-ahead.
   [x] 0 plan · [ ] 1 dimming readout · [ ] 2 brightness labels · [ ] 3 PWM dimming chart ·
   [ ] 4 `keepGlobalsFrom` · [ ] 5 formula dedups · [ ] 6 engine `dimDynamic` · [ ] 7 AGENTS.md rule · [ ] 8 close-out.
 - **Display calibration (Pixel and HyperOS confirmed)** —
@@ -105,6 +106,11 @@ proposing work; changing it is legislation under RUNBOOK's rule-review protocol.
 ## Changelog
 
 Newest first; ledger rows are the durable detail.
+
+- 2026-11-11 — **Light-refactor plan re-read against the tree and corrected, spec only: its
+  conversion freeze is gone, Unit 5 reuses `HandoffRules.effectiveThreshold`, Unit 4 is a
+  behaviour change with its own row, and Unit 1's coordinator publishes the dimming readout
+  (DE-036, owner).**
 
 - 2026-11-11 — **Android 17 QPR2 (API 37.2) read against the tree: no breakage, nothing on
   ColorOS 17. The faster-Shizuku plan gains its 37.2 facts (Units 2, 7, 8, 12), and the
