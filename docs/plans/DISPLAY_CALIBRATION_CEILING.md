@@ -263,7 +263,9 @@ Four gaps, in four code units:
 - **The reporter's Pixel** (confirmed case). The owner has none (DD-087), so this goes to the
   Owner queue as a request to the reporter:
   - grant DUMP and calibrate. Expect "Calibrated" in about 15 s, and the trace's corroboration
-    lines showing the transition point 0.63;
+    lines showing the transition point 0.63. Ask also for
+    `adb shell getprop ro.build.version.sdk_full`, so a run on Android 17 QPR2 (37.2, which
+    promises no behaviour change) can be told apart from an earlier build;
   - hand off in direct sun at 10 000 lx or more. Expect the readout above 255 and "High
     Brightness Mode activated" once, while
     `adb shell dumpsys display | grep -E 'mHbmMode|hbmMax'` shows the mode on.

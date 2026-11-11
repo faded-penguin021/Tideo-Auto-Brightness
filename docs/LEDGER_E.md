@@ -290,6 +290,7 @@
   optional finer-steps unit, which reopens DC-026 on its own terms; on API 36.1 and up its
   permission-free `getBrightness` could at most help a user pick DE-019's choice as a Live Debug
   readout that never feeds the conversion.
+  Corrected by DE-035.
 - DE-021 [cited]: **Codemap Unit 6 wired `scripts/guards/codemap.sh` into the ladder, fail-closed,
   running `codemap.py check` against a committed `codemap/map.json` (D2 (a)); D3 stays (b), so the
   map carries no `unanchored` list (2026-11-01).** Every non-zero status from the tool becomes
@@ -391,3 +392,37 @@
   `display_calibration_error` holds the cause; an `error` stored without one reads as the neutral
   `NO_READING`, since its cause was never established. The battery-saver refusal also skips the
   Set Initial Brightness that follows a run (Sol).
+- DE-033: **Android 17 QPR2 (API 37.2, Pixel first, 2026-11-10) lets the Quick Settings slider
+  move brightness while an app holds a window brightness override, which earlier builds refused
+  as "controlled by the top app"; whether the drag writes `screen_brightness` is unconfirmed
+  (2026-11-11).** Tideo sees a manual change only through `BrightnessObserver`'s watch on that
+  setting, so a temporary override, which the announcement's "normal brightness behavior
+  automatically resumes" suggests, goes unseen, while a persisted one would pause auto mode and
+  show the Resume card like any manual write. Neither Google's QPR2 release notes nor the
+  37.1→37.2 API diff mention the slider; the diff adds only `screenBrightnessUnit`, defaulting to
+  RAW, to `LayoutParams` and `BRIGHTNESS_UNIT_RAW` to `DisplayManager`. The Tools power-draw sweep
+  drives its own dialog window's `screenBrightness`, so on QPR2 a slider drag over that dialog
+  spoils the measurement instead of being refused. It settles on a QPR2 Pixel, which the owner
+  does not have (DD-087): with an app forcing brightness, drag the slider, compare
+  `adb shell settings get system screen_brightness` before and after, and look for the Resume
+  card; no code changes until then.
+- DE-034: **Android 17 QPR2's colour-correction change reaches Privileged Display's daltonizer
+  toggle only in how it renders: the protan matrix is fixed and the modes are renamed in
+  Settings, with no change to the keys Tideo writes (2026-11-11).** The 37.1→37.2 API diff lists
+  no `Settings.Secure` change, so `accessibility_display_daltonizer` and its `_enabled` key, with
+  modes 0, 11, 12 and 13, still mean what `SecureDisplayController` writes. On a QPR2 build mode 11
+  (`pd_daltonizer_protan`, "Protanomaly (red–green)") shows reds less brown or grey than before,
+  and that label may no longer match the new Settings wording, which no source quoted. The rest
+  of the release touches Tideo only at the edges: Developer options cannot be switched on during
+  a call with an unknown number, which stalls ELEVATED setup over adb in that case alone, and an
+  installer without "install apps" now gets a one-time-or-always dialog, which eases installing a
+  GitHub APK. Tideo targets SDK 36 and QPR2 promises no behaviour change, so nothing here needs
+  code.
+- DE-035: **DE-020's "only unit" is no longer the whole picture: API 37.2 adds
+  `DisplayManager.BRIGHTNESS_UNIT_RAW`, "the system range [0.0f, 1.0f]", device-dependent and
+  possibly unlike the slider's percentage (2026-11-11).** A raw unit would spare a finer-steps
+  write from modelling the slider's gamma, but whether `setBrightness` accepts it is unconfirmed,
+  and it exists only from 37.2, which is Pixel first and absent on ColorOS 17 and the F4. DE-020's
+  conclusion stands: the read side, the override check and the echo matching all read the int
+  setting, so DisplayManager is still not the fix for DE-019's device. The faster-Shizuku plan's
+  finer-steps unit carries the option behind its device gate.

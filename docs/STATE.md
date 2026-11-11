@@ -106,6 +106,11 @@ proposing work; changing it is legislation under RUNBOOK's rule-review protocol.
 
 Newest first; ledger rows are the durable detail.
 
+- 2026-11-11 — **Android 17 QPR2 (API 37.2) read against the tree: no breakage, nothing on
+  ColorOS 17. The faster-Shizuku plan gains its 37.2 facts (Units 2, 7, 8, 12), and the
+  calibration plan's Pixel check asks for `sdk_full`. The Quick Settings slider during a window
+  override is DE-033, colour correction and edge effects DE-034, and DE-020 is corrected by DE-035.**
+
 - 2026-11-04 — **Calibration Unit 4: a failed calibration stores `display_calibration_error` and
   shows one message per cause on the card and in the flash, with DUMP advice only for
   `NO_ACCESS`; battery saver refuses the run before any write (DE-032, DE-028). Owner queue item 1
