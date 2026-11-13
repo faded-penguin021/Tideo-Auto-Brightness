@@ -44,7 +44,8 @@ investigation stays closed (DB-051…DB-060), and Scorecard.dev is a run-once lo
   DE-015). D1 (a), amended; D2 (a), D3 (a), D4 (a) (DE-027); battery saver refuses a run
   (DE-028). It and the HyperOS plan are the current stage; each unit runs on the owner's go-ahead.
   [x] 0 plan · [x] 1 calibration trace (DE-029) · [x] 2 corroborated ceiling, stored (DE-030) · [x] 3 readout and
-  HBM flag (DE-031) · [x] 4 failure causes (DE-032) · [ ] 5 device checks and close-out.
+  HBM flag (DE-031) · [x] 4 failure causes (DE-032) · [ ] 5 device checks and close-out (the Pixel
+  calibrates, DE-037; the Pixel's HBM check and the F4 trace stay open and do not block release).
 - **HyperOS brightness scale** — `docs/plans/HYPEROS_SETTING_SCALE.md` (owner, 2026-10-31;
   DE-014, revised DE-016); issue #157 is the report (DE-017). D1 (a) and D2 (b) decided (DE-018);
   each unit runs on the owner's go-ahead.
@@ -94,6 +95,20 @@ investigation stays closed (DB-051…DB-060), and Scorecard.dev is a run-once lo
    --workflow release.yml --limit 1 --json conclusion,createdAt` shows `success` dated after the
    merge, and the version appears on F-Droid as reproducible.
 
+4. **[2026-11-12] Merge this train, close #157 and release 1.15.3 around Sat 2026-11-14 or Sun
+   2026-11-15, unless the F4 reporter answers first.** You said so on #157. The Pixel reporter
+   has already confirmed on AdvancedAutoBrightness issue 26 that calibration completes on the vc33
+   debug build (2026-11-05). If the F4 reporter sends a calibration log before you release, read it
+   first. If calibration failed there for some reason other than the screen simply stopping at its
+   normal maximum (about half the panel's range on that phone), have that new cause written up in
+   the ledger before you release. This release is also the one item 3 watches. Two reporter checks
+   stay open and do not block it. One is the Pixel's High Brightness Mode in direct sun: the
+   readout goes above 255, the toast shows once, and `adb shell dumpsys display | grep -E
+   'mHbmMode|hbmMax'` shows the mode on. The other is the F4's calibration log. When this item
+   leaves, move those two checks into the calibration plan's Unit 5, where they already sit.
+   Settles it: `gh pr list --head ccr-b1d50b4f-nyhwmv --state merged` lists this train's PR,
+   `gh issue view 157 --json state` prints `CLOSED`, and `gh release view v1.15.3` succeeds (DE-037).
+
 **The tree declares `1.15.3` / vc33, this train's one bump (DE-023)**; 1.15.2 was seen tagged on
 2026-11-01 (`git ls-remote --tags --refs origin 'refs/tags/v*'`). Never bump twice in one train.
 
@@ -106,6 +121,10 @@ proposing work; changing it is legislation under RUNBOOK's rule-review protocol.
 ## Changelog
 
 Newest first; ledger rows are the durable detail.
+
+- 2026-11-13 — **The Pixel reporter confirmed calibration completes on the vc33 debug build
+  (AdvancedAutoBrightness issue 26; HBM still unseen). The owner will merge, close #157 and
+  release around 2026-11-14/15 if the F4 reporter has not replied by then. Owner queue item 4 (DE-037).**
 
 - 2026-11-11 — **Light-refactor plan re-read against the tree and corrected, spec only: its
   conversion freeze is gone, Unit 5 reuses `HandoffRules.effectiveThreshold`, Unit 4 is a

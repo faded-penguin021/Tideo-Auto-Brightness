@@ -442,3 +442,12 @@
   changes no signature. A spec-only plan's retained-decision list is a claim about the ledger on
   the day it was written, so re-read it against the tree and the rows it cites before its first
   unit runs.
+- DE-037: **The Pixel reporter confirmed on AdvancedAutoBrightness issue 26 that calibration
+  completes with no error on the 1.15.3 / vc33 debug build (2026-11-05); High Brightness Mode is
+  still unseen there, because no day has been sunny enough.** The calibration plan's first Pixel
+  check is only partly met, since no trace, timing or `sdk_full` was sent, and its direct-sun
+  check stays open with that reporter. The F4 reporter has not
+  answered the trace request on #157 since 2026-11-05, so the HyperOS plan's Unit 2 and the F4
+  checks have no new evidence. On 2026-11-12 the owner wrote on #157 that, with no reply, they
+  will merge this train, close #157 and release around 2026-11-14/15, and the reporter may reopen
+  it. The open reporter checks therefore do not block the release.
