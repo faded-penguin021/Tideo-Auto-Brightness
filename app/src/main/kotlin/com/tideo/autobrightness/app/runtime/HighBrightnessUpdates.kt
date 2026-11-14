@@ -45,17 +45,20 @@ class HighBrightnessUpdates(
             }
     }
 
-    // Tasker: "_ReadBrightness" (AAB hand-off export, DD-077).
+    // Tasker: "_ReadBrightness" (AAB hand-off export, DD-077); a stored boundary flags from raw (DE-031).
     internal suspend fun read() {
         val record = calibration()
-        val level = if (record == null) {
-            settingBrightness()
-        } else {
-            reader.read(record.field)?.let { record.calibration.levelFor(it.raw) }
-        } ?: return
-        if (level == _readout.value) return
+        if (record == null) {
+            show(settingBrightness() ?: return, rawAbove = null)
+            return
+        }
+        val raw = reader.read(record.field)?.raw ?: return
+        show(record.calibration.levelFor(raw) ?: return, record.hbmBoundary?.let { raw > it })
+    }
+
+    private fun show(level: Int, rawAbove: Boolean?) {
         _readout.value = level
-        val above = level > DisplayCalibration.HBM_ABOVE
+        val above = rawAbove ?: (level > DisplayCalibration.HBM_ABOVE)
         if (above != hbm) {
             hbm = above
             sink.onHighBrightness(above)
@@ -68,7 +71,7 @@ class HighBrightnessUpdates(
 }
 
 class StoredDisplayCalibrationSink(
-    private val write: suspend (DisplayCalibrationRecord?) -> Unit,
+    private val write: suspend (DisplayCalibrationOutcome) -> Unit,
     private val flash: ToastHandoffSink,
 ) : DisplayCalibrationSink {
     override suspend fun started() {
@@ -76,12 +79,17 @@ class StoredDisplayCalibrationSink(
         flash.flash(R.string.flash_calibration_start)
     }
 
-    override suspend fun finished(record: DisplayCalibrationRecord?) {
+    override suspend fun finished(outcome: DisplayCalibrationOutcome) {
         try {
-            write(record)
+            write(outcome)
         } finally {
             LiveRuntimeState.setCalibrating(false)
-            flash.flash(if (record != null) R.string.flash_calibration_ok else R.string.flash_calibration_failed)
+            flash.flash(
+                when (outcome) {
+                    is DisplayCalibrationOutcome.Calibrated -> R.string.flash_calibration_ok
+                    is DisplayCalibrationOutcome.Failed -> outcome.cause.message
+                },
+            )
         }
     }
 }

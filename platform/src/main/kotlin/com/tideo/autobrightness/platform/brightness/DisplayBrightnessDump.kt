@@ -9,6 +9,7 @@ object DisplayBrightnessDump {
     const val TIMEOUT_SECONDS = 5L
     private const val REAP_MS = 2_000L
     private const val MAX_LINES = 32
+    private const val MAX_CORROBORATION_LINES = 8
     private const val MAX_LINE_CHARS = 512
     private const val MAX_CHARS = 16L * 1024 * 1024
 
@@ -17,11 +18,15 @@ object DisplayBrightnessDump {
         """(?<![A-Za-z])(mScreenBrightness|mDisplayBrightness|mCurrentScreenBrightness)=([0-9]+(?:\.[0-9]+)?(?:[eE][-+]?[0-9]+)?)""",
     )
 
-    fun run(argv: Array<String>): String? {
+    private val CORROBORATION = Regex(
+        """mCachedBrightnessInfo\.(?:hbmTransitionPoint|brightnessMax|brightnessMaxReason)\s*=|(?<![A-Za-z])(?:mHbmData|mAppliedLowPower)=""",
+    )
+
+    fun run(argv: Array<String>): DumpOutput {
         val process = try {
             ProcessBuilder(*argv).redirectErrorStream(true).start()
         } catch (_: Throwable) {
-            return null
+            return DumpOutput.Unavailable
         }
         return try {
             process.outputStream.close()
@@ -33,9 +38,10 @@ object DisplayBrightnessDump {
             if (!exited) process.destroyForcibly()
             // A `su -c` child can outlive its parent and hold the pipe, so close it rather than wait on it.
             reader.join(REAP_MS)
-            if (exited && !reader.isAlive && process.exitValue() == 0) lines?.ifBlank { null } else null
+            val kept = lines
+            if (exited && !reader.isAlive && process.exitValue() == 0 && kept != null) DumpOutput.Lines(kept) else DumpOutput.Failed
         } catch (_: Throwable) {
-            null
+            DumpOutput.Failed
         } finally {
             runCatching { process.inputStream.close() }
             process.destroy()
@@ -44,10 +50,19 @@ object DisplayBrightnessDump {
 
     internal fun filter(input: InputStream): String {
         val kept = ArrayList<String>()
+        var fields = 0
+        var corroborating = 0
         val line = StringBuilder()
         var total = 0L
         fun endLine() {
-            if (kept.size < MAX_LINES && FIELD.containsMatchIn(line)) kept += line.toString()
+            val field = FIELD.containsMatchIn(line)
+            if (field && fields < MAX_LINES) {
+                kept += line.toString()
+                fields++
+            } else if (!field && corroborating < MAX_CORROBORATION_LINES && CORROBORATION.containsMatchIn(line)) {
+                kept += line.toString()
+                corroborating++
+            }
             line.setLength(0)
         }
         input.reader().use { reader ->
@@ -71,4 +86,20 @@ object DisplayBrightnessDump {
             .filter { field == null || it.groupValues[1] == field }
             .mapNotNull { m -> m.groupValues[2].toDoubleOrNull()?.takeIf { it.isFinite() }?.let { DisplayBrightnessSample(m.groupValues[1], it) } }
             .firstOrNull()
+
+    fun corroboration(output: String): List<String> =
+        output.lineSequence().filter { !FIELD.containsMatchIn(it) && CORROBORATION.containsMatchIn(it) }.map { it.trim() }.toList()
+
+    private val TRANSITION = Regex("""(?:hbmTransitionPoint\s*=|(?<![A-Za-z])transition:)\s*([^\s,}]+)""")
+    private val MAX = Regex("""brightnessMax\s*=\s*([^\s,}]+)""")
+    private val MAX_REASON = Regex("""brightnessMaxReason\s*=\s*(\S+)""")
+
+    fun isHbmBoundary(corroboration: List<String>, plateau: Double): Boolean {
+        fun values(regex: Regex) = corroboration.flatMap { line -> regex.findAll(line).map { it.groupValues[1] } }
+        val transitions = values(TRANSITION)
+        return transitions.isNotEmpty() &&
+            transitions.all { it.toDoubleOrNull() == plateau } &&
+            values(MAX).all { it.toDoubleOrNull() == plateau } &&
+            values(MAX_REASON).all { it == "0" }
+    }
 }

@@ -524,4 +524,4 @@ reason = "entering the hand-off needs bright light; the pre-service mode and the
 [[scenario]]
 id = "s18_61"
 status = "manual"
-reason = "calibration sweeps the live panel, and the HBM readout needs direct sunlight"
+reason = "calibration sweeps the live panel, a ceiling case needs a Pixel or the POCO F4, the HBM readout needs direct sunlight, and each failure cause needs its own device state"

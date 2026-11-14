@@ -36,6 +36,7 @@ class DisplayTogglesCoordinator(
     private val writeAnchor: suspend (Int?) -> Unit = {},
     private val readPrior: suspend () -> NightLightPrior? = { null },
     private val writePrior: suspend (NightLightPrior?) -> Unit = {},
+    private val publishRampKelvin: (Int?) -> Unit = {},
     private val tickIntervalMs: Long = 60_000L,
     private val recheckDelayMs: Long = RECHECK_DELAY_MS,
     private val temperatureRoute: NightLightTemperatureRoute = NightLightTemperatureRoute(display),
@@ -123,6 +124,7 @@ class DisplayTogglesCoordinator(
                 resting?.let { applyLocked(DisplayToggleState.of(it), it, probe = false, nightLight = false) }
                 val held = prior
                 if (held != null) restorePriorLocked(held) else releaseAnchorLocked(settings = null)
+                publishRampKelvin(null)
                 restoreOwedK.also { restoreOwedK = null }
             }
         }
@@ -145,6 +147,7 @@ class DisplayTogglesCoordinator(
             latestEffective = null
             writePrior(null) // D-155's defaults are the reset; no later stop puts the pre-Tideo state back
             prior = null
+            publishRampKelvin(null)
             if (tierProvider() < Tier.ELEVATED) return // nothing we could write (or clear)
             display.setNightLight(false)
             releaseAnchorLocked(settings = null)
@@ -220,6 +223,7 @@ class DisplayTogglesCoordinator(
     ) {
         val last = lastApplied
         lastApplied = desired
+        if (!desired.circadianTemp) publishRampKelvin(null)
         if (last == null || desired == last) {
             if (nightLight && !desired.circadianTemp) releaseAnchorLocked(settings)
             return
@@ -263,7 +267,7 @@ class DisplayTogglesCoordinator(
             val kelvin = acquireAnchorLocked()?.let { anchor ->
                 circadianTemperature(settings, settings.nightLightTemperature ?: anchor)
             }
-            if (kelvin != null) writeKelvinLocked(kelvin, settings, probe)
+            if (kelvin != null) publishRampLocked(writeKelvinLocked(kelvin, settings, probe))
             recheck.trySend(Unit)
         } else if (released) {
             val temperature = desired.temperatureK
@@ -280,8 +284,11 @@ class DisplayTogglesCoordinator(
         val anchor = acquireAnchorLocked() ?: return // the tick acquires too: a grant can arrive after the swap
         val kelvin = circadianTemperature(settings, settings.nightLightTemperature ?: anchor) ?: return
         if (display.nightLightAvailable && display.readNightLightTemperature() != deviceTempK) deviceTempK = null
-        writeKelvinLocked(kelvin, settings)
+        publishRampLocked(writeKelvinLocked(kelvin, settings))
     }
+
+    private fun publishRampLocked(landed: Boolean) =
+        publishRampKelvin(deviceTempK.takeIf { landed && scope != null && display.nightLightAvailable })
 
     /** DD-048: [kelvin] clamped to [settings]' active range; [deviceTempK] tracks what landed. */
     private suspend fun writeKelvinLocked(

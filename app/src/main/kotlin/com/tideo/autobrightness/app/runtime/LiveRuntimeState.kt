@@ -57,6 +57,13 @@ object LiveRuntimeState {
         _calibrating.value = running
     }
 
+    private val _nightLightRampKelvin = MutableStateFlow<Int?>(null)
+    val nightLightRampKelvin: StateFlow<Int?> = _nightLightRampKelvin.asStateFlow()
+
+    fun setNightLightRampKelvin(kelvin: Int?) {
+        _nightLightRampKelvin.value = kelvin
+    }
+
     @Synchronized fun publish(
         instance: Any,
         state: PipelineState,
@@ -114,5 +121,6 @@ object LiveRuntimeState {
         _serviceRunning.value = false
         _activeProfile.value = null
         _calibrating.value = false
+        _nightLightRampKelvin.value = null
     }
 }

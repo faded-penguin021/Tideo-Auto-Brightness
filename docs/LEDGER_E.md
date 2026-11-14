@@ -290,6 +290,7 @@
   optional finer-steps unit, which reopens DC-026 on its own terms; on API 36.1 and up its
   permission-free `getBrightness` could at most help a user pick DE-019's choice as a Live Debug
   readout that never feeds the conversion.
+  Corrected by DE-035.
 - DE-021 [cited]: **Codemap Unit 6 wired `scripts/guards/codemap.sh` into the ladder, fail-closed,
   running `codemap.py check` against a committed `codemap/map.json` (D2 (a)); D3 stays (b), so the
   map carries no `unanchored` list (2026-11-01).** Every non-zero status from the tool becomes
@@ -308,3 +309,166 @@
   hint was added, and the settings-field scan stays deferred (DE-013). The plan's other exclusions
   stand with it: no parser dependency (SCIP, tree-sitter, Kotlin PSI), no CI commit of the map, no
   committed symbol-level graph, and no LLM audit in the ladder.
+- DE-023 [cited]: **Tideo treats `Settings.System.SCREEN_BRIGHTNESS` as 0–255 on every device and no
+  longer reads `config_screenBrightnessSettingMaximum`, overruling DC-026's "the lookup stays"
+  (HyperOS scale Unit 1, 1.15.3 / vc33, 2026-11-01; D1 (a), DE-018).** It starts from the
+  reporter's fork commit `1957d5e`, cherry-picked with `bnoeu` as author and only its
+  `settingsApiMaxOverride = 255` line kept; the unit's second commit dropped that seam and the lookup, so
+  writes and reads clamp to 0–255 and Live Debug's `Settings API max` reads 255 everywhere. A
+  device whose config said 255 gets the same writes; DE-019 holds the fix for a device shown to read
+  a wider scale.
+- DE-024: **The owner trimmed the HyperOS scale plan's Unit 2 to the reporter's days-of-use report
+  and one slider check (2026-11-02), since the reporter's evidence already covers the rest.** On
+  the F4, Unit 1's build (DE-023) writes and reads as the reporter's fork build did: with a
+  maximum of 255 the old conversion was already the 0–255 clamp Unit 1 applies on every device,
+  and the fork's two other changes touch only calibration's dump reads. The scale needs no
+  re-test, because the release build's floats are exactly 15/254, 31/254 and 47/254 (DE-014), and
+  the floor follows from it. Nothing shown covers the read side, that HyperOS's slider writes the
+  0–255 scale, so the reporter drags the slider low and compares `settings get` with
+  `mScreenBrightness × 254 + 1`, which is safe on the F4 because its shell returned the 16 Tideo
+  wrote (DE-017), unlike DC-025's OnePlus. The F4's calibration trace and failed-run dump check
+  calibration rather than the scale, so the calibration plan's device checks ask for them instead.
+- DE-025: **RUNBOOK playbook 9 on 1.15.3-debug vc33 (2fefbbe, owner's CPH2653, 2026-11-01..02):
+  17 of 20 auto rows pass or skip by rule, s02_10b is open on timing, and the wake pair was not
+  run; no Tideo defect found.** The first run failed six rows while the owner used the phone and
+  a crowded shade pushed Tideo's actions off screen; reruns untouched passed five, one failing
+  once on a uiautomator2 HTTP 500 first. s02_10b failed twice when the ambient light moved Tideo's
+  target mid-step (expected 33 against a settled 29); it needs steady light the owner could not
+  give. Step 7 found context rules, a baseline, daltonizer 13 → 11 and Night Light 4082 → 1133
+  from a day of the owner's use after the run, so the closing preflight skips 18 rows until
+  `contexts` is confirmed.
+- DE-026: **RUNBOOK playbook 8 gains step 5: a bumped action line in a workflow no PR runs
+  automatically is covered at PR time only by a step using the same SHA that ran, not skipped,
+  in a job the PR's checks list, and a pin no PR-run workflow carries goes to the Owner queue
+  with the check that settles its first run (owner, 2026-11-03).** Running the playbook on
+  Dependabot's #159 found that "full CI green on the PR" never executed its bumped lines in
+  `release.yml` and `release-signing.yml`; the same three SHAs had run in `build` and
+  `fdroid-compat` steps, so the step records which job covered each line rather than calling the
+  file validated. The fresh-context rule review added that a dispatch runs the file at the ref it
+  is dispatched on, so `release-signing.yml`, which only signs and uploads an artifact, can be run
+  on the PR branch, while `release.yml` attaches to a real release and `redirect-external-prs.yml`
+  waits for an outside contributor's PR. The step's commands run on the PR's head tree and match
+  only a two-space `pull_request:` line, so a filter or `if:` that skipped a PR is settled against
+  its checks by hand; `actions/github-script` and `softprops/action-gh-release` were the two pins
+  they listed on 2026-11-03.
+- DE-027 [cited]: **Calibration D2 (a), D3 (a) and D4 (a) are decided (owner, 2026-11-04): above a
+  verified boundary the readout keeps AAB's slope, each failure cause gets its own message, and a
+  plateau the dump does not corroborate fails the run.** D2 (a) was chosen over the recommended
+  (b) on purpose, so the calibration plan's Unit 3 keeps only the raw-based HBM flag. The F4
+  reporter's manual sweep on #157 holds 0.49975574 from setting 128 up, its dump's transition
+  point, with `brightnessMaxReason =0`, so the F4 is a confirmed ceiling case. That dump ran under
+  battery saver, where every reading is 0.9 times the normal one (`screenLowPowerBrightnessFactor`)
+  and the plateau no longer equals the printed transition point.
+- DE-028: **Display calibration refuses to start while battery saver is on, with a message that
+  says why (owner, 2026-11-04).** Battery saver scales every reading (DE-027), so a sweep under it
+  would store points 10 % low or fail an honest ceiling's corroboration. The check runs once,
+  before the first write; switching battery saver on mid-sweep or during a later readout is
+  accepted, not checked.
+- DE-029: **A display calibration logs what it saw under logcat tag `TideoCalibration`: one line per
+  level with each read's source, status, field, raw and elapsed ms, the answering dump's ceiling
+  lines, and a summary (calibration plan Unit 1, 2026-11-04).** Sources now report unavailable,
+  failed, no field or a sample, so a later unit can tell a missing grant from a slow or empty
+  read; reads, sources, windows and outcomes are unchanged. The filter keeps up to 8 ceiling
+  lines apart from the 32 brightness lines, so the Shizuku helper's version moved from 4 to 5.
+  Shizuku turning unusable still releases the held helper (DE-001).
+- DE-030 [cited]: **A display calibration whose readings hold on the previous point for a whole
+  window, at level 128 or above, writes 255 for one more window and stores `255:<plateau>` with
+  `display_calibration_hbm` only when the dump corroborates it; otherwise it fails (calibration
+  plan Unit 2, D1, D4 (a), 2026-11-04).** This departs from `_CalibrateDisplayRange`, which fails
+  every plateau (DD-078). Corroboration needs at least one printed transition point
+  (`hbmTransitionPoint`, or `mHbmData`'s `transition:`) and every printed one equal to the
+  plateau, while `brightnessMax` and `brightnessMaxReason`, spaced `=` included, are checked only
+  where the dump prints them, so the Pixel's unchecked dump cannot block it. A plateau first seen
+  at 255 still gets its own window at 255 (Sol).
+- DE-031 [cited]: **With a stored `display_calibration_hbm` boundary, the hand-off's HBM flag follows
+  `raw > boundary` on every read, even when the rounded readout is unchanged; a record without it
+  keeps AAB's `level > 255` (calibration plan Unit 3, D2 (a), 2026-11-04).** AAB's slope rounds raw
+  just past a 0.63 boundary to 255, so the rounded test would never fire there (DE-015). The readout
+  formula is unchanged, so this Pixel's 1.0 reads about 1150; Units 2 and 3 ship in one release.
+- DE-032 [cited]: **A failed display calibration stores and shows its cause, one message each,
+  with DUMP, root and Shizuku advice only when every source was unavailable at the first level;
+  battery saver refuses the run before anything is written (calibration plan Unit 4, D3 (a),
+  DE-028, 2026-11-04).** `display_calibration` keeps AAB's `error` (DD-078), and the new
+  `display_calibration_error` holds the cause; an `error` stored without one reads as the neutral
+  `NO_READING`, since its cause was never established. The battery-saver refusal also skips the
+  Set Initial Brightness that follows a run (Sol).
+- DE-033: **Android 17 QPR2 (API 37.2, Pixel first, 2026-11-10) lets the Quick Settings slider
+  move brightness while an app holds a window brightness override, which earlier builds refused
+  as "controlled by the top app"; whether the drag writes `screen_brightness` is unconfirmed
+  (2026-11-11).** Tideo sees a manual change only through `BrightnessObserver`'s watch on that
+  setting, so a temporary override, which the announcement's "normal brightness behavior
+  automatically resumes" suggests, goes unseen, while a persisted one would pause auto mode and
+  show the Resume card like any manual write. Neither Google's QPR2 release notes nor the
+  37.1→37.2 API diff mention the slider; the diff adds only `screenBrightnessUnit`, defaulting to
+  RAW, to `LayoutParams` and `BRIGHTNESS_UNIT_RAW` to `DisplayManager`. The Tools power-draw sweep
+  drives its own dialog window's `screenBrightness`, so on QPR2 a slider drag over that dialog
+  spoils the measurement instead of being refused. It settles on a QPR2 Pixel, which the owner
+  does not have (DD-087): with an app forcing brightness, drag the slider, compare
+  `adb shell settings get system screen_brightness` before and after, and look for the Resume
+  card; no code changes until then.
+- DE-034: **Android 17 QPR2's colour-correction change reaches Privileged Display's daltonizer
+  toggle only in how it renders: the protan matrix is fixed and the modes are renamed in
+  Settings, with no change to the keys Tideo writes (2026-11-11).** The 37.1→37.2 API diff lists
+  no `Settings.Secure` change, so `accessibility_display_daltonizer` and its `_enabled` key, with
+  modes 0, 11, 12 and 13, still mean what `SecureDisplayController` writes. On a QPR2 build mode 11
+  (`pd_daltonizer_protan`, "Protanomaly (red–green)") shows reds less brown or grey than before,
+  and that label may no longer match the new Settings wording, which no source quoted. The rest
+  of the release touches Tideo only at the edges: Developer options cannot be switched on during
+  a call with an unknown number, which stalls ELEVATED setup over adb in that case alone, and an
+  installer without "install apps" now gets a one-time-or-always dialog, which eases installing a
+  GitHub APK. Tideo targets SDK 36 and QPR2 promises no behaviour change, so nothing here needs
+  code.
+- DE-035: **DE-020's "only unit" is no longer the whole picture: API 37.2 adds
+  `DisplayManager.BRIGHTNESS_UNIT_RAW`, "the system range [0.0f, 1.0f]", device-dependent and
+  possibly unlike the slider's percentage (2026-11-11).** A raw unit would spare a finer-steps
+  write from modelling the slider's gamma, but whether `setBrightness` accepts it is unconfirmed,
+  and it exists only from 37.2, which is Pixel first and absent on ColorOS 17 and the F4. DE-020's
+  conclusion stands: the read side, the override check and the echo matching all read the int
+  setting, so DisplayManager is still not the fix for DE-019's device. The faster-Shizuku plan's
+  finer-steps unit carries the option behind its device gate.
+- DE-036: **A re-read of the light-refactor plan against `2ccac7e`, three weeks after it was
+  written, found its seven findings still true and three of its statements wrong; the owner
+  accepted the corrections (2026-11-11).** It called the brightness conversion path frozen and
+  cited DC-011, an unrelated row: the freeze was DC-019's, it ended with DC-026's ruling, and
+  DE-023 has since overruled part of that ruling, so its Decided non-items entry would have
+  declined what DE-019 already authorises and now says only that the three brightness APIs keep
+  separate contracts. Its hand-off unit proposed a new helper where
+  `HandoffRules.effectiveThreshold` already sat in `:domain`, tested and with no production
+  caller, and its shared global-fields helper was listed as no behaviour change although manual
+  load and import take `setupTitle` and `schemaVersion` from the incoming profile where a context
+  swap keeps the current ones. Two design changes came with it: the dimming coordinator publishes
+  its own readout, because `PanicHandler` holds no pipeline state and eight call sites would each
+  have had to zero it, and it takes the dim multiplier as its input so the engine-sourced unit
+  changes no signature. A spec-only plan's retained-decision list is a claim about the ledger on
+  the day it was written, so re-read it against the tree and the rows it cites before its first
+  unit runs.
+- DE-037: **The Pixel reporter confirmed on AdvancedAutoBrightness issue 26 that calibration
+  completes with no error on the 1.15.3 / vc33 debug build (2026-11-05); High Brightness Mode is
+  still unseen there, because no day has been sunny enough.** The calibration plan's first Pixel
+  check is only partly met, since no trace, timing or `sdk_full` was sent, and its direct-sun
+  check stays open with that reporter. The F4 reporter has not
+  answered the trace request on #157 since 2026-11-05, so the HyperOS plan's Unit 2 and the F4
+  checks have no new evidence. On 2026-11-12 the owner wrote on #157 that, with no reply, they
+  will merge this train, close #157 and release around 2026-11-14/15, and the reporter may reopen
+  it. The open reporter checks therefore do not block the release.
+- DE-038 [cited]: **Live Debug gains the Night Light card the owner added to AAB's debug page
+  (owner, 2026-11-14).** It shows Night Light on or off, circadian adjustment on or off, and the
+  colour temperature of the active mode — with circadian off the effective setpoint
+  (`%AAB_NightLightTemp`, "Device default" when unset), with it on the Kelvin the ramp last landed
+  (`%AAB_NightLightTempCirc`, "Waiting for the next update" until one lands), and a dash while
+  Night Light is off, as AAB shows nothing — reading the settings from the live store, which is the
+  effective truth (D-170). After each circadian write attempt `DisplayTogglesCoordinator` publishes
+  `deviceTempK` to `LiveRuntimeState.nightLightRampKelvin` if the write succeeded, the coordinator
+  is still started and the device has Night Light, and null otherwise; it publishes null when
+  tracking ends (below ELEVATED too), on stop and on panic, `reset()` clears it, and a swap whose
+  ramp equals a `deviceTempK` the seed assumed rather than wrote shows it unverified until the
+  recheck tick 5 s later reads the device. Like `setCalibrating`, the setter is not owner-gated
+  (DD-055), because `stop()` and `panicReset()` clear `scope` before taking the mutex and the
+  publish refuses a value once it is cleared. Two departures from AAB: the card says Tideo is not
+  applying Night Light while the service is stopped or below ELEVATED, because the setting alone
+  would read as applied; and the temperature shows the setpoint as set, not clamped to the device's
+  range, as AAB shows the variable. A fresh-context review (Fable 5.2) found the published Kelvin
+  could outlive a failed write and appear on a device with no Night Light, both now fixed with
+  tests, and noted outside this card that `stop()` cancels the effective-flow collector without
+  joining it, so an emission already resumed could still write after the restore (the D-139
+  class), not reproduced and left for its own unit.

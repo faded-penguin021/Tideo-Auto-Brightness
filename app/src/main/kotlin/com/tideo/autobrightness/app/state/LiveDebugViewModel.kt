@@ -5,6 +5,7 @@ import android.content.ComponentName
 import android.provider.Settings
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.tideo.autobrightness.app.AppModule
 import com.tideo.autobrightness.app.runtime.AabFlash
 import com.tideo.autobrightness.app.runtime.AabToastAccessibilityService
 import com.tideo.autobrightness.app.runtime.AutoBrightnessRuntime
@@ -12,6 +13,8 @@ import com.tideo.autobrightness.app.runtime.LiveRuntimeState
 import com.tideo.autobrightness.app.runtime.PipelineState
 import com.tideo.autobrightness.app.runtime.SensorCallbacks
 import com.tideo.autobrightness.app.storage.settingsDataStore
+import com.tideo.autobrightness.platform.privilege.PrivilegeManager
+import com.tideo.autobrightness.platform.privilege.Tier
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -35,6 +38,15 @@ data class LiveDebugUiState(
     val panicRequiresPlugged: Boolean = false,
     // G2R-F50: global-flash AccessibilityService enabled
     val globalToastsEnabled: Boolean = false,
+    val nightLight: NightLightDebug = NightLightDebug(),
+)
+
+data class NightLightDebug(
+    val enabled: Boolean = false,
+    val circadian: Boolean = false,
+    val temperatureK: Int? = null,
+    val rampKelvin: Int? = null,
+    val elevated: Boolean = true,
 )
 
 private data class LiveDebugSettings(
@@ -43,6 +55,9 @@ private data class LiveDebugSettings(
     val debugLevel: Int,
     val panicSensitivity: Int,
     val panicRequiresPlugged: Boolean,
+    val nightLightEnabled: Boolean,
+    val nightLightCircadian: Boolean,
+    val nightLightTemperatureK: Int?,
 )
 
 /** S12.6b, G2R-F6/F9: drives LiveDebugScreen. Live %AAB_* from LiveRuntimeState; settings from DataStore. */
@@ -50,18 +65,25 @@ class LiveDebugViewModel(application: Application) : AndroidViewModel(applicatio
     private val app = application
 
     private val settingsFlow = app.settingsDataStore.data
-        .map { LiveDebugSettings(it.minBrightness, it.maxBrightness, it.debugLevel, it.panicSensitivity, it.panicRequiresPlugged) }
+        .map {
+            LiveDebugSettings(
+                it.minBrightness, it.maxBrightness, it.debugLevel, it.panicSensitivity, it.panicRequiresPlugged,
+                it.nightLightEnabled, it.nightLightCircadianEnabled, it.nightLightTemperature,
+            )
+        }
+
+    private val privilegeManager: PrivilegeManager = AppModule(application).privilegeManager
 
     // G2R-F50: re-read on demand (system settings outside DataStore)
     private val globalToasts = MutableStateFlow(isGlobalToastServiceEnabled())
 
     val state: StateFlow<LiveDebugUiState> = combine(
         combine(LiveRuntimeState.pipeline, LiveRuntimeState.sensorCallbacks.state, ::Pair),
-        LiveRuntimeState.activeContext,
-        LiveRuntimeState.serviceRunning,
+        combine(LiveRuntimeState.activeContext, LiveRuntimeState.serviceRunning, ::Pair),
+        combine(LiveRuntimeState.nightLightRampKelvin, privilegeManager.tierFlow(), ::Pair),
         settingsFlow,
         globalToasts,
-    ) { (pipeline, callbacks), context, running, settings, global ->
+    ) { (pipeline, callbacks), (context, running), (rampKelvin, tier), settings, global ->
         LiveDebugUiState(
             pipeline = pipeline,
             sensorCallbacks = callbacks,
@@ -73,6 +95,13 @@ class LiveDebugViewModel(application: Application) : AndroidViewModel(applicatio
             panicSensitivity = settings.panicSensitivity,
             panicRequiresPlugged = settings.panicRequiresPlugged,
             globalToastsEnabled = global,
+            nightLight = NightLightDebug(
+                enabled = settings.nightLightEnabled,
+                circadian = settings.nightLightCircadian,
+                temperatureK = settings.nightLightTemperatureK,
+                rampKelvin = rampKelvin,
+                elevated = tier >= Tier.ELEVATED,
+            ),
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), LiveDebugUiState())
 
@@ -102,6 +131,8 @@ class LiveDebugViewModel(application: Application) : AndroidViewModel(applicatio
     fun refreshGlobalToastStatus() {
         globalToasts.value = isGlobalToastServiceEnabled()
     }
+
+    fun refreshTier() = privilegeManager.refresh()
 
     private fun isGlobalToastServiceEnabled(): Boolean {
         val flattened = Settings.Secure.getString(

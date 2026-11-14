@@ -5,6 +5,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 class DisplayCalibrationTest {
 
@@ -24,6 +25,17 @@ class DisplayCalibrationTest {
         assertEquals(255, linear.levelFor(4095.0))
         assertEquals(256, linear.levelFor(4112.0))
         assertEquals(291, linear.levelFor(4674.0), "the OEM's 4674 boost ceiling")
+    }
+
+    @Test
+    fun extrapolatesPastAStoredBoundaryWithAabsSlope_DE031() {
+        val pixel = assertNotNull(
+            DisplayCalibration.of(DisplayCalibration.LEVELS.filter { it <= 150 }.map { Point(it, (it - 1) / 254.0) } + Point(255, 0.63)),
+        )
+        assertEquals(255, pixel.levelFor(0.63))
+        assertEquals(255, pixel.levelFor(0.6301), "the slope rounds just past the boundary to 255")
+        assertEquals(1150, pixel.levelFor(1.0), "D2 (a): no proportional readout above the boundary")
+        assertTrue(pixel.encode().endsWith(",150:${149 / 254.0},255:0.63"))
     }
 
     @Test
