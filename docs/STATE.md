@@ -107,10 +107,8 @@ investigation stays closed (DB-051…DB-060), and Scorecard.dev is a run-once lo
    readout goes above 255, the toast shows once, and `adb shell dumpsys display | grep -E
    'mHbmMode|hbmMax'` shows the mode on. The other is the F4's calibration log. When this item
    leaves, move those two checks into the calibration plan's Unit 5, where they already sit.
-   Branch `ccr-a514a061-zwetfs` carries the train plus Live Debug's Night Light card (DE-038), so
-   merge it instead if you want the card in 1.15.3 (its `33.txt` names the card, 485 of 500
-   characters). Settles it: `gh pr list --head ccr-b1d50b4f-nyhwmv --state merged` (or
-   `ccr-a514a061-zwetfs`) lists this train's PR,
+   The train also carries Live Debug's Night Light card (DE-038), which `33.txt` names.
+   Settles it: `gh pr list --head ccr-b1d50b4f-nyhwmv --state merged` lists this train's PR,
    `gh issue view 157 --json state` prints `CLOSED`, and `gh release view v1.15.3` succeeds (DE-037).
 
 **The tree declares `1.15.3` / vc33, this train's one bump (DE-023)**; 1.15.2 was seen tagged on
