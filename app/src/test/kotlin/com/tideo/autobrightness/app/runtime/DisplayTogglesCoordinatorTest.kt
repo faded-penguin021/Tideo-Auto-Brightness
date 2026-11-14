@@ -103,6 +103,7 @@ class DisplayTogglesCoordinatorTest {
         var anchorGiven: Int? = null
         var storedAnchor: Int? = null
         var storedPrior: NightLightPrior? = null
+        val rampPublished = mutableListOf<Int?>()
         val baselineFlow = MutableStateFlow(baseline)
         val effectiveFlow = MutableStateFlow<AabSettings?>(null)
         val service = FakeService()
@@ -120,6 +121,7 @@ class DisplayTogglesCoordinatorTest {
             writeAnchor = { this.storedAnchor = it },
             readPrior = { this.storedPrior },
             writePrior = { this.storedPrior = it },
+            publishRampKelvin = { rampPublished += it },
             tickIntervalMs = tickIntervalMs,
             temperatureRoute = NightLightTemperatureRoute(
                 display, service.takeIf { withService }, bridgeOutOfRange = bridgeOutOfRange,
@@ -447,6 +449,96 @@ class DisplayTogglesCoordinatorTest {
 
 
     private val deviceDefaultProfile = circadianProfile.copy(nightLightTemperature = null)
+
+    @Test
+    fun rampReadout_followsWhatLanded_andClearsWhenTrackingEnds_DE038() = runTest(UnconfinedTestDispatcher()) {
+        val h = Harness()
+        h.rampKelvin = 3_400
+        h.coordinator.start(backgroundScope)
+        h.effectiveFlow.value = circadianProfile
+        runCurrent()
+        assertEquals(3_400, h.rampPublished.last(), "a swap-in publishes what landed")
+        h.rampKelvin = 3_300
+        advanceTimeBy(61_000); runCurrent()
+        assertEquals(3_300, h.rampPublished.last(), "a tick publishes what landed")
+        h.rampKelvin = 10_000
+        advanceTimeBy(60_000); runCurrent()
+        assertEquals(SecureDisplayController.NIGHT_LIGHT_MAX_K, h.display.deviceTemp)
+        assertEquals(h.display.deviceTemp, h.rampPublished.last(), "the clamped Kelvin, not the request")
+        h.effectiveFlow.value = circadianProfile.copy(nightLightCircadianEnabled = false)
+        runCurrent()
+        assertEquals(null, h.rampPublished.last(), "a static profile is not a ramp")
+    }
+
+    @Test
+    fun rampReadout_neverShowsAKelvinThatDidNotLand_DE038() = runTest(UnconfinedTestDispatcher()) {
+        val h = Harness()
+        h.display.failTemperatureWrites = true
+        h.rampKelvin = 3_400
+        h.coordinator.start(backgroundScope)
+        h.effectiveFlow.value = circadianProfile
+        runCurrent()
+        advanceTimeBy(61_000); runCurrent()
+        assertTrue(h.rampPublished.isNotEmpty(), "each refused write must still report")
+        assertTrue(h.rampPublished.none { it != null }, "refused writes published ${h.rampPublished}")
+    }
+
+    @Test
+    fun rampReadout_staysEmpty_whenTheDeviceHasNoNightLight_DE038() = runTest(UnconfinedTestDispatcher()) {
+        val h = Harness()
+        h.display.nightLightAvailable = false
+        h.rampKelvin = 3_400
+        h.coordinator.start(backgroundScope)
+        h.effectiveFlow.value = circadianProfile
+        runCurrent()
+        advanceTimeBy(61_000); runCurrent()
+        assertTrue(h.rampPublished.isNotEmpty())
+        assertTrue(h.rampPublished.none { it != null }, "nothing was written: ${h.rampPublished}")
+    }
+
+    @Test
+    fun rampReadout_clears_whenAWriteFailsAfterTheKeyMoved_DE038() = runTest(UnconfinedTestDispatcher()) {
+        val h = Harness()
+        h.rampKelvin = 3_400
+        h.coordinator.start(backgroundScope)
+        h.effectiveFlow.value = circadianProfile
+        runCurrent()
+        assertEquals(3_400, h.rampPublished.last())
+        h.display.deviceTemp = 2_800 // the user moved the system slider
+        h.display.failTemperatureWrites = true
+        h.rampKelvin = 3_300
+        advanceTimeBy(61_000); runCurrent()
+        assertEquals(null, h.rampPublished.last(), "3400 K is no longer on the device")
+    }
+
+    @Test
+    fun rampReadout_clearsOnStopAndPanic_evenWithACircadianBaseline_DE038() = runTest(UnconfinedTestDispatcher()) {
+        for (panic in listOf(false, true)) {
+            val h = Harness(baseline = circadianProfile)
+            h.rampKelvin = 3_400
+            h.coordinator.start(backgroundScope)
+            h.effectiveFlow.value = circadianProfile
+            runCurrent()
+            advanceTimeBy(61_000); runCurrent()
+            assertEquals(3_400, h.rampPublished.last())
+            if (panic) h.coordinator.panicReset() else h.coordinator.stop()
+            assertEquals(null, h.rampPublished.last(), if (panic) "panic" else "stop")
+        }
+    }
+
+    @Test
+    fun rampReadout_clearsWhenTrackingEndsBelowElevated_DE038() = runTest(UnconfinedTestDispatcher()) {
+        val h = Harness()
+        h.rampKelvin = 3_400
+        h.coordinator.start(backgroundScope)
+        h.effectiveFlow.value = circadianProfile
+        runCurrent()
+        assertEquals(3_400, h.rampPublished.last())
+        h.tier = Tier.BASIC
+        h.effectiveFlow.value = nightProfile
+        runCurrent()
+        assertEquals(null, h.rampPublished.last())
+    }
 
     @Test
     fun aNullSetpoint_anchorsTheRampToTheDevicesOwnKelvin_notAConstant_DC056() = runTest(UnconfinedTestDispatcher()) {

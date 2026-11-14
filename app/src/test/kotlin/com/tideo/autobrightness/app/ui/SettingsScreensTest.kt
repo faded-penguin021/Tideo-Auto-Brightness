@@ -33,6 +33,7 @@ import com.tideo.autobrightness.app.state.AppEntry
 import com.tideo.autobrightness.app.state.CalibrationBadge
 import com.tideo.autobrightness.app.state.DisplayCalibrationUi
 import com.tideo.autobrightness.app.state.LiveDebugUiState
+import com.tideo.autobrightness.app.state.NightLightDebug
 import com.tideo.autobrightness.app.ui.components.ChartPager
 import com.tideo.autobrightness.app.ui.components.ChartSlot
 import com.tideo.autobrightness.app.ui.components.CircadianDiagnosticCardContent
@@ -196,6 +197,47 @@ class SettingsScreensTest {
         compose.onNodeWithText("123.4", substring = true).performScrollTo().assertExists()
         compose.onNodeWithText("31.3%", substring = true).performScrollTo().assertExists()
         compose.onNodeWithText("0.35 – 800", substring = true).performScrollTo().assertExists()
+    }
+
+    @Test
+    fun liveDebug_nightLightCard_showsTheTemperatureOfTheActiveMode() {
+        var nightLight by mutableStateOf(NightLightDebug())
+        var running by mutableStateOf(true)
+        compose.setContent {
+            MaterialTheme {
+                LiveDebugContent(
+                    state = LiveDebugUiState(nightLight = nightLight, serviceRunning = running),
+                    onSelectDebug = {}, onBack = {},
+                )
+            }
+        }
+        fun notApplied(expected: String?) {
+            val node = compose.onNodeWithTag("debug_night_light_not_applied")
+            if (expected == null) node.assertDoesNotExist() else node.performScrollTo().assertTextEquals(expected)
+        }
+        fun temperature(expected: String) =
+            compose.onNodeWithTag("debug_night_light_temperature").performScrollTo()
+                .assertTextEquals("Color temperature: $expected")
+
+        compose.onNodeWithTag("debug_night_light_status").performScrollTo().assertTextEquals("Status: Off")
+        temperature("—")
+        nightLight = NightLightDebug(enabled = true)
+        temperature("Device default")
+        nightLight = NightLightDebug(enabled = true, temperatureK = 2_700, rampKelvin = 3_400)
+        temperature("2700 K")
+        nightLight = nightLight.copy(circadian = true, rampKelvin = null)
+        temperature("Waiting for the next update")
+        nightLight = nightLight.copy(rampKelvin = 3_400)
+        temperature("3400 K")
+        compose.onNodeWithTag("debug_night_light_circadian").performScrollTo()
+            .assertTextEquals("Circadian adjustment: On")
+        notApplied(null)
+        nightLight = nightLight.copy(elevated = false)
+        notApplied("Needs elevated access: Tideo is not applying Night Light.")
+        running = false
+        notApplied("Service stopped: Tideo is not applying Night Light.")
+        nightLight = NightLightDebug(elevated = false)
+        notApplied(null)
     }
 
     // DC-007: the write card must render WITHOUT an override having fired (owner device check 3).

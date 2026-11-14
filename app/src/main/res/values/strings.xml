@@ -571,6 +571,18 @@
     <string name="debug_mode_not_manual">Not manual</string>
     <string name="debug_reclaim_ok">Recovered</string>
     <string name="debug_reclaim_failed">Failed</string>
+    <!-- Live Debug: Night Light card (DE-038). -->
+    <string name="debug_night_light_title">Night Light</string>
+    <string name="debug_night_light_status">Status</string>
+    <string name="debug_night_light_circadian">Circadian adjustment</string>
+    <string name="debug_night_light_temperature">Color temperature</string>
+    <string name="debug_night_light_on">On</string>
+    <string name="debug_night_light_off">Off</string>
+    <string name="debug_night_light_kelvin" translatable="false">%1$d K</string>
+    <string name="debug_night_light_device_default">Device default</string>
+    <string name="debug_night_light_ramp_pending">Waiting for the next update</string>
+    <string name="debug_night_light_not_applied">Needs elevated access: Tideo is not applying Night Light.</string>
+    <string name="debug_night_light_service_stopped">Service stopped: Tideo is not applying Night Light.</string>
     <!-- Live Debug: Light Sensor card (DC-066). Enum names (WAKE, DEAD_BAND…) are shown untranslated. -->
     <string name="debug_sensor_title">Light Sensor</string>
     <string name="debug_sensor_last_callback">Last callback</string>

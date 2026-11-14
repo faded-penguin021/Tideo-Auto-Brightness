@@ -181,6 +181,7 @@ class AppModule(context: Context) {
             },
             readPrior = nightLightAnchorStore::readPrior,
             writePrior = nightLightAnchorStore::writePrior,
+            publishRampKelvin = LiveRuntimeState::setNightLightRampKelvin,
             temperatureRoute = nightLightTemperatureRoute(secureDisplay),
         )
 

@@ -65,14 +65,15 @@ investigation stays closed (DB-051…DB-060), and Scorecard.dev is a run-once lo
 > fork, options, recommendation (D-167), dated (DA-006); credential leaks and external-content
 > escalations land here too.
 
-1. **[2026-10-04] Get 71 Chinese strings translated; they show in English until then.** #143 asks
+1. **[2026-10-04] Get 81 Chinese strings translated; they show in English until then.** #143 asks
    for 65 — four changed meaning and lost their old Chinese, the rest are new (DD-026, DD-035,
    DD-047, DD-050, DD-071…DD-077); since then two of those were replaced by eight
-   `calibration_failed_*` messages, and `handoff_calibration_note_failed` was reworded (DE-032), so
-   #143 needs those added. Missing keys fall back to English, so it does not block a
+   `calibration_failed_*` messages, and `handoff_calibration_note_failed` was reworded (DE-032), and
+   Live Debug's Night Light card added ten `debug_night_light_*` labels (DE-038), so #143 needs
+   those added. Missing keys fall back to English, so it does not block a
    release (owner, 2026-10-08). Paste translations replied there into the file. Settles it: `comm -23 <(grep -v 'translatable="false"' app/src/main/res/values/strings.xml |
    grep -o 'name="[^"]*"' | sort) <(grep -o 'name="[^"]*"'
-   app/src/main/res/values-b+zh+Hans/strings.xml | sort) | wc -l` prints 0 (71 on 2026-11-04).
+   app/src/main/res/values-b+zh+Hans/strings.xml | sort) | wc -l` prints 0 (81 on 2026-11-14).
 
 2. **[2026-10-13] Decide whether to add a check that the output-redaction hook is still wired.**
    Since AMH 15.0.0 both adapters run `scripts/redact-tool-output.sh` after every tool call, but
@@ -106,7 +107,10 @@ investigation stays closed (DB-051…DB-060), and Scorecard.dev is a run-once lo
    readout goes above 255, the toast shows once, and `adb shell dumpsys display | grep -E
    'mHbmMode|hbmMax'` shows the mode on. The other is the F4's calibration log. When this item
    leaves, move those two checks into the calibration plan's Unit 5, where they already sit.
-   Settles it: `gh pr list --head ccr-b1d50b4f-nyhwmv --state merged` lists this train's PR,
+   Branch `ccr-a514a061-zwetfs` carries the train plus Live Debug's Night Light card (DE-038), so
+   merge it instead if you want the card in 1.15.3 (its `33.txt` names the card, 485 of 500
+   characters). Settles it: `gh pr list --head ccr-b1d50b4f-nyhwmv --state merged` (or
+   `ccr-a514a061-zwetfs`) lists this train's PR,
    `gh issue view 157 --json state` prints `CLOSED`, and `gh release view v1.15.3` succeeds (DE-037).
 
 **The tree declares `1.15.3` / vc33, this train's one bump (DE-023)**; 1.15.2 was seen tagged on
@@ -121,6 +125,11 @@ proposing work; changing it is legislation under RUNBOOK's rule-review protocol.
 ## Changelog
 
 Newest first; ledger rows are the durable detail.
+
+- 2026-11-14 — **Live Debug gains AAB's Night Light card: status, circadian adjustment, and the
+  setpoint or the Kelvin the ramp last landed; the coordinator publishes the landed Kelvin, and
+  the card says when Tideo is not applying it (DE-038, owner). Owner queue item 1 is now
+  81 strings.**
 
 - 2026-11-13 — **The Pixel reporter confirmed calibration completes on the vc33 debug build
   (AdvancedAutoBrightness issue 26; HBM still unseen). The owner will merge, close #157 and

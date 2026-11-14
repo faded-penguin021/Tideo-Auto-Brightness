@@ -833,6 +833,13 @@
             "anchors": [
               "PrivilegeManager"
             ],
+            "path": "app/src/main/kotlin/com/tideo/autobrightness/app/state/LiveDebugViewModel.kt"
+          },
+          {
+            "ambiguous": [],
+            "anchors": [
+              "PrivilegeManager"
+            ],
             "path": "app/src/main/kotlin/com/tideo/autobrightness/app/state/SettingsViewModel.kt"
           },
           {

@@ -1,3 +1,5 @@
+New:
+- Live Debug shows a Night Light card
 Fixes:
 - on phones whose system reports a brightness scale other than 0–255, such as the POCO F4 on HyperOS, the screen no longer sits near full brightness: Tideo now writes the brightness setting on Android's 0–255 scale on every phone (thanks to bnoeu, #157)
 - display calibration now completes on phones whose brightness stops below High Brightness Mode, such as Pixels, says why a run failed, and asks you to turn battery saver off first

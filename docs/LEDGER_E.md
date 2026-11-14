@@ -451,3 +451,24 @@
   checks have no new evidence. On 2026-11-12 the owner wrote on #157 that, with no reply, they
   will merge this train, close #157 and release around 2026-11-14/15, and the reporter may reopen
   it. The open reporter checks therefore do not block the release.
+- DE-038 [cited]: **Live Debug gains the Night Light card the owner added to AAB's debug page
+  (owner, 2026-11-14).** It shows Night Light on or off, circadian adjustment on or off, and the
+  colour temperature of the active mode — with circadian off the effective setpoint
+  (`%AAB_NightLightTemp`, "Device default" when unset), with it on the Kelvin the ramp last landed
+  (`%AAB_NightLightTempCirc`, "Waiting for the next update" until one lands), and a dash while
+  Night Light is off, as AAB shows nothing — reading the settings from the live store, which is the
+  effective truth (D-170). After each circadian write attempt `DisplayTogglesCoordinator` publishes
+  `deviceTempK` to `LiveRuntimeState.nightLightRampKelvin` if the write succeeded, the coordinator
+  is still started and the device has Night Light, and null otherwise; it publishes null when
+  tracking ends (below ELEVATED too), on stop and on panic, `reset()` clears it, and a swap whose
+  ramp equals a `deviceTempK` the seed assumed rather than wrote shows it unverified until the
+  recheck tick 5 s later reads the device. Like `setCalibrating`, the setter is not owner-gated
+  (DD-055), because `stop()` and `panicReset()` clear `scope` before taking the mutex and the
+  publish refuses a value once it is cleared. Two departures from AAB: the card says Tideo is not
+  applying Night Light while the service is stopped or below ELEVATED, because the setting alone
+  would read as applied; and the temperature shows the setpoint as set, not clamped to the device's
+  range, as AAB shows the variable. A fresh-context review (Fable 5.2) found the published Kelvin
+  could outlive a failed write and appear on a device with no Night Light, both now fixed with
+  tests, and noted outside this card that `stop()` cancels the effective-flow collector without
+  joining it, so an emission already resumed could still write after the restore (the D-139
+  class), not reproduced and left for its own unit.
