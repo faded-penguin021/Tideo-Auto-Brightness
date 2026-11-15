@@ -45,6 +45,7 @@ import com.tideo.autobrightness.app.runtime.SensorCallbacks
 import com.tideo.autobrightness.app.runtime.SensorDiagnostics
 import com.tideo.autobrightness.app.state.LiveDebugUiState
 import com.tideo.autobrightness.app.state.LiveDebugViewModel
+import com.tideo.autobrightness.app.state.NightLightDebug
 import com.tideo.autobrightness.app.ui.components.AabTopBar
 import com.tideo.autobrightness.app.ui.components.DiagnosticCard
 import com.tideo.autobrightness.app.ui.components.DiagnosticLine
@@ -72,7 +73,10 @@ fun LiveDebugScreen(navController: NavHostController, vm: LiveDebugViewModel = v
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_RESUME) vm.refreshGlobalToastStatus()
+            if (event == Lifecycle.Event.ON_RESUME) {
+                vm.refreshGlobalToastStatus()
+                vm.refreshTier()
+            }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
@@ -84,7 +88,6 @@ fun LiveDebugScreen(navController: NavHostController, vm: LiveDebugViewModel = v
         onSetPanicSensitivity = vm::setPanicSensitivity,
         onSetPanicRequiresPlugged = vm::setPanicRequiresPlugged,
         onEnableGlobalToasts = {
-            // Deep-link to the system Accessibility settings so the user can enable the overlay.
             runCatching {
                 context.startActivity(
                     Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
@@ -148,6 +151,8 @@ fun LiveDebugContent(
                 )
                 Metric(stringResource(R.string.debug_active_rule), state.activeContext ?: stringResource(R.string.debug_active_rule_none), "debug_active_rule")
             }
+
+            NightLightCard(state.nightLight, state.serviceRunning)
 
             // DC-007: requested vs acknowledged vs settingsApiMax, readable without an override firing.
             BrightnessWriteCard(p)
@@ -307,6 +312,38 @@ private fun BrightnessWriteCard(p: PipelineState) {
             }
             Metric(stringResource(R.string.debug_override_age), relativeAgeLabel(d.timestampMs), "debug_override_age")
         }
+    }
+}
+
+/** DE-038: the AAB debug page's Night Light card; the temperature follows the active mode. */
+@Composable
+private fun NightLightCard(n: NightLightDebug, serviceRunning: Boolean) {
+    @Composable
+    fun onOff(on: Boolean) = stringResource(if (on) R.string.debug_night_light_on else R.string.debug_night_light_off)
+    @Composable
+    fun kelvin(k: Int) = stringResource(R.string.debug_night_light_kelvin, k)
+
+    DiagnosticCard(stringResource(R.string.debug_night_light_title), "debug_night_light") {
+        Metric(stringResource(R.string.debug_night_light_status), onOff(n.enabled), "debug_night_light_status")
+        Metric(stringResource(R.string.debug_night_light_circadian), onOff(n.circadian), "debug_night_light_circadian")
+        Metric(
+            stringResource(R.string.debug_night_light_temperature),
+            when {
+                !n.enabled -> stringResource(R.string.debug_write_absent)
+                n.circadian -> n.rampKelvin?.let { kelvin(it) }
+                    ?: stringResource(R.string.debug_night_light_ramp_pending)
+                else -> n.temperatureK?.let { kelvin(it) }
+                    ?: stringResource(R.string.debug_night_light_device_default)
+            },
+            "debug_night_light_temperature",
+        )
+        val notApplied = when {
+            !(n.enabled || n.circadian) -> null
+            !serviceRunning -> R.string.debug_night_light_service_stopped
+            !n.elevated -> R.string.debug_night_light_not_applied
+            else -> null
+        }?.let { stringResource(it) }
+        if (notApplied != null) DiagnosticLine("debug_night_light_not_applied") { append(notApplied) }
     }
 }
 

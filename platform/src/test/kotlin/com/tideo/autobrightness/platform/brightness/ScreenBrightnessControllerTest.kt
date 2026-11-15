@@ -172,37 +172,31 @@ class ScreenBrightnessControllerTest {
     }
 
     @Test
-    fun oemNormalization_roundTripIsIdentity_for1023Max() {
-        val oem = AndroidScreenBrightnessController(context, settingsApiMaxOverride = 1023)
-        for (domain in intArrayOf(0, 1, 99, 100, 128, 254, 255)) {
-            oem.write(domain)
-            assertEquals(domain, oem.read(), "round-trip failed for domain=$domain")
+    fun write_storesTheDomainValueUnscaled_andClampsOutsideIt_DE023() {
+        fun stored() = Settings.System.getInt(context.contentResolver, Settings.System.SCREEN_BRIGHTNESS, -1)
+        for (n in 0..255) {
+            val result = controller.write(n)
+            assertEquals(n, stored(), "write($n)")
+            assertEquals(n, controller.read(), "read after write($n)")
+            assertEquals(n, result.requestedSettingValue)
+            assertEquals(255, result.settingsApiMax)
         }
-    }
-
-    @Test
-    fun oemNormalization_writeScalesToDeviceRange() {
-        val oem = AndroidScreenBrightnessController(context, settingsApiMaxOverride = 1023)
-        oem.write(255)
-        val raw = Settings.System.getInt(
-            context.contentResolver, Settings.System.SCREEN_BRIGHTNESS, -1,
-        )
-        assertEquals(1023, raw)
-    }
-
-    @Test
-    fun write_clampsOutOfRangeDomainInput() {
         controller.write(300)
-        assertEquals(255, controller.read())
+        assertEquals(255, stored())
         controller.write(-5)
-        assertEquals(0, controller.read())
+        assertEquals(0, stored())
+    }
+
+    @Test
+    fun read_clampsAStoredValueAboveTheScale_DE023() {
+        Settings.System.putInt(context.contentResolver, Settings.System.SCREEN_BRIGHTNESS, 787)
+        assertEquals(255, controller.read())
     }
 
     /** DC-002: an OEM that stores [store] of what we asked for; reads stay real. */
-    private fun normalizing(store: (Int) -> Int, settingsApiMax: Int = 1023) =
+    private fun normalizing(store: (Int) -> Int) =
         AndroidScreenBrightnessController(
             context,
-            settingsApiMaxOverride = settingsApiMax,
             rawWrite = { raw ->
                 Settings.System.putInt(context.contentResolver, Settings.System.SCREEN_BRIGHTNESS, store(raw))
             },
@@ -210,26 +204,31 @@ class ScreenBrightnessControllerTest {
 
     @Test
     fun normalizedWrite_marksTheSTOREDValue_soTheEchoIsASelfWrite() {
-        val oem = normalizing(store = { 3083 })
-        val result = oem.write(255)
+        val oem = normalizing(store = { 103 })
+        val result = oem.write(100)
         assertEquals(WriteStatus.ACKNOWLEDGED, result.status)
-        assertEquals(255, result.requestedDomain)
-        assertEquals(1023, result.requestedSettingValue)
-        assertEquals(3083, result.readBackSettingValue)
-        assertEquals(255, result.acknowledgedDomain)
-        assertEquals(1023, result.settingsApiMax)
-        assertTrue(oem.isSelfWrite(3083))
+        assertEquals(100, result.requestedDomain)
+        assertEquals(100, result.requestedSettingValue)
+        assertEquals(103, result.readBackSettingValue)
+        assertEquals(103, result.acknowledgedDomain)
+        assertEquals(255, result.settingsApiMax)
+        assertTrue(oem.isSelfWrite(103))
         // The requested raw stays matchable: a provider that applies asynchronously echoes it later.
-        assertTrue(oem.isSelfWrite(1023))
+        assertTrue(oem.isSelfWrite(100))
         assertFalse(oem.isSelfWrite(77))
     }
 
     @Test
     fun acknowledgedDomain_isTheStoredRawConverted_notTheRequestedDomain() {
-        val oem = normalizing(store = { 512 })
+        val oem = normalizing(store = { 128 })
         val result = oem.write(255)
         assertEquals(255, result.requestedDomain)
-        assertEquals(128, result.acknowledgedDomain, "512/1023 → 128 in domain space")
+        assertEquals(128, result.acknowledgedDomain, "the stored 128, not the requested 255")
+        val overOem = normalizing(store = { 3083 })
+        val over = overOem.write(200)
+        assertEquals(3083, over.readBackSettingValue)
+        assertEquals(255, over.acknowledgedDomain, "a stored value above the scale clamps to 255")
+        assertTrue(overOem.isSelfWrite(3083), "the marker is the raw stored value, never clamped")
     }
 
     @Test
@@ -238,7 +237,6 @@ class ScreenBrightnessControllerTest {
         lateinit var oem: AndroidScreenBrightnessController
         oem = AndroidScreenBrightnessController(
             context,
-            settingsApiMaxOverride = 255,
             rawWrite = { raw ->
                 seenMidWrite = oem.isSelfWrite(9999)
                 Settings.System.putInt(context.contentResolver, Settings.System.SCREEN_BRIGHTNESS, raw)
@@ -254,7 +252,6 @@ class ScreenBrightnessControllerTest {
         var refuse = false
         val oem = AndroidScreenBrightnessController(
             context,
-            settingsApiMaxOverride = 255,
             rawWrite = { raw ->
                 if (refuse) false
                 else Settings.System.putInt(context.contentResolver, Settings.System.SCREEN_BRIGHTNESS, raw)
@@ -275,7 +272,6 @@ class ScreenBrightnessControllerTest {
         var deny = false
         val oem = AndroidScreenBrightnessController(
             context,
-            settingsApiMaxOverride = 255,
             rawWrite = { raw ->
                 if (deny) throw SecurityException("WRITE_SETTINGS revoked")
                 Settings.System.putInt(context.contentResolver, Settings.System.SCREEN_BRIGHTNESS, raw)
@@ -293,7 +289,6 @@ class ScreenBrightnessControllerTest {
     fun writtenButUnacknowledged_keepsTheREQUESTEDMarker_soItsOwnEchoIsStillFiltered() {
         val oem = AndroidScreenBrightnessController(
             context,
-            settingsApiMaxOverride = 255,
             rawWrite = { raw ->
                 Settings.System.putInt(context.contentResolver, Settings.System.SCREEN_BRIGHTNESS, raw)
             },
@@ -314,7 +309,6 @@ class ScreenBrightnessControllerTest {
         var explode = false
         val oem = AndroidScreenBrightnessController(
             context,
-            settingsApiMaxOverride = 255,
             rawWrite = { raw ->
                 if (explode) throw IllegalStateException("provider")
                 Settings.System.putInt(context.contentResolver, Settings.System.SCREEN_BRIGHTNESS, raw)

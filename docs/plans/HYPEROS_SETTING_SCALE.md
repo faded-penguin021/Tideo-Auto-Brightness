@@ -2,14 +2,16 @@
 
 ## Status
 
-- **Spec only. No code has changed.** On 2026-10-31 a reporter's public fork patched Tideo's
-  brightness scale for their phone, and the owner asked for a plan, not a fix. This file, ledger
-  row DE-014 and the STATE entries are **Unit 0**. Every later unit needs the owner's go-ahead.
+- **Unit 1 landed on 2026-11-01 (DE-023), 1.15.3 / vc33; Unit 2 is next, trimmed on 2026-11-02
+  to what the reporter's evidence does not already cover (owner, DE-024).** On 2026-10-31 a
+  reporter's public fork patched Tideo's brightness scale for their phone, and the owner asked for
+  a plan, not a fix. This file, ledger row DE-014 and the STATE entries are **Unit 0**. Every
+  later unit needs the owner's go-ahead.
 - **Revised on 2026-10-31 after a review of this plan and the Pixel calibration plan, relayed by
   the owner (DE-015, DE-016).** All calibration work moved to the Pixel plan
   (`DISPLAY_CALIBRATION_CEILING.md`), now the shared calibration plan. This plan keeps the
-  setting's scale and the override-point migration, and its reporter checks gather the HyperOS
-  calibration evidence that plan needs.
+  setting's scale and the override-point migration. The HyperOS calibration evidence that plan
+  needs is asked for there, in its device checks (DE-024).
 - **Sequencing (owner, 2026-10-31).** Both plans stay open, and executing them is the next stage,
   after the codemap plan is complete and merged to `main`. No unit here starts before then.
 - **D1 (a) and D2 (b) are decided** (owner, 2026-10-31; DE-018): 0–255 on every device, and
@@ -65,7 +67,7 @@ Shizuku 13.5 running.
   manual brightness capped at the transition point. It supports H1; no plateau is shown yet.
 - **The shell and the app share one scale here** *(#157)*. `adb shell settings get system
   screen_brightness` returned 16, the value Tideo wrote. On the owner's OnePlus the shell reads
-  another scale (DC-025). Unit 2 still reads `dumpsys`.
+  another scale (DC-025). Unit 2's slider check relies on this.
 - **The dump's Shizuku leg never ran** *(#157)*. Shizuku 13.5 was running, but Tideo was never
   authorised in it: an adb-elevated user is never asked. That gap belongs to the faster-Shizuku
   plan's Unit 5. Here it only bears on H2.
@@ -158,6 +160,14 @@ Written for the decided D1 (a) and D2 (b) (DE-018).
 - **Live Debug.** `Settings API max` stays and reads 255 everywhere. Its label, its string key and
   `DEVICE_TEST_SCRIPT.md` §2's "reads 255 on the owner's phone" all stay true, so no string
   changes.
+- **Docs that name the lookup** (codemap check, 2026-11-01). `README.md:140` says the mapping "is
+  detected from `config_screenBrightnessSettingMaximum`", and `DEVICE_TEST_SCRIPT.md` §2 (:91-92)
+  defines the card's M as that config. Both become false: M is the fixed 255 of Tideo's contract.
+  Correct them in our commit.
+- **Comment budget.** The platform module also stands at its limit (338/338 on 2026-11-01), so
+  the DE pointer replaces a comment line in `ScreenBrightnessController.kt` rather than adding
+  one: `// Falls back to 255 if absent` (:47) goes with the lookup, and `device range may differ`
+  (:22) goes stale and is reworded in place.
 - **Tests** (`ScreenBrightnessControllerTest`):
   - the two 1023 conversion tests go, since no conversion is left; one test pins that a write of
     n stores n for 0 to 255 and clamps outside it;
@@ -175,48 +185,42 @@ Written for the decided D1 (a) and D2 (b) (DE-018).
   - The train's one version bump by playbook 6: a patch, expected to be 1.15.3 / vc33, shared
     with any other unit in the train. Check the live tags first.
 
-### Unit 2. The reporter's device checks
+### Unit 2. The reporter's check (trimmed 2026-11-02, DE-024)
 
-The owner has no HyperOS phone. The reporter offered on #157 to test any debug build, so this
-unit asks them there, through the Owner queue, to run a debug build of Unit 1. Step 6 also needs
-the calibration plan's Unit 1 (its trace) in that build. One ask needs no build: the full
-`dumpsys display` they offered on #157, for Owner-queue item 3's `brightnessMaxReason` check.
+The owner has no HyperOS phone, so this unit asks the reporter on #157, through the Owner queue,
+with Unit 1's debug build attached. It asks only what their evidence does not already cover:
 
-Two values are kept apart throughout (DE-016): the **app-facing setting**, which Live Debug's
-**Requested → acknowledged** reads back, and the **applied panel brightness**,
-`mScreenBrightness` in `dumpsys display`. Under H1 the panel stops at about 0.49976 from setting
-128 up, while the setting keeps the value written.
+- **On the F4, Unit 1's build behaves as the fork's build did.** With a maximum of 255 the old
+  conversion was already the 0–255 clamp Unit 1 now applies on every device, and the fork's two
+  other changes touch only calibration's dump reads. What the reporter saw on the fork stands for
+  Unit 1.
+- **The scale needs no re-test.** The release build's floats are exactly 15/254, 31/254 and
+  47/254 (DE-014), which a misread or another scale would not produce, and the floor follows
+  from the scale.
 
-1. **The scale, below any ceiling.** Live Debug reads `Settings API max: 255`. Vary the light
-   until **Requested → acknowledged** shows about 25, 50 and 100. At each,
-   `adb shell "dumpsys display | grep -E 'mScreenBrightness=|brt='"` shows about
-   `(requested − 1) / 254`. These three decide the scale.
-2. **Saturation, checked separately.** At a request of 128 or more:
-   - pass for the scale: acknowledged equals requested, and where the dump's brightness event log
-     has `unclampedBrt` (DE-005's Pixel did), the latest one is about `(requested − 1) / 254`;
-   - record `mScreenBrightness`: still on `(requested − 1) / 254` means no manual ceiling (H1
-     false), and about 0.49976 means H1's ceiling. Either passes; which one is H1's first
-     evidence.
-3. **The floor.** In the dark at domain 1, `mScreenBrightness` reads 0.0 or the panel's minimum
-   of 9.7704E-4, about 2 nits.
-4. **The read side.** Drag the system slider low, where `mScreenBrightness` stays below 0.49976,
-   while Tideo runs. Tideo pauses, and the settled value on Live Debug's override diagnostic is
-   about `mScreenBrightness × 254 + 1` from `dumpsys display` right after. Above a ceiling that
-   formula cannot rebuild the setting, so at a high slider position compare with
-   `unclampedBrt × 254 + 1` from the event log instead, or skip it. Use `dumpsys`, never
-   `settings get`: on the owner's OnePlus the shell speaks another scale than the app (DC-025).
-5. **Days of use**, nights included, with the screen never brighter than the dashboard says.
-6. **The calibration evidence** (next section). Start
-   `adb logcat -s <the calibration plan's trace tag> > trace.txt`, calibrate, then at once run
-   `adb shell dumpsys display > display.txt`, and attach both. The trace gives the failing level,
-   each read's source, field, raw samples and elapsed time, across every source tried. The dump's
-   event log gives each level's `brt` and `unclampedBrt`. A shell `time dumpsys display` is not
-   asked for: it times one call, not the app's read path.
+The asks:
+
+1. **Days of use**, nights included, on either build, with the screen never brighter than the
+   dashboard says. The reporter already offered this report on the fork.
+2. **The read side**, the assumption under "What it breaks" that nothing shown covers. Drag the
+   system slider low, where `mScreenBrightness` stays below 0.49976, then run
+   `adb shell settings get system screen_brightness` and
+   `adb shell "dumpsys display | grep mScreenBrightness="`. It passes when the setting is about
+   `mScreenBrightness × 254 + 1`. `settings get` is safe on the F4, whose shell returned the 16
+   Tideo wrote *(#157)*, but not on the owner's OnePlus (DC-025). A failure means the slider
+   writes a wider scale: overrides still pause, but saved points are read on the wrong scale and
+   clamp at 255, which gets a DE row and a fix here.
+
+Not this unit's:
+
+- **The F4's calibration evidence** (the trace and the dump of a failed run) checks calibration,
+  not the scale. The calibration plan's device checks ask for it, from a build with its Unit 1.
+- **The full `dumpsys display`** the reporter offered on #157 feeds Owner-queue item 3's
+  `brightnessMaxReason` check.
 
 ### Unit 3. Close out
 
-- Every finding has its DE row. The calibration evidence goes to its own row, and settles the
-  calibration plan's provisional F4 case.
+- Every finding has its DE row.
 - The owner answers #157 and decides when it closes.
 - Remove the STATE checklist and delete this file.
 
@@ -224,8 +228,8 @@ Two values are kept apart throughout (DE-016): the **app-facing setting**, which
 
 The scale fix does not fix the Pixel's calibration failure (DE-005), and it is not shown to fix
 the F4's. H1 and H2 below are hypotheses, not an exhaustive list of causes (DE-016). The cause is
-established from the corrected build's evidence (Unit 2, step 6) before the calibration plan's
-ceiling fix is declared to apply here.
+established from the corrected build's evidence (the calibration plan's device checks, DE-024)
+before that plan's ceiling fix is declared to apply here.
 
 - **H1, a manual ceiling (plausible).** The dump gives `hbmTransitionPoint=0.49975574`, 500 nits
   on the spline, and at 0 lx in manual mode `brightnessMax` equals it *(#157)*, the cap the
@@ -302,8 +306,6 @@ ceiling fix is declared to apply here.
 - **The fork's longer time limits**: not without the app's measured read times, see H2. They
   stay out of Unit 1's cherry-pick.
 - **The fork's workflow**, which only builds its debug APK. It also stays out of the pick.
-- **The shell's scale on HyperOS** (DC-025's split on the OnePlus): Unit 2 reads `dumpsys`,
-  never `settings get` or `settings put`, so it does not matter here.
 
 ## Relation to other plans
 
@@ -311,8 +313,9 @@ ceiling fix is declared to apply here.
   owns every calibration change: the trace (its Unit 1), ceiling validation and persistence, the
   readout and HBM flag above the boundary, and the failure causes, which would have kept this
   failure from blaming DUMP.
-  - This plan's Unit 2 needs that plan's Unit 1 in its build for step 6.
-  - The F4 is that plan's provisional case until step 6's evidence settles the cause.
+  - That plan's device checks ask the reporter for the F4's calibration evidence, from a build
+    with its Unit 1; this plan's Unit 2 no longer carries it (DE-024).
+  - The F4 is a confirmed ceiling case there, from the reporter's sweep on #157 (DE-027).
   - Whichever plan lands second rebases on the other.
 - **Faster Shizuku paths, Unit 12** (float writes). See "Deliberately left alone".
 
@@ -326,8 +329,6 @@ ceiling fix is declared to apply here.
   - a push to the session branch.
 - **Reviews.** Unit 1 touches `:platform` and the runtime glue, so it gets the fresh-context glue
   review before its commit.
-- **Order.** Unit 2's step 6 needs the calibration plan's Unit 1 in the reporter's build. If that
-  unit has not landed, run steps 1–5 and hold step 6.
 - **Version.** Unit 1 carries the train's one bump unless another unit already has (playbook 6).
   Never bump twice in one train.
 - **Decisions.** D1 (a) and D2 (b) are decided, and Unit 1 is written for them: no Misc
@@ -338,5 +339,5 @@ ceiling fix is declared to apply here.
 
 0. Commit this plan, DE-014 and the STATE entries. **Stop.**
 1. One scale for the setting (D1, D2).
-2. The reporter's device checks, through the Owner queue.
+2. The reporter's days-of-use report and slider check, through the Owner queue.
 3. Close out and delete this file.

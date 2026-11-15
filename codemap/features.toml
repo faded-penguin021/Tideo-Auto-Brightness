@@ -15,7 +15,7 @@ keywords = ["kelvin", "night"]
 [handoff]
 anchors = ["HandoffCoordinator", "HandoffRules", "HighBrightnessUpdates", "DisplayBrightnessReader",
            "DisplayBrightnessDump", "DisplayCalibration", "DisplayCalibrationRun",
-           "DisplayCalibrationStore"]
+           "DisplayCalibrationStore", "DisplayCalibrationTrace"]
 keywords = ["handoff", "hbm", "calibration"]
 
 [super-dimming]

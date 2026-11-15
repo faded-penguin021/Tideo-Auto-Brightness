@@ -9,6 +9,15 @@
 - Three independent audits fed it: Opus, Astra (`gpt-6-astra`, high effort) and an earlier ChatGPT
   review of v1.14.1. Every finding below was re-checked against `math-explained` at `20ad58b`. A
   finding that one model made and the code did not bear out was dropped.
+- **Re-read against the tree at `2ccac7e` on 2026-11-11** (owner asked; DE-036). All seven findings
+  held. The owner accepted the corrections it produced, and they are folded in below:
+  - Unit 1 publishes from the coordinator, and takes the dim multiplier as its input;
+  - Unit 2 names the Curve card label and its two hand-off cases;
+  - Unit 3 records the ordinary-mode chart as retained;
+  - Unit 4 is a behaviour change;
+  - Unit 5 reuses the hand-off helper that already exists;
+  - the conversion freeze is gone from Unit 7's entry.
+- Rows this plan asks for go in the live ledger volume, whatever its prefix is by then.
 - It does not touch the Night Light write paths, which had their own plan, now closed
   (DD-090…DD-093). The two plans share no files.
 
@@ -55,17 +64,30 @@ and a threshold of 40, Live Debug says 40 and the Dashboard says 5.
   - **Over-reports.** Below ELEVATED, the readout shows dimming that was never applied.
 - **Change:**
   - **Pure plan.** One pure `DimmingPlan` (mode, raw DS, relative readout, integer level) computed
-    once from target, settings and scale.
-  - **Coordinator.** `DimmingCoordinator.apply` returns it, together with whether it engaged.
-  - **Pipeline.** One pipeline helper publishes the readout, called from both `runCycle` and
-    `setInitialBrightness`. That also removes the duplicated floor → write → dim tail of those two
-    functions.
-  - **Disengage.** Every disengage publishes zeros.
+    once from target, settings and the circadian dim multiplier.
+  - **Its input is the multiplier, not the scale.** `DimmingCoordinator.apply` takes `dimDynamic`
+    in place of `scaleDynamic`. The pipeline derives it with `circadianDimMultiplier` until Unit 6
+    swaps the source, so Unit 6 changes no dimming signature and none of this unit's tests.
+  - **The coordinator publishes.** It is built with a readout callback. `apply` publishes the
+    plan's readout when it engaged and zeros when it did not.
+  - **Disengage.** `disengage` publishes zeros itself, before its `engaged == false` early return.
+    None of the 8 call sites changes, and a ninth cannot miss it. The call sites are the wrong
+    place: `PanicHandler` holds no pipeline state.
+  - **Pipeline.** One pipeline helper calls `apply` for both `runCycle` and `setInitialBrightness`,
+    which removes the duplicated floor → write → dim tail of those two functions. Neither
+    function writes `dimmingCurrent`/`dimmingDS` itself any more.
+  - **Wiring, for the unit to settle.** `AppModule` builds the coordinator before the controller
+    that owns the state, so the unit picks how the callback is bound.
+  - **Glue review.** `stop()` and the panic path call `disengage` off the pipeline coroutine. The
+    state update is atomic and `stop()` already updates state there; the review checks the publish
+    against D-027 all the same.
   - **Keep.** Keep the task650 `DS × progress` relative readout as it is.
 - **Tests:**
   - the readout after `setInitialBrightness`;
   - the readout after an override pause;
   - the readout below ELEVATED;
+  - the readout is 0 after a failed level write, and after a failed activation (D1's rule: not
+    engaged reads 0);
   - PWM and ordinary levels unchanged when engaged.
   - The golden `superdimming.csv` is untouched.
 
@@ -80,10 +102,21 @@ and a threshold of 40, Live Debug says 40 and the Dashboard says 5.
 - **Charts.** The Circadian and Super Dimming charts take the shared marker instead of
   `targetBrightness`.
 - **Labels.** Each label names the value it shows:
-  - Live Debug shows both, as "Perceived" and "Hardware (written)";
+  - Live Debug already shows both, as "Current" (hardware) and "Target" (perceived). They become
+    "Hardware (written)" and "Perceived";
   - the Dashboard's "Applied" label stops describing a perceived number;
+  - the Curve card's "Current brightness" (`diag_curve_current_bright`) shows the perceived value
+    under the words Live Debug uses for the hardware one, so it takes the perceived label;
   - the `DiagnosticCard` circadian and dimming lines say "hardware".
-- **No value changes.** Only selection and labels change.
+- **No value changes outside hand-off.** Only selection and labels change, with one exception and
+  one line that deliberately stays as it is:
+  - **Live Debug's perceived line reads `shownBrightness`.** Today it reads `targetBrightness`,
+    which is not gated on hand-off, so it shows the last target from before Android took over.
+    After the change it shows what the Dashboard shows.
+  - **The `DiagnosticCard` circadian and dimming lines keep reading `lastAppliedBrightness`.** They
+    describe Tideo's own write, and show "—" while handed off. `currentBrightness` would put
+    Android's value beside Tideo's scale and dim level. This is the one consumer that does not go
+    through the two definitions, and the KDoc says why.
 - **Strings.** Changed strings join Owner-queue item 1 (untranslated Chinese strings).
 
 ### 3. Dimming chart follows the active mode
@@ -91,7 +124,11 @@ and a threshold of 40, Live Debug says 40 and the Dashboard says 5.
 - `DimmingChart` takes `pwmSensitive` and `pwmExponent`.
 - In PWM mode it plots `SoftwareDimming.finalDimLevel` over the same x-range, so the live marker sits
   on the curve the runtime uses.
-- This departs from Tasker's dimming graph (`dimming_graph.md`), so it needs a DD row.
+- This departs from Tasker's dimming graph (`dimming_graph.md`), so it needs a ledger row.
+- **Ordinary mode stays as Tasker draws it.** There the chart plots `dimmingstrength × dim_progress`
+  without the circadian multiplier the runtime applies. That is the transcribed graph, and the
+  circadian effect has its own chart beside it. It is listed under Deliberately left alone so that
+  Unit 7's preview clause does not read as an instruction to change it.
 
 ### 4. One helper for global fields kept across a swap
 
@@ -99,20 +136,34 @@ and a threshold of 40, Live Debug says 40 and the Dashboard says 5.
 - Manual load, import and reset call it. They state their own extras at the call site:
   - the context lock;
   - import's preserved secure-display fields.
-- **Draft rebase stays separate.** It lets `detectOverrides` be edited on purpose.
+- **This changes behaviour, so it gets a ledger row.** Manual load and import take `setupTitle` and
+  `schemaVersion` from the incoming profile today, and reset takes the defaults. With the helper
+  all three keep the current ones, as a context swap already does. Nothing reads either field in
+  a way a user would see: the schema migration only raises the number, and the stored settings
+  are already at the current one.
+- **The draft stays separate, at both of its sites** in `DraftSettingsViewModel`: the rebase in
+  its settings collector, and the commit in `apply`. The draft edits `detectOverrides` on purpose,
+  so neither takes the helper.
 - **Not a blanket copy.** `GlobalPrefs` is the wrong boundary, because it also holds per-profile
   fields (`ContextEngine.kt` KDoc on `mergeProfile`).
-- **Test.** One test asserts that every swap path keeps the same global set.
+- **Test.** One test asserts that every swap path keeps the same global set. The two draft sites
+  are not swap paths and are outside it.
 
 ### 5. Small pure formulas, one copy each (no behaviour change)
 
 - **Validator.** `SettingsValidator` calls the raw `BrightnessEngine.mapLuxToBrightness(1000.0, …)`
   instead of its own three zones. Keep it raw: no scale, offset or clamp. It also calls
-  `AabSettings.minRequiredMaxBrightness()` instead of recomputing it.
+  `AabSettings.minRequiredMaxBrightness()` instead of recomputing it. That helper moves from
+  `app.state` (`SettingsViewModel.kt`) to `app.settings`, so the validator imports nothing from
+  `state`.
 - **Wizard.** `AabSettings.withCurveSuggestion(cfg)` replaces the two five-field copies in
   `ToolsScreen`. Preview and Apply keep their different validation timing.
-- **Hand-off lux.** `HandoffRules.effectiveLux(handoffLux, curve)` replaces `maxOf(...)` in
-  `HandoffCoordinator` and `HandoffScreen`.
+- **Hand-off lux.** The helper already exists: `HandoffRules.effectiveThreshold(storedLux, cfg)`
+  is in `:domain`, tested, and has no production caller. Do not add another.
+  - Add an overload that takes the minimum, `effectiveThreshold(storedLux, minimum)`, and have the
+    existing one delegate to it.
+  - It replaces `maxOf(...)` in `HandoffCoordinator` and `HandoffScreen`. Both already hold the
+    minimum, and the coordinator caches it because the scan behind it runs up to 100 000 steps.
 - **Distance.** `ContextEngine`'s location debounce uses `ContextMatching`'s haversine and Earth
   radius.
 
@@ -120,14 +171,18 @@ and a threshold of 40, Live Debug says 40 and the Dashboard says 5.
 
 - **Change:**
   - `BrightnessEngine.dynamicScale` passes `dimSpreadPercent` and publishes `dimDynamic`.
-  - The coordinator uses it, and `circadianDimMultiplier` is deleted.
+  - The pipeline passes that to `apply` in place of the value it rebuilds, and
+    `circadianDimMultiplier` is deleted. Unit 1 already made the multiplier the input, so no
+    dimming signature changes here.
+  - **Keep the gate that function holds.** Task646 applies the multiplier only when
+    `%AAB_ScalingUse` is on (D-072), so with circadian scaling off the pipeline still passes none.
 - **Why it changes behaviour.** This is Tasker task90's own value. The current rebuild divides the
   3-decimal-rounded scale by `ScaleSpread`, which multiplies the rounding error by up to 100.
   - Worked example (Astra): ScaleSpread 1, DimSpread 100, strength 25. The chart says 1.540, the
     runtime 1.500: level 39 vs 38.
   - At the defaults (15 / 100) the difference is ≤ 0.004.
-- **Needs the owner's decision.** It revisits D-072 and changes an output interface, so it needs a DD
-  row.
+- **Needs the owner's decision.** It revisits D-072 and changes an output interface, so it needs a
+  ledger row.
 
 ### 7. Keep it from coming back (owner, 2026-10-21)
 
@@ -173,12 +228,14 @@ It also found three over-reaches:
   citations are filled in and verified when the unit lands):
 
   > **Deliberate differences retained by the light-refactor decision (owner, 2026-10-21;
-  > `<DD-row>`).** Do not propose unifying these contracts unless the owner reopens them:
+  > `<ledger-row>`).** Do not propose unifying these contracts unless the owner reopens them:
   > - Alpha remains the transcribed Tasker preview; the brightness chart retains its labelled base
   >   curve and final-output marker.
+  > - The ordinary-mode dimming chart remains the transcribed Tasker graph, without the circadian
+  >   multiplier.
   > - The wizard evaluator retains its distinct Tasker bounds, power handling and clamp.
-  > - Settings, calibration and window conversions retain their API contracts; the existing
-  >   conversion freeze remains in force.
+  > - The brightness setting, display calibration and window brightness retain their own API
+  >   contracts. This does not bar a change to any one of them, DE-019's included.
   > - Override tolerances 2 and 1 answer different questions.
   > - `evaluate`/`calculatedBrightness` and `round3`/`bigScale3` retain their rounding contracts.
   > - Per-screen lux precision and domain/app animation defaults retain their distinct uses.
@@ -191,8 +248,9 @@ It also found three over-reaches:
   - the contract default-string audit (checked, all equal).
 
   A later plan may take them up without reopening anything.
-- **Rows.** Only Units 1, 2, 3 and 6 write DD rows, and they cover what those units change. This
-  unit writes the row behind the Decided non-items entry, and any row a retained difference lacks.
+- **Rows.** Only Units 1, 2, 3, 4 and 6 write ledger rows, and they cover what those units
+  change. This unit writes the row behind the Decided non-items entry, and any row a retained
+  difference lacks.
   It verifies every row it cites.
 - **Why prose and no guard.** A duplication or missing-caller detector would be either noisy or easy
   to satisfy without meeting its intent; DA-004 records that Goodhart risk. The tests that Units 1–5
@@ -216,9 +274,17 @@ It also found three over-reaches:
   - The alpha chart is a transcribed Tasker preview.
   - The wizard evaluator is a different Tasker algorithm: inclusive bounds, `safePowDelta`, clamped
     `form3A`. AGENTS.md says to preserve quirks.
+- **Dimming chart in ordinary mode:**
+  - It plots Tasker's `dimmingstrength × dim_progress` and leaves out the circadian multiplier the
+    runtime applies. That is the transcribed graph (`dimming_graph.md`).
+  - Unit 3 changes the chart in PWM mode only.
 - **Brightness conversions:**
-  - Settings 0–255 conversion, display calibration and window brightness: different APIs.
-  - The conversion path is frozen (DC-011…).
+  - The brightness setting, display calibration and window brightness: different APIs.
+  - The setting is no longer converted at all. From 1.15.3 Tideo reads and writes it as 0–255 on
+    every device (DE-023).
+  - Nothing here is frozen. The freeze DC-019 named ended with the owner's ruling in DC-026, DE-023
+    has since overruled part of that ruling, and DE-019 holds the fix for a device shown to read a
+    wider scale. Learning the scale stays declined (DC-026).
 - **Settings contract, defaults and limits:**
   - The contract's default strings were checked and match the code.
   - A schema rewrite is not light.
@@ -253,9 +319,9 @@ It also found three over-reaches:
   - Units 1, 2 and 6 touch runtime glue, so they get the glue review.
   - Each code unit gets a Sol review before its commit.
 - **Records.**
-  - Behaviour-changing units (1, 2, 3, 6) get DD rows and ride the train's next version bump; they
-    never bump on their own.
-  - Code cites DD rows, never this file.
+  - Behaviour-changing units (1, 2, 3, 4, 6) get ledger rows and ride the train's next version
+    bump; they never bump on their own.
+  - Code cites ledger rows, never this file.
 - **Comment budget.** A comment-budget raise, if one is needed, is a rule change and is asked for
   first.
 - **Rule review for Unit 7.** Unit 7 edits `AGENTS.md` and Decided non-items, so it runs the

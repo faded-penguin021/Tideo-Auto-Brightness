@@ -373,6 +373,8 @@
   `raw(n) = n`" was exactly that mistake — it would have injected two more domain-adjacent values
   and re-read the same silence — and is rewritten to S. DC-010's rule survives unchanged: pick the
   raw value for the domain value you want; only the scale it converts with was wrong.
+  → Its `deviceMax` lookup is gone: from 1.15.3 Tideo reads the setting as 0–255 on every device,
+  overruling "the lookup stays" — see DE-023.
 
 - DC-027: **§2 10b passes on a device — one domain step is dismissed as drift, two steps still
   pause, and the quiet half was JUDGED rather than dropped.** Re-run on 1.10.0-debug vc24 (owner,

@@ -65,7 +65,9 @@ class LiveRuntimeStateTest {
     @Test
     fun reset_clearsSnapshotAndRunning() {
         LiveRuntimeState.publish(owner, PipelineState(smoothedLux = 5.0), activeContext = "Cinema", nowMs = 100L)
+        LiveRuntimeState.setNightLightRampKelvin(3_400)
         LiveRuntimeState.reset()
+        assertNull(LiveRuntimeState.nightLightRampKelvin.value)
         assertNull(LiveRuntimeState.pipeline.value.lastPublishMs)
         assertNull(LiveRuntimeState.pipeline.value.smoothedLux)
         assertNull(LiveRuntimeState.activeContext.value)

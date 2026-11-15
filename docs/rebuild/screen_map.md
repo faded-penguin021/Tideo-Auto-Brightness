@@ -645,7 +645,9 @@ destination. The S12.5a drawer is retired.
 > the now-GLOBAL 10-label debug-category selector (moved off Misc, G2R-F9). The in-scene close button +
 > back-key props are handled by Compose nav. Per-screen `DiagnosticCard`s embed the same live readout on
 > Reactivity (threshold + dead zone) and Circadian (uncompressed vs true scale) (G2R-F7/F8). Power-draw
-> calibration stays on Tools.
+> calibration stays on Tools. Later cards: Brightness Writes (DC-007), Light Sensor (DC-066), and
+> Night Light from AAB's newer debug page (status, circadian adjustment, temperature of the active
+> mode, DE-038).
 
 | Element | Type | Disposition |
 |---|---|---|

@@ -351,10 +351,44 @@ Do it in two reviewable commits; on-device verification is owner-only (no emulat
   4. **Let CI run against the PR** — the bump is only validated by the workflows executing, above all
      `fdroid-compat.yml`'s reproducibility job round-tripping `upload-`/`download-artifact`. Do **not**
      cherry-pick action bumps onto an unrelated branch where those jobs never run.
+  5. **Name the bumped lines no PR runs automatically (DE-026).** A workflow triggered only by a
+     tag, a release, a dispatch, a `main`-only push or `pull_request_target` (which never runs the
+     PR's copy of its file) does not run on the PR. Run both commands below on the PR's HEAD tree,
+     never the session branch, which by step 4 does not carry the bumps: a detached worktree
+     (`git worktree add --detach <scratch dir> <head SHA>`, removed with
+     `git worktree remove --force <scratch dir>`). This lists those workflows:
+     `grep -LE '^  pull_request:' .github/workflows/*.y*ml` (`release.yml`, `release-signing.yml`,
+     `clean-dist.yml`, `translation-badges.yml` and `redirect-external-prs.yml`, 2026-11-03). A
+     bumped line in one is covered at PR time when a step using the same action at the same SHA
+     ran, not skipped, in a job the PR's checks list; the record names that job, and it shows the
+     action runs, not that this file's own inputs work with it. A pin no PR-run workflow carries
+     has no automatic PR-time run:
+     `pins() { tr '\n' '\0' | xargs -0 grep -hoE "uses[\"']? *: *[\"']?[^@ \"']+@[0-9a-f]{40}" /dev/null | sed -E "s/.*[: \"']//" | sort -u; }; comm -23 <(grep -LE '^  pull_request:' .github/workflows/*.y*ml | pins) <(grep -lE '^  pull_request:' .github/workflows/*.y*ml | pins)`
+     (`actions/github-script` and `softprops/action-gh-release`, 2026-11-03). Route each such bump
+     to the Owner queue with the check that settles it, never into the record as green:
+     - `release-signing.yml` only signs and uploads an artifact, so the owner may dispatch it on
+       the PR branch (Actions → Release Signing → Run workflow), which runs its own copy with its
+       own inputs; it runs with the signing secrets, which the same SHAs receive after the merge.
+     - `release.yml` is never dispatched for this, because a dispatch attaches an APK to a real
+       release; its check is the next tag's run:
+       `gh run list --workflow release.yml --limit 1 --json conclusion,createdAt`.
+     - `redirect-external-prs.yml`'s `triage` job skips the owner's and bots' PRs, so its first run
+       is the next outside contributor's PR, which nobody can schedule; its check is the same
+       command with `--workflow redirect-external-prs.yml`, or the owner accepts it as watch-only,
+       a broken run costing one missing triage comment.
+     Both commands match a two-space-indented `pull_request:` line, nothing more. Any other
+     spelling of the trigger lists as never-PR, the safe direction, while a PR workflow whose
+     `branches:`, `paths:` or `types:` filter, or a job or step `if:`, skipped this PR still lists
+     as PR-run, so match against the PR's checks and their step conclusions, not the list. A
+     newline in a file name breaks them. **Prose only:** no guard runs these commands or reads the
+     record; the PR's checks and job logs are the evidence.
 - **Avoid:** SHA→tag reversion; splitting the grouped PR; trusting the marker on any line with
-  trailing prose; merging before `build` **and** `fdroid-compat` are green; bumping gradle on a cadence.
-- **Acceptance:** full CI green on the PR. **Record:** STATE changelog line; a `D-NN` only if the
-  process itself changed.
+  trailing prose; merging before `build` **and** `fdroid-compat` are green; bumping gradle on a
+  cadence; calling a line step 5 names validated because the PR's CI is green.
+- **Acceptance:** full CI green on the PR, and every bumped line step 5 names either matched to a
+  step that ran its SHA in the PR's checks or routed to the Owner queue with its settling check.
+  **Record:** STATE changelog line, with step 5's outcome; a `D-NN` only if the process itself
+  changed.
 
 ### 9. Running the device E2E suite on the owner's phone
 - **When:** a build needs device evidence beyond JVM tests — a fix on a scenario's path, a train

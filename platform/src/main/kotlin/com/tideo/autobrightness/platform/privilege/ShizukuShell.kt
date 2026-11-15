@@ -6,6 +6,7 @@ import android.content.ServiceConnection
 import android.content.pm.PackageManager
 import android.os.IBinder
 import com.tideo.autobrightness.platform.brightness.DisplayBrightnessDump
+import com.tideo.autobrightness.platform.brightness.DumpOutput
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -33,6 +34,16 @@ object ShizukuShell {
     private var held: Held? = null
 
     enum class ReadOperation { WIFI_STATUS, FORCE_DARK, DISPLAY_BRIGHTNESS }
+
+    suspend fun readDisplayBrightness(context: Context): DumpOutput = serial.withLock {
+        val appContext = context.applicationContext
+        if (!binding.isUsable()) {
+            release(appContext)
+            return@withLock DumpOutput.Unavailable
+        }
+        callExclusive(appContext, timeoutFor(ReadOperation.DISPLAY_BRIGHTNESS)) { it.displayBrightnessLines() }
+            ?.let { DumpOutput.Lines(it) } ?: DumpOutput.Failed
+    }
 
     suspend fun read(context: Context, operation: ReadOperation): String? = call(context, timeoutFor(operation)) { service ->
         when (operation) {
@@ -134,6 +145,6 @@ object ShizukuShell {
             .processNameSuffix("aab_shell")
             .debuggable(false)
             .daemon(false)
-            .version(4)
+            .version(5)
     }
 }

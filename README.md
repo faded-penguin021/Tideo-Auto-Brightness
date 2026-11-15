@@ -137,7 +137,7 @@ To find out more about the use of Shizuku in this project, please read [`SHIZUKU
 - **A Settings key is not proof that a display feature is supported.** Tideo reproduces Android's
   framework capability gates before exposing or writing Night Light and always-on display. Some
   supported OEM implementations can still ignore Night Light temperature changes.
-- **Brightness range looks off.** Tideo normalizes the device's brightness range to a 0–255 scale. Some OEMs use different scales. The mapping is detected from `config_screenBrightnessSettingMaximum`.
+- **Brightness range looks off.** Tideo writes Android's brightness setting on its documented 0–255 scale on every device, whatever the device's `config_screenBrightnessSettingMaximum` says. If your screen is much brighter or dimmer than the dashboard's value, please open an issue with your device model.
 - **Context rules not firing.** For per-app rules, grant Usage Access when prompted; for location/Wi-Fi
   rules, grant and enable Location (unless you run Shizuku). Live Debug (set to Context Automation) shows the active context and any priority conflicts. Please note that this requires the Global Flashes to be enabled. 
 
@@ -174,7 +174,7 @@ A 3-module Gradle build:
 
 - **`:domain`**: pure JVM/Kotlin. All brightness math and decision logic (smoothing, curve mapping,
   thresholds, animation, circadian scale, context resolution). No Android dependencies.
-- **`:platform`**: Android library. Real system adapters behind small interfaces: light sensor, brightness writer (OEM-range normalization), secure-dimming writer, tiered privilege manager, brightness-override observer, and battery/Wi-Fi/location/foreground-app readers.
+- **`:platform`**: Android library. Real system adapters behind small interfaces: light sensor, brightness writer (the 0–255 setting), secure-dimming writer, tiered privilege manager, brightness-override observer, and battery/Wi-Fi/location/foreground-app readers.
 - **`:app`**: Compose Material 3 UI, DataStore settings, the foreground monitoring service, a Quick Settings tile, a home-screen widget, a boot receiver, and interactive notification.
 
 ## Building

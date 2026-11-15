@@ -5,8 +5,12 @@ import com.tideo.autobrightness.domain.brightness.DisplayCalibration
 import com.tideo.autobrightness.domain.brightness.DisplayCalibration.Point
 import com.tideo.autobrightness.platform.brightness.DisplayBrightnessReader
 import com.tideo.autobrightness.platform.brightness.DisplayBrightnessSample
+import com.tideo.autobrightness.platform.brightness.DisplayBrightnessRead
+import com.tideo.autobrightness.platform.brightness.DumpAttempt
+import com.tideo.autobrightness.platform.brightness.DumpStatus
 import com.tideo.autobrightness.platform.brightness.BrightnessWriteResult
 import com.tideo.autobrightness.platform.brightness.ScreenBrightnessController
+import com.tideo.autobrightness.platform.brightness.WriteStatus
 import com.tideo.autobrightness.platform.observe.BrightnessObserver
 import com.tideo.autobrightness.platform.sensor.LightSample
 import com.tideo.autobrightness.platform.sensor.LightSensorSource
@@ -19,6 +23,7 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import kotlin.test.assertEquals
@@ -58,11 +63,16 @@ class HandoffPipelineTest {
         var manualForced = 0
         var restores = 0
         var onHandOff: () -> Unit = {}
+        var refuse: (writeIndex: Int) -> Boolean = { false }
         private var lastWrite: Int? = null
 
         override fun read(): Int = current
         override fun write(level: Int): BrightnessWriteResult {
             if (automatic) writesWhileAutomatic++
+            if (refuse(writes.size)) {
+                writes += level
+                return unlandedWrite(level, WriteStatus.REFUSED)
+            }
             writes += level
             current = level
             lastWrite = level
@@ -98,19 +108,32 @@ class HandoffPipelineTest {
         override fun clearSelfWriteMarker() { lastWrite = null }
     }
 
-    /** A panel whose dumpsys value is 16 x the level; [answers] false models no DUMP, root or Shizuku. */
+    /** A panel whose dumpsys value is 16 x the level; unanswered, or above [silentAbove], it reads [unread]. */
     private class Display(private val brightness: ModeBrightness) : DisplayBrightnessReader {
         var answers = true
+        var silentAbove = Int.MAX_VALUE
+        var unread = DumpStatus.UNAVAILABLE
         var raw: (Int) -> Double = { it * 16.0 }
+        var ceilingLines = listOf("mAppliedLowPower=false")
         override suspend fun read(field: String?): DisplayBrightnessSample? =
-            if (answers) DisplayBrightnessSample("mScreenBrightness", raw(brightness.current)) else null
+            if (answers && brightness.current <= silentAbove) DisplayBrightnessSample("mScreenBrightness", raw(brightness.current)) else null
+
+        override suspend fun trace(field: String?): DisplayBrightnessRead {
+            val sample = read(field)
+            val status = if (sample == null) unread else DumpStatus.SAMPLE
+            return DisplayBrightnessRead(sample, listOf(DumpAttempt("DUMP", status, sample, 0)), ceilingLines)
+        }
     }
 
     private class Calibrations : DisplayCalibrationSink {
         var started = 0
         val finished = mutableListOf<DisplayCalibrationRecord?>()
+        val causes = mutableListOf<CalibrationFailure?>()
         override suspend fun started() { started++ }
-        override suspend fun finished(record: DisplayCalibrationRecord?) { finished += record }
+        override suspend fun finished(outcome: DisplayCalibrationOutcome) {
+            finished += (outcome as? DisplayCalibrationOutcome.Calibrated)?.record
+            causes += (outcome as? DisplayCalibrationOutcome.Failed)?.cause
+        }
     }
 
     private class Dimming(private val log: MutableList<String>) : DimmingCoordinator {
@@ -136,7 +159,9 @@ class HandoffPipelineTest {
         val flashes = mutableListOf<Boolean>()
         val display = Display(brightness)
         val calibrations = Calibrations()
+        val traces = mutableListOf<String>()
         var settings = initial
+        var batterySaver = false
         var settingsReadMs = 0L
         var nowMs = 1_000L
         val scope = CoroutineScope(UnconfinedTestDispatcher(test.testScheduler))
@@ -151,6 +176,8 @@ class HandoffPipelineTest {
             handoffSink = { flashes += it },
             displayReader = display,
             calibrationSink = calibrations,
+            calibrationTrace = { traces += it },
+            batterySaver = { batterySaver },
         )
         val state: PipelineState get() = controller.state.value
 
@@ -194,10 +221,116 @@ class HandoffPipelineTest {
         assertEquals(1, rig.calibrations.started)
         assertEquals("mScreenBrightness", record.field)
         assertEquals(DisplayCalibration.LEVELS.map { Point(it, it * 16.0) }, record.calibration.points)
+        assertNull(record.hbmBoundary, "a rising panel stores no boundary")
         val writes = rig.brightness.writes.drop(before)
         assertEquals(DisplayCalibration.LEVELS + applied, writes.take(14), "13 levels, then the level found")
         assertEquals(applied, rig.brightness.current, "Set Initial Brightness runs again afterwards")
         assertFalse(rig.state.paused)
+        rig.close()
+    }
+
+    @Test
+    fun calibration_tracesEachLevel_theDumpsCeilingLines_andASummary() = runTest {
+        val rig = Rig(this)
+        rig.controller.start()
+        rig.reading(500.0)
+
+        rig.controller.calibrateDisplay()
+        advanceUntilIdle()
+        assertNotNull(rig.calibrations.finished.single())
+        val levels = rig.traces.filter { it.startsWith("level ") }
+        assertEquals(DisplayCalibration.LEVELS.map { "level $it" }, levels.map { it.substringBefore(":") })
+        assertTrue(levels.all { "stable at" in it && "DUMP:sample:mScreenBrightness=" in it }, levels.toString())
+        assertEquals("dump: mAppliedLowPower=false", rig.traces[rig.traces.size - 2])
+        assertTrue(rig.traces.last().startsWith("summary: calibrated, 13 points, field mScreenBrightness, restore landed"), rig.traces.last())
+
+        rig.traces.clear()
+        rig.display.raw = { minOf(it, 100) * 16.0 }
+        rig.controller.calibrateDisplay()
+        advanceUntilIdle()
+        val stalled = DisplayCalibration.LEVELS.first { it > 100 }
+        assertTrue(rig.traces.single { it.startsWith("level $stalled:") }.startsWith("level $stalled: poll limit"))
+        assertTrue(rig.traces.last().startsWith("summary: failed (level $stalled: no stable reading), restore landed"), rig.traces.last())
+
+        rig.traces.clear()
+        rig.display.answers = false
+        rig.controller.calibrateDisplay()
+        advanceUntilIdle()
+        val first = DisplayCalibration.LEVELS.first()
+        val unread = rig.traces.single { it.startsWith("level ") }
+        assertTrue(unread.startsWith("level $first: poll limit") && "DUMP:unavailable:0ms" in unread, unread)
+        assertTrue(rig.traces.none { it.startsWith("dump:") }, "no read, so no dump lines from an earlier run")
+        assertTrue(rig.traces.last().startsWith("summary: failed (level $first: no stable reading)"), rig.traces.last())
+        rig.close()
+    }
+
+    private val pixelCeiling = listOf(
+        "mCachedBrightnessInfo.brightnessMax=0.63",
+        "mCachedBrightnessInfo.hbmTransitionPoint=0.63",
+        "mCachedBrightnessInfo.brightnessMaxReason =0",
+        "mHbmData=HBM{minLux: 10000.0, transition: 0.63, timeWindow: 0ms}",
+    )
+
+    private fun cappedAt(cap: Double): (Int) -> Double = { minOf((it - 1) / 254.0, cap) }
+
+    @Test
+    fun calibration_onAPixelShapedCeiling_confirmsAt255_andStoresTheCorroboratedBoundary_DE030() = runTest {
+        val rig = Rig(this)
+        rig.controller.start()
+        rig.reading(500.0)
+        val applied = rig.brightness.current
+        val before = rig.brightness.writes.size
+        rig.display.raw = cappedAt(0.63)
+        rig.display.ceilingLines = pixelCeiling
+
+        rig.controller.calibrateDisplay()
+        advanceUntilIdle()
+
+        val record = assertNotNull(rig.calibrations.finished.single())
+        val rising = DisplayCalibration.LEVELS.filter { it <= 150 }
+        assertEquals(rising.map { Point(it, (it - 1) / 254.0) } + Point(255, 0.63), record.calibration.points)
+        assertEquals(0.63, record.hbmBoundary)
+        val writes = rig.brightness.writes.drop(before)
+        assertEquals(DisplayCalibration.LEVELS.filter { it <= 200 } + 255 + applied, writes.take(13), "12 levels, then the level found")
+        assertTrue("plateau at 0.63" in rig.traces.single { it.startsWith("level 200:") })
+        assertTrue(rig.traces.last().startsWith("summary: calibrated, 10 points, field mScreenBrightness, hbm boundary 0.63"), rig.traces.last())
+
+        val top = (225 - 1) / 254.0
+        rig.display.raw = cappedAt(top)
+        rig.display.ceilingLines = listOf("mCachedBrightnessInfo.hbmTransitionPoint=$top")
+        val again = rig.brightness.writes.size
+        rig.controller.calibrateDisplay()
+        advanceUntilIdle()
+        assertEquals(Point(255, top), assertNotNull(rig.calibrations.finished.last()).calibration.points.last())
+        assertEquals(DisplayCalibration.LEVELS + 255, rig.brightness.writes.drop(again).take(14), "a plateau first seen at 255 is written again")
+        assertEquals(2, rig.traces.count { it.startsWith("level 255:") && "plateau at $top" in it }, "and gets its own window")
+        rig.close()
+    }
+
+    @Test
+    fun calibration_failsAPlateauTheDumpDoesNotCorroborate_orThatLeavesItAt255_DE030() = runTest {
+        val rig = Rig(this)
+        rig.controller.start()
+        rig.reading(500.0)
+        val applied = rig.brightness.current
+        suspend fun calibrate(raw: (Int) -> Double, lines: List<String>, reason: String) {
+            rig.traces.clear()
+            rig.display.raw = raw
+            rig.display.ceilingLines = lines
+            rig.controller.calibrateDisplay()
+            advanceUntilIdle()
+            assertNull(rig.calibrations.finished.last(), reason)
+            assertTrue(rig.traces.last().startsWith("summary: failed ($reason)"), rig.traces.last())
+            assertEquals(applied, rig.brightness.current)
+        }
+
+        val notCorroborated = "plateau at 0.7 not corroborated by the dump"
+        calibrate(cappedAt(0.7), listOf("mCachedBrightnessInfo.hbmTransitionPoint=Infinity"), notCorroborated)
+        calibrate(cappedAt(0.7), listOf("mCachedBrightnessInfo.hbmTransitionPoint=0.7", "mCachedBrightnessInfo.brightnessMaxReason =1"), notCorroborated)
+        val stuck = (150 - 1) / 254.0
+        calibrate({ (minOf(it, 150) - 1) / 254.0 }, listOf("mAppliedLowPower=false"), "plateau at $stuck not corroborated by the dump")
+        calibrate({ if (it == 255) 0.9 else cappedAt(0.63)(it) }, pixelCeiling, "level 255: left the plateau at 0.63")
+        assertEquals(4, rig.calibrations.finished.size)
         rig.close()
     }
 
@@ -232,8 +365,10 @@ class HandoffPipelineTest {
         advanceUntilIdle()
 
         assertEquals(listOf<DisplayCalibrationRecord?>(null), rig.calibrations.finished)
+        assertEquals(listOf<CalibrationFailure?>(CalibrationFailure.ADAPTIVE), rig.calibrations.causes)
         assertEquals(writes, rig.brightness.writes.size)
         assertEquals(forced, rig.brightness.manualForced, "never forces MANUAL")
+        assertEquals(listOf("refused: brightness mode is not manual"), rig.traces)
         assertTrue(rig.brightness.automatic)
         rig.brightness.automatic = false
         rig.close()
@@ -258,6 +393,117 @@ class HandoffPipelineTest {
         advanceUntilIdle()
         assertEquals(listOf<DisplayCalibrationRecord?>(null, null), rig.calibrations.finished, "raw must keep rising")
         assertEquals(applied, rig.brightness.current)
+        rig.close()
+    }
+
+    @Test
+    fun calibration_namesWhatTheReadsShowed_DE032() = runTest {
+        val rig = Rig(this)
+        rig.controller.start()
+        rig.reading(500.0)
+        suspend fun cause(): CalibrationFailure? {
+            rig.controller.calibrateDisplay()
+            advanceUntilIdle()
+            return rig.calibrations.causes.last()
+        }
+
+        rig.display.answers = false
+        assertEquals(CalibrationFailure.NO_ACCESS, cause(), "every source unavailable at the first level")
+        rig.display.unread = DumpStatus.FAILED
+        assertEquals(CalibrationFailure.NO_READING, cause(), "DUMP granted, but the dump timed out")
+        rig.display.unread = DumpStatus.NO_FIELD
+        assertEquals(CalibrationFailure.NO_READING, cause(), "output came, but no field parsed")
+        assertTrue(rig.traces.last().endsWith(", cause NO_READING"), rig.traces.last())
+
+        rig.display.answers = true
+        rig.display.unread = DumpStatus.UNAVAILABLE
+        rig.display.silentAbove = 50
+        assertEquals(CalibrationFailure.READING_LOST, cause(), "readings stop after level 50, even with every source unavailable")
+        rig.display.silentAbove = Int.MAX_VALUE
+
+        var reads = 0
+        rig.display.raw = { it * 16.0 + reads++ % 2 }
+        assertEquals(CalibrationFailure.UNSTEADY, cause(), "readings that never repeat")
+        rig.display.raw = { minOf(it, 100) * 16.0 }
+        assertEquals(CalibrationFailure.UNSTEADY, cause(), "readings that stop rising below level 128")
+
+        rig.display.raw = cappedAt(0.7)
+        rig.display.ceilingLines = listOf("mCachedBrightnessInfo.hbmTransitionPoint=Infinity")
+        assertEquals(CalibrationFailure.CEILING_UNCONFIRMED, cause())
+        rig.display.raw = { if (it == 255) 0.9 else cappedAt(0.63)(it) }
+        rig.display.ceilingLines = pixelCeiling
+        assertEquals(CalibrationFailure.UNSTEADY, cause(), "a plateau that leaves at 255")
+        assertNull(rig.calibrations.finished.last())
+        rig.close()
+    }
+
+    @Test
+    fun calibration_aRefusedWriteOrRestore_orAStop_isInterrupted_DE032() = runTest {
+        val rig = Rig(this)
+        rig.controller.start()
+        rig.reading(500.0)
+        var from = rig.brightness.writes.size
+        rig.brightness.refuse = { it == from + 3 }
+        rig.controller.calibrateDisplay()
+        advanceUntilIdle()
+        assertEquals(CalibrationFailure.INTERRUPTED, rig.calibrations.causes.last())
+        assertTrue(rig.traces.last().startsWith("summary: failed (level 25: write refused)"), rig.traces.last())
+
+        from = rig.brightness.writes.size
+        rig.brightness.refuse = { it == from + DisplayCalibration.LEVELS.size }
+        rig.controller.calibrateDisplay()
+        advanceUntilIdle()
+        assertEquals(listOf<DisplayCalibrationRecord?>(null, null), rig.calibrations.finished, "a refused restore drops a good sweep")
+        assertEquals(CalibrationFailure.INTERRUPTED, rig.calibrations.causes.last())
+        assertTrue(rig.traces.last().startsWith("summary: failed (restore refused)"), rig.traces.last())
+        rig.brightness.refuse = { false }
+        rig.display.answers = false
+        rig.controller.calibrateDisplay()
+        advanceUntilIdle()
+        assertEquals(CalibrationFailure.NO_ACCESS, rig.calibrations.causes.last(), "seeds a cause the next run must not inherit")
+        rig.display.answers = true
+
+        rig.controller.calibrateDisplay()
+        advanceTimeBy(2_000)
+        assertEquals(4, rig.calibrations.started)
+        assertEquals(3, rig.calibrations.causes.size, "still sweeping")
+        rig.controller.stop()
+        advanceUntilIdle()
+        assertEquals(CalibrationFailure.INTERRUPTED, rig.calibrations.causes.last(), "Disable and panic stop the run")
+        assertTrue(rig.traces.last().endsWith(", cause INTERRUPTED"), rig.traces.last())
+        rig.close()
+    }
+
+    @Test
+    fun calibration_underBatterySaver_refusesBeforeAnyWrite_andAnUnreleasedHandoffIsAdaptive_DE032() = runTest {
+        val rig = Rig(this)
+        rig.controller.start()
+        rig.reading(500.0)
+        rig.batterySaver = true
+        rig.brightness.current = 3
+        var writes = rig.brightness.writes.size
+        rig.controller.calibrateDisplay()
+        advanceUntilIdle()
+        assertEquals(listOf<CalibrationFailure?>(CalibrationFailure.BATTERY_SAVER), rig.calibrations.causes)
+        assertEquals(0, rig.calibrations.started, "no start flash, since nothing starts")
+        assertEquals(writes, rig.brightness.writes.size, "not even Set Initial Brightness")
+        assertEquals(listOf("refused: battery saver is on"), rig.traces)
+
+        rig.seeded(30_000.0)
+        assertTrue(rig.state.handedOff)
+        writes = rig.brightness.writes.size
+        rig.controller.calibrateDisplay()
+        advanceUntilIdle()
+        assertEquals(CalibrationFailure.BATTERY_SAVER, rig.calibrations.causes.last())
+        assertEquals(writes, rig.brightness.writes.size)
+        assertEquals(0, rig.brightness.reclaims, "not even the hand-back")
+
+        rig.batterySaver = false
+        rig.brightness.reclaimLands = false
+        rig.controller.calibrateDisplay()
+        advanceUntilIdle()
+        assertEquals(CalibrationFailure.ADAPTIVE, rig.calibrations.causes.last(), "the hand-off could not be released")
+        assertEquals(writes, rig.brightness.writes.size)
         rig.close()
     }
 

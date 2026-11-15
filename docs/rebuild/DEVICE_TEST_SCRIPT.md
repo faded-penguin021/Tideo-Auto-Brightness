@@ -89,8 +89,8 @@ are in `e2e/scenarios.toml`.
     halves and before 10c.
 
     **Two scales, and the shell is not on the app's (DC-025).** The card's "Settings API max" (call it M)
-    is `config_screenBrightnessSettingMaximum`, the app-facing maximum Tideo converts with, and it
-    reads **255** on the owner's phone. What `adb settings get/put` speaks is the STORED scale,
+    is the app-facing maximum Tideo converts with, fixed at **255** on every device whatever its
+    `config_screenBrightnessSettingMaximum` says (DE-023). What `adb settings get/put` speaks is the STORED scale,
     whose ceiling (call it S) is **4095** there — the same setting key, a different scale, with the
     conversion sitting below the app API. Both numbers are right (DC-017, DC-025). Measure S rather
     than assuming it equals M: drag the system brightness slider to maximum, then `adb shell
@@ -837,6 +837,18 @@ N lx". Watch Live Debug's Light Sensor card for smoothed lux.
     Android's brightness, above 255 when the OEM boosts past its normal maximum (`adb shell
     dumpsys display | grep mScreenBrightness` above `mScreenBrightnessNormalMaximum`), with "High
     Brightness Mode activated" flashed once. Uncalibrated, the readout stops at 255.
+    **Ceiling panel** (a Pixel, the POCO F4; battery saver off): the sweep stops rising below the
+    top, then jumps to 255 for one more window, about 15 s in all. **Expected:** "Calibrated", and
+    `adb shell run-as com.tideo.autobrightness.debug cat files/datastore/display_prefs.preferences_pb | grep -a display_calibration`
+    shows a last point `255:` at the dump's `hbmTransitionPoint` plus `display_calibration_hbm`;
+    `adb logcat -s TideoCalibration` names the plateau. A plateau the dump does not match fails
+    the run and stores no boundary (DE-030).
+    **Failures name their cause** (DE-032), on the card's banner and in the flash, and the
+    summary line ends `cause <NAME>`: with DUMP revoked
+    (`adb shell pm revoke com.tideo.autobrightness.debug android.permission.DUMP`), Shizuku stopped
+    and no root, the message asks for DUMP, root or Shizuku; paused under Adaptive Brightness, it
+    asks to turn Adaptive Brightness off; with battery saver on, it says the calibration was not
+    started, and the screen does not change at all. No other cause mentions DUMP.
 
 ---
 

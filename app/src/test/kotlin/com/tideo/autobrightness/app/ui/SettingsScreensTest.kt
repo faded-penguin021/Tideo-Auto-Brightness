@@ -1,6 +1,10 @@
 package com.tideo.autobrightness.app.ui
 
+import android.content.Context
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.SemanticsMatcher
@@ -8,6 +12,7 @@ import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertTextContains
+import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onAllNodesWithText
@@ -16,6 +21,9 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.unit.dp
+import androidx.test.core.app.ApplicationProvider
+import com.tideo.autobrightness.R
+import com.tideo.autobrightness.app.runtime.CalibrationFailure
 import com.tideo.autobrightness.app.runtime.PipelineState
 import com.tideo.autobrightness.app.settings.AabSettings
 import com.tideo.autobrightness.app.settings.ExperimentDateLocation
@@ -25,6 +33,7 @@ import com.tideo.autobrightness.app.state.AppEntry
 import com.tideo.autobrightness.app.state.CalibrationBadge
 import com.tideo.autobrightness.app.state.DisplayCalibrationUi
 import com.tideo.autobrightness.app.state.LiveDebugUiState
+import com.tideo.autobrightness.app.state.NightLightDebug
 import com.tideo.autobrightness.app.ui.components.ChartPager
 import com.tideo.autobrightness.app.ui.components.ChartSlot
 import com.tideo.autobrightness.app.ui.components.CircadianDiagnosticCardContent
@@ -190,14 +199,55 @@ class SettingsScreensTest {
         compose.onNodeWithText("0.35 – 800", substring = true).performScrollTo().assertExists()
     }
 
+    @Test
+    fun liveDebug_nightLightCard_showsTheTemperatureOfTheActiveMode() {
+        var nightLight by mutableStateOf(NightLightDebug())
+        var running by mutableStateOf(true)
+        compose.setContent {
+            MaterialTheme {
+                LiveDebugContent(
+                    state = LiveDebugUiState(nightLight = nightLight, serviceRunning = running),
+                    onSelectDebug = {}, onBack = {},
+                )
+            }
+        }
+        fun notApplied(expected: String?) {
+            val node = compose.onNodeWithTag("debug_night_light_not_applied")
+            if (expected == null) node.assertDoesNotExist() else node.performScrollTo().assertTextEquals(expected)
+        }
+        fun temperature(expected: String) =
+            compose.onNodeWithTag("debug_night_light_temperature").performScrollTo()
+                .assertTextEquals("Color temperature: $expected")
+
+        compose.onNodeWithTag("debug_night_light_status").performScrollTo().assertTextEquals("Status: Off")
+        temperature("—")
+        nightLight = NightLightDebug(enabled = true)
+        temperature("Device default")
+        nightLight = NightLightDebug(enabled = true, temperatureK = 2_700, rampKelvin = 3_400)
+        temperature("2700 K")
+        nightLight = nightLight.copy(circadian = true, rampKelvin = null)
+        temperature("Waiting for the next update")
+        nightLight = nightLight.copy(rampKelvin = 3_400)
+        temperature("3400 K")
+        compose.onNodeWithTag("debug_night_light_circadian").performScrollTo()
+            .assertTextEquals("Circadian adjustment: On")
+        notApplied(null)
+        nightLight = nightLight.copy(elevated = false)
+        notApplied("Needs elevated access: Tideo is not applying Night Light.")
+        running = false
+        notApplied("Service stopped: Tideo is not applying Night Light.")
+        nightLight = NightLightDebug(elevated = false)
+        notApplied(null)
+    }
+
     // DC-007: the write card must render WITHOUT an override having fired (owner device check 3).
     @Test
     fun liveDebug_writeCard_rendersRequestedVsAcknowledged_withNoOverride() {
         val seeded = PipelineState(
             lastAppliedBrightness = 250,
             lastBrightnessWrite = BrightnessWriteResult(
-                requestedDomain = 255, requestedSettingValue = 4014, readBackSettingValue = 3083,
-                acknowledgedDomain = 196, settingsApiMax = 4095, status = WriteStatus.ACKNOWLEDGED,
+                requestedDomain = 255, requestedSettingValue = 255, readBackSettingValue = 196,
+                acknowledgedDomain = 196, settingsApiMax = 255, status = WriteStatus.ACKNOWLEDGED,
             ),
         )
         compose.setContent {
@@ -210,8 +260,8 @@ class SettingsScreensTest {
         }
         compose.onNodeWithTag("debug_write_roundtrip").performScrollTo().assertExists()
         compose.onNodeWithText("255 \u2192 196", substring = true).performScrollTo().assertExists()
-        // settingsApiMax is what Tideo converts with, so the owner can derive one domain step from it.
-        compose.onNodeWithText("4095", substring = true).performScrollTo().assertExists()
+        // settingsApiMax is what Tideo converts with: 255 on every device (DE-023).
+        compose.onNodeWithText("Settings API max: 255", substring = true).performScrollTo().assertExists()
         compose.onNodeWithTag("debug_override_disposition").assertDoesNotExist()
     }
 
@@ -243,13 +293,13 @@ class SettingsScreensTest {
     @Test
     fun liveDebug_writeCard_rendersTheOverridesOwnWrite_notOnlyTheLatestOne() {
         val seeded = PipelineState(
-            lastBrightnessWrite = BrightnessWriteResult(200, 3212, 3212, 200, 4095, WriteStatus.ACKNOWLEDGED),
+            lastBrightnessWrite = BrightnessWriteResult(200, 200, 200, 200, 255, WriteStatus.ACKNOWLEDGED),
             overrideDiagnostic = OverrideDiagnostic(
                 source = OverrideSource.OBSERVER,
                 disposition = OverrideDisposition.DISMISSED_DRIFT,
                 observed = 69, settled = 69, expected = 68, manualMode = true,
                 modeRecovered = null,
-                write = BrightnessWriteResult(100, 1606, 1573, 98, 4095, WriteStatus.ACKNOWLEDGED),
+                write = BrightnessWriteResult(100, 100, 98, 98, 255, WriteStatus.ACKNOWLEDGED),
                 timestampMs = 0L,
             ),
         )
@@ -384,6 +434,40 @@ class SettingsScreensTest {
         compose.onNodeWithTag("calibration_error").performScrollTo().assertExists()
         compose.onNodeWithTag("calibration_service_off").assertExists()
         compose.onNodeWithTag("calibration_button").assertTextContains("Retry calibration").assertIsNotEnabled()
+    }
+
+    @Test
+    fun handoff_calibration_failed_namesItsCause_andBlamesPermissionsOnlyForNoAccess_DE032() {
+        var failure: CalibrationFailure? by mutableStateOf(CalibrationFailure.NO_ACCESS)
+        compose.setContent {
+            MaterialTheme {
+                HandoffContent(
+                    AabSettings(), AabSettings(), epoch = 0, dirty = false, onEdit = {}, onApply = {}, onDiscard = {}, onBack = {},
+                    calibration = DisplayCalibrationUi(CalibrationBadge.FAILED, serviceRunning = true, failure), onCalibrate = {},
+                )
+            }
+        }
+        val res = ApplicationProvider.getApplicationContext<Context>().resources
+        val expected = mapOf(
+            CalibrationFailure.NO_ACCESS to R.string.calibration_failed_no_access,
+            CalibrationFailure.NO_READING to R.string.calibration_failed_no_reading,
+            CalibrationFailure.READING_LOST to R.string.calibration_failed_reading_lost,
+            CalibrationFailure.ADAPTIVE to R.string.calibration_failed_adaptive,
+            CalibrationFailure.UNSTEADY to R.string.calibration_failed_unsteady,
+            CalibrationFailure.CEILING_UNCONFIRMED to R.string.calibration_failed_ceiling_unconfirmed,
+            CalibrationFailure.INTERRUPTED to R.string.calibration_failed_interrupted,
+            CalibrationFailure.BATTERY_SAVER to R.string.calibration_failed_battery_saver,
+        )
+        assertEquals(CalibrationFailure.entries.toSet(), expected.keys)
+        compose.onNodeWithTag("calibration_note").performScrollTo().assertTextEquals("The last calibration failed.")
+        for ((cause, message) in expected) {
+            failure = cause
+            val text = res.getString(message)
+            compose.onNodeWithTag("calibration_error").performScrollTo().assertTextEquals(text)
+            assertEquals(cause == CalibrationFailure.NO_ACCESS, "DUMP" in text, cause.name)
+        }
+        failure = null
+        compose.onNodeWithTag("calibration_error").assertTextEquals(res.getString(R.string.calibration_failed_no_reading))
     }
 
     @Test

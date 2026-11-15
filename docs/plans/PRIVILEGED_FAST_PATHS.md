@@ -13,6 +13,9 @@
   life, so the plan targets ColorOS 17.
   - Units 0 and 1 need no phone.
   - Unit 3 (docs only) needs no phone either. It may move earlier if the owner says so.
+  - Observed 2026-11-11, from press reports: ColorOS 17 for the OnePlus 13 began rolling out in
+    October 2026, India first (CPH2649). Whether CPH2653 has it is the owner's check:
+    `adb shell getprop ro.build.version.sdk` prints 37.
 - **Testability rule (owner, 2026-10-19).** The plan covers only what works on that phone and can
   be checked there.
   - A unit whose device check fails is dropped and recorded, never shipped untested.
@@ -58,6 +61,20 @@ API 36.1 (`BAKLAVA_1`), and Android 17 carries the same set. It made public:
 
 API 36 also added `EVENT_TYPE_DISPLAY_STATE`, but nothing in Tideo needs it. Compiling against
 36.1 needs AGP ≥ 8.13.0; the repo has 8.13.2.
+
+**Android 17 QPR2 is API 37.2 (Pixel first, 2026-11-10); read 2026-11-11 from its release notes
+and the 37.1→37.2 API diff.**
+- Google says the minor SDK release "has no planned behavior changes".
+- The diff's only brightness additions:
+  - `DisplayManager.BRIGHTNESS_UNIT_RAW`, "the system range [0.0f, 1.0f]", device-dependent, and
+    possibly different from the slider's percentage;
+  - `WindowManager.LayoutParams.screenBrightnessUnit`, which defaults to RAW, so today's
+    `screenBrightness` writes keep their meaning.
+- It lists no `BrightnessInfo` change and no brightness key in `Settings.System`.
+- ColorOS 17 is Android 17, so the phone has none of this until F1's `sdk_full` reads 37.2 or
+  above. Under the testability rule, no unit may depend on a 37.2 API before then.
+- QPR2 also lets the Quick Settings slider move brightness while an app holds a window override,
+  and normal behaviour resumes when the app leaves (DE-033).
 
 **OxygenOS 16 priors, re-measured in Unit 2.**
 - DD-083: `BrightnessInfo` floats are in panel units (755 of 4095). OPlus's own auto controller
@@ -162,7 +179,7 @@ becomes a new DD row in the unit that acts on it:
   - Any failure is fixed under playbook 4 first.
 - **Facts (the agent runs them over adb; all read-only except F5's restored mode switch):**
   - F1 `getprop ro.build.version.sdk`, `ro.build.version.sdk_full` and `ro.build.display.id`.
-    Expect 37.
+    Expect 37. An `sdk_full` of 37.2 or above means the QPR2 APIs in Context exist on the phone.
   - F2 `aflags list | grep display_listener_performance_improvements`. This gates Unit 9.
   - F3 `pm dump com.android.shell | grep -E 'CONTROL_DISPLAY_BRIGHTNESS|MANAGE_ACTIVITY_TASKS|DEVICE_POWER|MANAGE_APP_OPS_MODES|WRITE_SECURE_SETTINGS'`.
     Each must read `granted=true`. This gates Units 5, 7, 10 and 11.
@@ -221,10 +238,10 @@ becomes a new DD row in the unit that acts on it:
     its WRITE_SECURE_SETTINGS grant is then a repeat, which the glue review confirms is harmless,
     or the request is split out.
   - The advice that sends users to Shizuku cannot be followed in the app today:
-    `flash_calibration_failed`, `handoff_calibration_failed_banner` and
-    `help_handoff_calibration` ("allow root or Shizuku"), and `pd_night_light_needs_shizuku`
-    ("Start Shizuku"). The review decides whether they change. The calibration banner is also
-    the display-calibration plan's Unit 4; whichever lands second rebases.
+    `calibration_failed_no_access` and `help_handoff_calibration` ("allow root or Shizuku"),
+    and `pd_night_light_needs_shizuku` ("Start Shizuku"). The review decides whether they
+    change. The display-calibration plan's Unit 4 already limits that advice to the cause where
+    every source was unavailable (DE-032).
   - Device: the owner removes Tideo's authorisation in the Shizuku app, then Privileged Display
     offers "Use Shizuku" at ELEVATED; after the tap, a Shizuku use answers again (Unit 4's helper
     card counts the call).
@@ -288,6 +305,8 @@ becomes a new DD row in the unit that acts on it:
   - Calibration records name their field, so one recalibration switches the source.
   - `DisplayCalibrationRun`'s 150 ms polls become cheap.
 - Live Debug shows the max reason (thermal capping) and the window override, as diagnostics only.
+  From QPR2 the slider can move the level during a window override (DE-033), so the flag no longer
+  means the level is fixed.
 - This is the same fourth use in the same file, so the count stays at 4. The wording in
   AGENTS.md, `SHIZUKU_USAGE.md` and `privilege_tiers.md` changes, so the rule review runs.
 - A DD row records the deviation: AAB's `_ReadBrightness` reads dumpsys (DD-078); this has the
@@ -311,6 +330,9 @@ becomes a new DD row in the unit that acts on it:
     and main).
 - If F-Droid can't provide 36.1, call the two public methods reflectively behind the same gate
   instead (Astra Q2).
+- Platforms 37 and 37.2 now exist too. Compiling against 36.1 still covers every method Units 9
+  and 12 call. Choose 37.x only if a unit needs a 37.2 member, and only once F1 shows it on the
+  phone. The QPR2 release notes give no AGP minimum, so check it before choosing 37.x.
 
 **9. Event-driven readout (BASIC tier; deviates from AAB's 2 s tick, DD-078).**
 - While handed off, `HighBrightnessUpdates` reads on `EVENT_TYPE_DISPLAY_BRIGHTNESS` (no
@@ -367,6 +389,9 @@ becomes a new DD row in the unit that acts on it:
 - Animation frames *between* Tasker-domain endpoints use the public
   `setBrightness(…, BRIGHTNESS_UNIT_PERCENTAGE)`, which BASIC can call. Endpoints keep today's
   exact domain write.
+  - 37.2's `BRIGHTNESS_UNIT_RAW` could replace the percentage and its gamma mapping (DE-020,
+    corrected by DE-035). Use it only if `setBrightness` accepts that unit (unconfirmed) and F1
+    shows 37.2 on the phone. Otherwise the percentage stays the only option.
 - The echo handling (DC-002…DC-008, DB-082) must treat sub-step echoes as self-writes.
 - The range comes from the API and is never learned (a Decided non-item).
 - Glue review, and a rule review if any AGENTS.md invariant is touched.
@@ -438,7 +463,8 @@ becomes a new DD row in the unit that acts on it:
     always offered".
 12. **Android 17 platform changes.** Per-app memory limits (the resident helper). Reflection
     limits apply only to apps targeting 37, which we don't. No new activity starts are planned
-    (BAL hardening).
+    (BAL hardening). QPR2 (37.2) promises no behaviour change, and its two brightness additions
+    are absent on ColorOS 17 (Context).
 13. **Unit sizing.** About one focused hour each, with binary acceptance. Should anything be
     split, merged or reordered?
 
@@ -500,5 +526,6 @@ consideration. Answers to Q1–Q6. A list of units to drop and of anything missi
   - `DisplayManagerService.java`, `DisplayManager.java`, `DisplayManagerGlobal.java` and
     `BrightnessInfo.java`;
   - `ActivityTaskManagerService.java`.
-- The Android API diffs for 36, 36.1 and 37 (`developer.android.com/sdk/api_diff/…`).
+- The Android API diffs for 36, 36.1, 37 and 37.2 (`developer.android.com/sdk/api_diff/…`), and
+  the Android 17 QPR2 release notes (`developer.android.com/about/versions/17/qpr2/release-notes`).
 - The Android 16 QPR2 SDK setup page and the Shizuku-API `Shizuku.java`.

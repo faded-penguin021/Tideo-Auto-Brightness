@@ -3,6 +3,7 @@ package com.tideo.autobrightness.platform.privilege
 import android.content.Context
 import android.content.ServiceConnection
 import androidx.test.core.app.ApplicationProvider
+import com.tideo.autobrightness.platform.brightness.DumpOutput
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Before
@@ -59,6 +60,20 @@ class ShizukuShellTest {
         assertEquals(4082, ShizukuShell.readNightDisplayTemperature(context))
     }
 
+    @Test
+    fun displayRead_reportsLinesFailureAndUnavailable_andReleasesWhenUnusable() = runBlocking {
+        fake.service.lines = "mScreenBrightness=0.5"
+        assertEquals(DumpOutput.Lines("mScreenBrightness=0.5"), ShizukuShell.readDisplayBrightness(context))
+        fake.service.lines = null
+        assertEquals(DumpOutput.Failed, ShizukuShell.readDisplayBrightness(context))
+        val held = fake.bound.last()
+        assertTrue(held !in fake.unbound, "a null answer keeps the helper (DE-001)")
+        fake.usable = false
+        assertEquals(DumpOutput.Unavailable, ShizukuShell.readDisplayBrightness(context))
+        assertTrue(held in fake.unbound, "an unusable Shizuku releases the held helper (DE-001)")
+        fake.usable = true
+    }
+
     /** DE-001, as in Shizuku 13.1.5: a bind right after a `remove = true` unbind of a live helper never connects. */
     private class FakeBinding : ShizukuShell.UserServiceBinding {
         var service = FakeService()
@@ -68,7 +83,9 @@ class ShizukuShellTest {
         private val connected = mutableMapOf<ServiceConnection, FakeService>()
         private var loseNextBind = false
 
-        override fun isUsable() = true
+        var usable = true
+
+        override fun isUsable() = usable
 
         override fun bind(context: Context, connection: ServiceConnection) {
             bound += connection
@@ -99,6 +116,7 @@ class ShizukuShellTest {
         override fun setForceDark(enabled: Boolean): String? = null
         override fun readNightDisplayTemperature() = 4082
         override fun setNightDisplayTemperature(kelvin: Int) = kelvin
-        override fun displayBrightnessLines(): String? = null
+        var lines: String? = null
+        override fun displayBrightnessLines(): String? = lines
     }
 }
