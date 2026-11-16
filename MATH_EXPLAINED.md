@@ -8,7 +8,7 @@ You don't *have* to read the formulas. Every section starts with a simple Englis
 followed by a table showing: what changes, when you turn the setting up or down. The formulas are
 in grey boxes.
 
-Unless an example says otherwise, its numbers are calculated from Tideo's code (version 1.15.0)
+Unless an example says otherwise, its numbers are calculated from Tideo's code (version 1.15.3)
 with the app's initial settings. The app rounds some intermediate results, so a simplified
 formula here can differ from what's shown in the Live Debug screen in the last digit.
 
@@ -95,9 +95,10 @@ Three values appear throughout this document, good to know what’s what:
   behind raw lux while Tideo follows a change (§6).
 - **Brightness** is Tideo's internal control value from **0 to 255**. It isn't a percentage of
   your screen's light output or a value in nits. Your display decides how much light each value
-  produces. Android's slider and stored brightness setting may use a different scale. The 
-  values can only go "above" 255 when Android is in control (§10). Although the values above 255 are
-  just a heuristic for High Brightness Mode and should not be read at face value.
+  produces. Tideo reads and writes Android's stored brightness setting on the same 0–255 scale on
+  every phone, but Android's own slider may show a different scale. Values can only go "above" 255
+  while Android is in control and the display has been calibrated (§10). Even then, they're a
+  heuristic for High Brightness Mode and shouldn't be read at face value.
 
 Some events take a different path: start-up, resume, applying settings, and a manual override.
 While a brightness transition is running, Tideo doesn't start a second one alongside it. 
@@ -982,8 +983,8 @@ lux, Tideo never hands off.
 **Display range calibration (optional and experimental).** Without running it once, Tideo shows
 Android's brightness setting while Android is in control, and the range stops at 255. The
 calibration card on the same screen steps the screen through 13 levels (1, 5, 10, 25, 50, 75, 100,
-128, 150, 175, 200, 225 and 255) and attempts to read, through `dumpsys display`, the hardware value
-the panel reports for each level. Tideo then turns a hardware reading back into its own scale:
+128, 150, 175, 200, 225 and 255) and reads, through `dumpsys display`, the hardware value the panel
+reports for each level. Tideo then turns a hardware reading back into its own scale:
 
 ```
 between two measured levels:  a straight line between them
@@ -995,9 +996,23 @@ then rounded to a whole number
 This means a measured value above 255, post-calibration, signals that the phone's High Brightness
 Mode is extending the screen brightness past its normal Maximum; Tideo flashes a toast when that
 happens. For example, if the calibration runs in a straight line from hardware 16 at level 1 to
-4,095 at level 255, a reading of 4,171 shows as **260**. Calibration needs at least the DUMP
-permission granted and might need to be repeated after a system update. Currently, many failures to
-resolve dumpsys display print something about granting DUMP permission.
+4,095 at level 255, a reading of 4,171 shows as **260**.
+
+Some panels stop rising before level 255: the hardware value holds at a ceiling, and High
+Brightness Mode starts from there. If the readings stop rising at level 128 or above, Tideo writes
+255, checks that the reading stays at that ceiling, and accepts it only if `dumpsys display`
+reports the same value as the panel's High Brightness Mode transition point. Tideo then treats the
+ceiling as level 255 and remembers it. While Android is in control, any hardware reading above the
+ceiling counts as High Brightness Mode, even when it still rounds to 255. If the readings stop
+rising below level 128, or `dumpsys display` doesn't confirm the ceiling, the calibration fails.
+
+To calibrate, Tideo must be running and able to read `dumpsys display`: the DUMP permission
+granted over ADB, root, or Shizuku. Keep the screen on and don't touch it during the run.
+Calibration also needs manual brightness, and it won't start while battery saver is on, because
+battery saver dims every reading and the calibration would be wrong. If a calibration fails, the
+card says why and what to do next. For example, it can't read the display at all, the readings
+stopped or didn't settle, or Tideo couldn't confirm the ceiling. Calibrate again after a system
+update; the card tells you when that's needed.
 
 | Setting | Default | Range | What it does |
 |---|---|---|---|
@@ -1137,7 +1152,7 @@ your profile, check which profile is active while you compare.
 | Most light levels are too dim or bright | **Scale** (or **Scale spread** if circadian scaling is on) | **Offset** for a fixed shift |
 | A sharp rise just after the lights go on (around Zone 1 end) | Lower **form2C** and check the graph for a kink | Move **Zone 1 end** |
 | Not bright enough outdoors | Check **Max brightness**, then **Scale** and the curve at the lux you measured | Raise **form2B**. Zone 2 end is not a reliable outdoor boost (§3.4) |
-| Already at Max in direct sunlight and still hard to read | Turn on the **hand-off** so the phone's own sunlight boost can work (§10) | **Calibrate the display** to see whether the boost engages (a reading above 255) |
+| Already at Max in direct sunlight and still hard to read | Turn on the **hand-off** so the phone's own sunlight boost can work (§10) | **Calibrate the display** to see whether the boost engages (a reading above 255, or the High Brightness Mode toast) |
 | Control keeps switching between Tideo and Android in bright light | Lower the **Hand-back level** | Raise **Hand-off lux** so the switch happens only in stronger light |
 | Brightness flickers up and down under constant light | Raise the relevant **threshold** | Lower **Smoothing Δ** |
 | A real light change is ignored | Lower the relevant **threshold** | — (Smoothing Δ can't rescue a rejected reading) |
@@ -1212,20 +1227,20 @@ raised by Apply on the Misc screen (§3.6).
 
 ## 15. Where to find it in the code
 
-These point at **v1.15.0**, the version this guide was checked against. Use them when you need the
+These point at **v1.15.3**, the version this guide was checked against. Use them when you need the
 exact rounding rather than the simplified formula.
 
 | Topic | Source |
 |---|---|
-| Curve, thresholds, smoothing, taper and animation timing | [BrightnessEngine.kt](https://github.com/faded-penguin021/Tideo-Auto-Brightness/blob/v1.15.0/domain/src/main/kotlin/com/tideo/autobrightness/domain/brightness/BrightnessEngine.kt) |
-| Continuity coefficients (form2A, form3A) | [BrightnessFormulae.kt](https://github.com/faded-penguin021/Tideo-Auto-Brightness/blob/v1.15.0/domain/src/main/kotlin/com/tideo/autobrightness/domain/brightness/BrightnessFormulae.kt) |
-| The stored band, pending reading and settling | [LightAdmission.kt](https://github.com/faded-penguin021/Tideo-Auto-Brightness/blob/v1.15.0/app/src/main/kotlin/com/tideo/autobrightness/app/runtime/LightAdmission.kt) |
-| Applying targets, the PWM floor and recording overrides | [PipelineCycleRunner.kt](https://github.com/faded-penguin021/Tideo-Auto-Brightness/blob/v1.15.0/app/src/main/kotlin/com/tideo/autobrightness/app/runtime/PipelineCycleRunner.kt) |
-| Animation writes and the throttle | [AnimationRunner.kt](https://github.com/faded-penguin021/Tideo-Auto-Brightness/blob/v1.15.0/app/src/main/kotlin/com/tideo/autobrightness/app/runtime/AnimationRunner.kt), [ThrottleController.kt](https://github.com/faded-penguin021/Tideo-Auto-Brightness/blob/v1.15.0/app/src/main/kotlin/com/tideo/autobrightness/app/runtime/ThrottleController.kt) |
-| Defaults, saved ranges and warnings | [AabSettings.kt](https://github.com/faded-penguin021/Tideo-Auto-Brightness/blob/v1.15.0/app/src/main/kotlin/com/tideo/autobrightness/app/settings/AabSettings.kt), [AabSettingsMapper.kt](https://github.com/faded-penguin021/Tideo-Auto-Brightness/blob/v1.15.0/app/src/main/kotlin/com/tideo/autobrightness/app/settings/AabSettingsMapper.kt), [SettingsValidator.kt](https://github.com/faded-penguin021/Tideo-Auto-Brightness/blob/v1.15.0/app/src/main/kotlin/com/tideo/autobrightness/app/settings/SettingsValidator.kt) |
-| Built-in profiles | [DefaultProfiles.kt](https://github.com/faded-penguin021/Tideo-Auto-Brightness/blob/v1.15.0/app/src/main/kotlin/com/tideo/autobrightness/app/settings/DefaultProfiles.kt) |
-| Solar windows and the day/night modifier | [SolarTimes.kt](https://github.com/faded-penguin021/Tideo-Auto-Brightness/blob/v1.15.0/domain/src/main/kotlin/com/tideo/autobrightness/domain/circadian/SolarTimes.kt), [DynamicScaleEngine.kt](https://github.com/faded-penguin021/Tideo-Auto-Brightness/blob/v1.15.0/domain/src/main/kotlin/com/tideo/autobrightness/domain/circadian/DynamicScaleEngine.kt), [CircadianScaleRefresh.kt](https://github.com/faded-penguin021/Tideo-Auto-Brightness/blob/v1.15.0/app/src/main/kotlin/com/tideo/autobrightness/app/runtime/CircadianScaleRefresh.kt) |
-| Super dimming and PWM formulas, and which mode runs | [SoftwareDimming.kt](https://github.com/faded-penguin021/Tideo-Auto-Brightness/blob/v1.15.0/domain/src/main/kotlin/com/tideo/autobrightness/domain/brightness/SoftwareDimming.kt), [SuperDimmingCoordinator.kt](https://github.com/faded-penguin021/Tideo-Auto-Brightness/blob/v1.15.0/app/src/main/kotlin/com/tideo/autobrightness/app/runtime/SuperDimmingCoordinator.kt) |
-| Bright-light hand-off and the display calibration | [HandoffRules.kt](https://github.com/faded-penguin021/Tideo-Auto-Brightness/blob/v1.15.0/domain/src/main/kotlin/com/tideo/autobrightness/domain/brightness/HandoffRules.kt), [HandoffCoordinator.kt](https://github.com/faded-penguin021/Tideo-Auto-Brightness/blob/v1.15.0/app/src/main/kotlin/com/tideo/autobrightness/app/runtime/HandoffCoordinator.kt), [DisplayCalibration.kt](https://github.com/faded-penguin021/Tideo-Auto-Brightness/blob/v1.15.0/domain/src/main/kotlin/com/tideo/autobrightness/domain/brightness/DisplayCalibration.kt) |
-| Override detection and point normalisation | [OverrideRules.kt](https://github.com/faded-penguin021/Tideo-Auto-Brightness/blob/v1.15.0/domain/src/main/kotlin/com/tideo/autobrightness/domain/brightness/OverrideRules.kt) |
-| Curve wizard and its quality report | [CurveSuggestionEngine.kt](https://github.com/faded-penguin021/Tideo-Auto-Brightness/blob/v1.15.0/domain/src/main/kotlin/com/tideo/autobrightness/domain/wizard/CurveSuggestionEngine.kt) |
+| Curve, thresholds, smoothing, taper and animation timing | [BrightnessEngine.kt](https://github.com/faded-penguin021/Tideo-Auto-Brightness/blob/v1.15.3/domain/src/main/kotlin/com/tideo/autobrightness/domain/brightness/BrightnessEngine.kt) |
+| Continuity coefficients (form2A, form3A) | [BrightnessFormulae.kt](https://github.com/faded-penguin021/Tideo-Auto-Brightness/blob/v1.15.3/domain/src/main/kotlin/com/tideo/autobrightness/domain/brightness/BrightnessFormulae.kt) |
+| The stored band, pending reading and settling | [LightAdmission.kt](https://github.com/faded-penguin021/Tideo-Auto-Brightness/blob/v1.15.3/app/src/main/kotlin/com/tideo/autobrightness/app/runtime/LightAdmission.kt) |
+| Applying targets, the PWM floor and recording overrides | [PipelineCycleRunner.kt](https://github.com/faded-penguin021/Tideo-Auto-Brightness/blob/v1.15.3/app/src/main/kotlin/com/tideo/autobrightness/app/runtime/PipelineCycleRunner.kt) |
+| Animation writes and the throttle | [AnimationRunner.kt](https://github.com/faded-penguin021/Tideo-Auto-Brightness/blob/v1.15.3/app/src/main/kotlin/com/tideo/autobrightness/app/runtime/AnimationRunner.kt), [ThrottleController.kt](https://github.com/faded-penguin021/Tideo-Auto-Brightness/blob/v1.15.3/app/src/main/kotlin/com/tideo/autobrightness/app/runtime/ThrottleController.kt) |
+| Defaults, saved ranges and warnings | [AabSettings.kt](https://github.com/faded-penguin021/Tideo-Auto-Brightness/blob/v1.15.3/app/src/main/kotlin/com/tideo/autobrightness/app/settings/AabSettings.kt), [AabSettingsMapper.kt](https://github.com/faded-penguin021/Tideo-Auto-Brightness/blob/v1.15.3/app/src/main/kotlin/com/tideo/autobrightness/app/settings/AabSettingsMapper.kt), [SettingsValidator.kt](https://github.com/faded-penguin021/Tideo-Auto-Brightness/blob/v1.15.3/app/src/main/kotlin/com/tideo/autobrightness/app/settings/SettingsValidator.kt) |
+| Built-in profiles | [DefaultProfiles.kt](https://github.com/faded-penguin021/Tideo-Auto-Brightness/blob/v1.15.3/app/src/main/kotlin/com/tideo/autobrightness/app/settings/DefaultProfiles.kt) |
+| Solar windows and the day/night modifier | [SolarTimes.kt](https://github.com/faded-penguin021/Tideo-Auto-Brightness/blob/v1.15.3/domain/src/main/kotlin/com/tideo/autobrightness/domain/circadian/SolarTimes.kt), [DynamicScaleEngine.kt](https://github.com/faded-penguin021/Tideo-Auto-Brightness/blob/v1.15.3/domain/src/main/kotlin/com/tideo/autobrightness/domain/circadian/DynamicScaleEngine.kt), [CircadianScaleRefresh.kt](https://github.com/faded-penguin021/Tideo-Auto-Brightness/blob/v1.15.3/app/src/main/kotlin/com/tideo/autobrightness/app/runtime/CircadianScaleRefresh.kt) |
+| Super dimming and PWM formulas, and which mode runs | [SoftwareDimming.kt](https://github.com/faded-penguin021/Tideo-Auto-Brightness/blob/v1.15.3/domain/src/main/kotlin/com/tideo/autobrightness/domain/brightness/SoftwareDimming.kt), [SuperDimmingCoordinator.kt](https://github.com/faded-penguin021/Tideo-Auto-Brightness/blob/v1.15.3/app/src/main/kotlin/com/tideo/autobrightness/app/runtime/SuperDimmingCoordinator.kt) |
+| Bright-light hand-off and the display calibration | [HandoffRules.kt](https://github.com/faded-penguin021/Tideo-Auto-Brightness/blob/v1.15.3/domain/src/main/kotlin/com/tideo/autobrightness/domain/brightness/HandoffRules.kt), [HandoffCoordinator.kt](https://github.com/faded-penguin021/Tideo-Auto-Brightness/blob/v1.15.3/app/src/main/kotlin/com/tideo/autobrightness/app/runtime/HandoffCoordinator.kt), [DisplayCalibration.kt](https://github.com/faded-penguin021/Tideo-Auto-Brightness/blob/v1.15.3/domain/src/main/kotlin/com/tideo/autobrightness/domain/brightness/DisplayCalibration.kt), [DisplayCalibrationRun.kt](https://github.com/faded-penguin021/Tideo-Auto-Brightness/blob/v1.15.3/app/src/main/kotlin/com/tideo/autobrightness/app/runtime/DisplayCalibrationRun.kt) |
+| Override detection and point normalisation | [OverrideRules.kt](https://github.com/faded-penguin021/Tideo-Auto-Brightness/blob/v1.15.3/domain/src/main/kotlin/com/tideo/autobrightness/domain/brightness/OverrideRules.kt) |
+| Curve wizard and its quality report | [CurveSuggestionEngine.kt](https://github.com/faded-penguin021/Tideo-Auto-Brightness/blob/v1.15.3/domain/src/main/kotlin/com/tideo/autobrightness/domain/wizard/CurveSuggestionEngine.kt) |

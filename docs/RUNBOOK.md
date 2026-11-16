@@ -197,6 +197,21 @@ so check it explicitly.
   and GitHub's auto "What's Changed". So the owner no longer hand-copies the changelog into the release
   body; just keep this file accurate. (If it's missing, the release still publishes with only the auto
   "What's Changed".)
+- **`MATH_EXPLAINED.md` follows every version bump (DE-039).** The user guide names the version it
+  was checked against in its intro and pins its §15 source links to that release tag. In the unit
+  that bumps the version, re-pin both to the new version and fix every section whose behaviour,
+  default, range, message or screen changed since the pinned release. Find them with
+  `git diff v<the guide's pinned version> -- domain/src/main app/src/main platform/src/main`,
+  starting from the guide's own pin, not the latest tag: if a bump skipped the guide, the latest
+  tag would hide that release's changes. `domain/` changes touch the math sections, `app/` and
+  `platform/` changes the runtime ones (hand-off, calibration, overrides). If nothing user-visible
+  changed, re-pin anyway. A unit that lands after the bump and before the tag re-runs the diff
+  from the same pin. Before hand-off, check that every §15 path exists in the tree
+  (`git cat-file -e HEAD:<path>`). The PR template's Release impact asks for the outcome, re-pin
+  included. The re-pinned links do not resolve until the owner publishes the tag. **No guard
+  enforces this bullet**; this bullet is the check. That is a choice: the guide shipped stale
+  through 1.15.1–1.15.3 (DE-039), and a later unit may add a guard comparing its pinned version
+  with `versionName`.
 - **F-Droid store icon (DA-024):** the listing icon comes from
   `fastlane/metadata/android/en-US/images/icon.png` (512×512), **not** from the APK — F-Droid cannot
   rasterize our adaptive-icon XML (`mipmap-anydpi/ic_launcher.xml`), so with no PNG the client shows
