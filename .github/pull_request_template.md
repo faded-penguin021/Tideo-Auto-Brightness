@@ -12,8 +12,10 @@
      GitHub release "What's new" (D-123). If you can't link it, it likely doesn't exist yet: write it.
      Also on a version bump, bring MATH_EXPLAINED.md up to date: re-pin the version in its intro and
      the §15 source links (they point at the release tag), and fix any section whose behaviour,
-     default, range, message or screen this release changed. Say which here, or "MATH_EXPLAINED.md:
-     no user-visible change" — a doc pinned to an older release is how §10 went stale after 1.15.3. -->
+     default, range, message or screen changed since the version it was pinned to (RUNBOOK
+     playbook 6, DE-039). Say "MATH_EXPLAINED.md: re-pinned to <version>; updated §N, §M" or
+     "MATH_EXPLAINED.md: re-pinned to <version>, no user-visible change". A doc pinned to an older
+     release is how §10 went stale through 1.15.3. -->
 
 ## Verification
 <!-- Acceptance ladder (domain/platform/app tests + lint + assembleDebug): green, or which subset ran.

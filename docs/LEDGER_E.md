@@ -472,3 +472,10 @@
   tests, and noted outside this card that `stop()` cancels the effective-flow collector without
   joining it, so an emission already resumed could still write after the restore (the D-139
   class), not reproduced and left for its own unit.
+- DE-039 [cited]: **Every version bump re-checks `MATH_EXPLAINED.md`: re-pin its intro version and §15
+  links, and fix each section changed since its pinned release (owner, 2026-11-16; RUNBOOK
+  playbook 6).** The guide stayed pinned to 1.15.0 through releases 1.15.1–1.15.3, so §10 still
+  described calibration failures as a DUMP-permission problem after DE-032 gave each cause its own
+  message. The diff starts from the guide's own pin, not the latest tag, so a skipped bump cannot
+  hide a release; the PR template's Release impact comment asks for the outcome, re-pin included.
+  Prose-only by choice: no guard yet compares the guide's version with `versionName`.
