@@ -109,6 +109,10 @@ proposing work; changing it is legislation under RUNBOOK's rule-review protocol.
 
 Newest first; ledger rows are the durable detail.
 
+- 2026-11-16 — **`MATH_EXPLAINED.md` re-checked against v1.15.3 (no `domain/` change since
+  v1.15.0): §1's setting scale (DE-023), §10's calibration ceiling, HBM flag, requirements and
+  per-cause failures (DE-028, DE-030…DE-032), §15 links re-pinned. The PR template's Release impact
+  now asks for that update on every version bump (prose-only, no guard).**
 - 2026-11-16 — **Design-tells redesign planned, spec only (owner): each catalogue match judged
   remove, fix or keep, good design kept; D1–D10 open for the Astra review. STATE compressed by stage:
   the 1.15.3 train is folded below. Owner queue: the release item closed (PR #160 merged on
