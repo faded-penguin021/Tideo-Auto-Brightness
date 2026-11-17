@@ -479,3 +479,27 @@
   message. The diff starts from the guide's own pin, not the latest tag, so a skipped bump cannot
   hide a release; the PR template's Release impact comment asks for the outcome, re-pin included.
   Prose-only by choice: no guard yet compares the guide's version with `versionName`.
+- DE-040: **Issue #161 asks to stop Tideo's flashes appearing over other apps; the owner asked for a
+  plan, `docs/plans/FLASH_VISIBILITY_TOGGLE.md`, and waived the README's AAB-first rule for it
+  (owner, #161, 2026-11-17).** Whether a background flash shows is decided by whether Android has
+  destroyed Tideo's activity, not by any choice: `AabFlashHost` registers for its composition, so a
+  stopped activity swallows every flash in an invisible pill and a destroyed one lets D-093's plain
+  toast draw over other apps — read from the code, unconfirmed on a device. Live Debug's
+  Accessibility check compares setting entries as strings with the long component form, so a
+  short-form entry would read Off with the service on, as the owner saw; the cause awaits the
+  owner's `settings get secure enabled_accessibility_services`. Defaulting flashes to inside-Tideo
+  only is not a cleanup: AAB flashes everywhere (G2R-F50) and D-093 chose the background toast,
+  though the card's "Off (foreground only)" label and D-058's wording say otherwise. The plan
+  leaves that default (D1), the toggle's scope (D2), its place (D3) and the context-load flash's
+  untranslated text (D5) to the owner, and stores the toggle outside `AabSettings` (D4, as D-157).
+  → D1–D5 decided: DE-041.
+- DE-041: **#161's flash decisions (owner, 2026-11-17): one global setting with three states —
+  On (the default: over other apps, as AAB and D-093), Off (outside Tideo) and Off (everywhere) —
+  on Live Debug's flash card, in its own Preferences store rather than `AabSettings` (as D-157).**
+  The state governs every flash through `AabFlash`, the in-app confirmations through `Toaster`
+  included, so Off (everywhere) also silences the message a button press shows; the manual override
+  keeps its heads-up notification, and a debug category picked under it shows a note instead of
+  being overridden. The context-load flash's text moves into `strings.xml` as a translatable
+  `flash_context_loaded`, and `HardcodedStringCheckTest` scans `AabFlash.show("`. Until the store's
+  first value arrives, `AabFlash` behaves as Off (outside Tideo), so neither off state can leak a
+  cold-start toast over another app. `docs/plans/FLASH_VISIBILITY_TOGGLE.md` Units 2 and 3 carry it.
