@@ -139,11 +139,36 @@ unit is untouched.
 scans `AabFlash.show("`, so the gap cannot reopen. It adds one string to the Chinese backlog
 (Owner queue item 1), alongside the strings Units 1 and 2 add.
 
+## How the units run (owner, 2026-11-17)
+
+The plan-runner executes the units from the Docker host, with the owner's phone connected over
+wireless adb. Code units (1, 2, 3) build and test in the container as usual. Device work (the
+Unit 1 read and Unit 4) goes **only through the e2e harness**, `e2e/run.sh`, under RUNBOOK
+playbook 9 and `e2e/README.md`:
+
+- **Connection.** The phone is in `adb tcpip` mode. Either the host's adb server
+  (`ADB_SERVER_HOST`, default `host.docker.internal:5037`) or one inside the container
+  (`adb connect <phone>:5555`, then `ADB_SERVER_HOST=127.0.0.1`), with
+  `TIDEO_E2E_SERIAL=<phone>:5555` set in the environment and never written to a file (the
+  harness's identifier rule).
+- **No hand-typed `adb shell`.** A write outside `run.sh` is unjournaled (playbook 9, "Avoid"),
+  and a read outside it can capture other apps' data into a log. Every device read this plan
+  needs is a harness READ template or one added under its unit tests.
+- **The owner's part stays the owner's.** Typing `INSTALL` for `e2e/run.sh --install`, keeping
+  the phone unlocked with display settings untouched, and switching Tideo's Accessibility service
+  on and off in Android's settings. The harness can read `secure/enabled_accessibility_services`,
+  but by design never writes it (`tideo_e2e/device.py`). The runner asks the owner for each of
+  these and waits; it never works around one.
+- **Private output stays private.** Snapshots, JUnit XML and pytest reports go to the private
+  store (`XDG_STATE_HOME`), never under `e2e/`. Only the conclusion goes into a commit or a
+  ledger row: pass, skip or fail counts, and which form the Accessibility entry takes.
+
 ## Units
 
 Each unit ends shippable: STATE Changelog line, `scripts/ladder.sh` green, commit,
-`scripts/ladder.sh --guards-only`, push (RUNBOOK Session discipline 3). Both code units touch
-`:app` runtime glue, so each runs the **glue-review protocol** (RUNBOOK). Before editing, run
+`scripts/ladder.sh --guards-only`, push (RUNBOOK Session discipline 3). Units 1 and 2 touch
+`:app` runtime glue, so each runs the **glue-review protocol** (RUNBOOK). Unit 3 touches only
+`e2e/` and the device script. Before editing, run
 `python3 scripts/codemap.py impact` on each file named below. No flash feature is registered in
 `codemap/features.toml` yet; Unit 2 registers one (`flash`: `AabFlash`, `AabFlashHost`,
 `AabToastAccessibilityService`, `ToastDebugSink`, the new store) and runs
@@ -162,10 +187,17 @@ and Changelog lines.
 
 ### Unit 1 — make background flashes predictable, and the card truthful (bug fix, playbook 4)
 
-1. **Evidence first (owner, on device).** On the phone whose card read Off with the service on:
-   `adb shell settings get secure enabled_accessibility_services`. If the Tideo entry is the short
-   form (`…/.app.runtime.AabToastAccessibilityService`), Finding 2's cause is confirmed. If it is
-   the long form, the cause is elsewhere; the unit then stops at step 3 and asks.
+1. **Evidence first (runner, through the harness).** The READ template
+   `settings_get_enabled_accessibility_services` already exists, but no harness code calls it:
+   preflight snapshots only restorable keys (`SNAPSHOT_KEYS`). So `e2e/tideo_e2e/preflight.py`
+   gains one report line saying whether a Tideo entry is listed, and in which form: **long**
+   (`<pkg>/<pkg>.app.runtime.AabToastAccessibilityService`), **short**
+   (`<pkg>/.app.runtime.AabToastAccessibilityService`) or **absent**. The line never prints the
+   setting itself, since it names other apps' services. A device-free unit test under
+   `e2e/tests/unit/` covers the three forms, and `e2e/run.sh tests/unit` stays green. Then, with
+   the owner having switched the service **on**, the runner runs `e2e/run.sh --preflight`, which
+   is read-only. **Short** confirms Finding 2's cause. **Long** means the cause is elsewhere: the
+   unit stops after step 2 and reports to the owner.
 2. **`AabFlashHost` follows the activity's lifecycle, not composition.** It registers its presenter
    on `ON_START` and unregisters it on `ON_STOP`, through `LocalLifecycleOwner`, with no new
    dependency. DD-034 still holds: a host clears only its own registration. Result: while Tideo is
@@ -185,8 +217,9 @@ and Changelog lines.
      setting, and the `.debug` application ID.
    - `SettingsScreensTest` (or the Live Debug UI test that owns `global_flash_card`): the three
      status labels render.
-5. **Acceptance:** `scripts/ladder.sh` green. Device checks are queued for Unit 3; this container
-   has no emulator.
+5. **Acceptance:** `scripts/ladder.sh` and `e2e/run.sh tests/unit` green, and the preflight line
+   read. Device checks are queued for Unit 4, since the container has no emulator and the phone
+   run needs the build from Unit 2.
 
 ### Unit 2 — the three-state setting (feature, playbook 5)
 
@@ -243,29 +276,100 @@ and Changelog lines.
    `codemap/features.toml`.
 7. **Acceptance:** `scripts/ladder.sh` green.
 
-### Unit 3 — device checks (owner; the reporter on #161 if they will)
+### Unit 3 — the device steps and their e2e scenarios (device-free)
 
-Added to `docs/rebuild/DEVICE_TEST_SCRIPT.md` and its row in `e2e/scenarios.toml` in the **same
-commit** (RUNBOOK playbook 5, "Device steps change in two places"); Unit 2 writes both.
+A new `DEVICE_TEST_SCRIPT.md` section, **§19 Flash visibility (#161)**, with steps **62–66**, and
+one `e2e/scenarios.toml` row per step, `s19_62` to `s19_66`, written in the **same commit**
+(RUNBOOK playbook 5, "Device steps change in two places"; `tests/unit/test_manifest.py` fails
+otherwise). The section's `E2E auto:` line names the auto rows.
 
-1. **On**, overlay off. Open Tideo, press Home, trigger a context switch (for example a battery
-   or app rule). **Expected:** a plain toast over the launcher. Repeat with Developer options →
-   "Don't keep activities" on, so the activity is destroyed when it leaves the screen.
-   **Expected:** the same toast both ways. Before Unit 1 the first case showed nothing, because
-   the activity was only stopped. Turn the overlay on and repeat. **Expected:** the teal overlay
-   instead of the plain toast.
-2. **Off (outside Tideo)**, overlay off and then on. Same triggers with Tideo in the background.
-   **Expected:** nothing over other apps. With Tideo open, trigger the same switch, or press Apply
-   on any settings screen. **Expected:** the teal pill shows.
-3. **Off (everywhere)**. Same triggers in the background, then Apply inside Tideo. **Expected:**
-   nothing in either place. Pick a debug category. **Expected:** the note that debug messages will
-   not show.
-4. Live Debug's overlay status on the phone that read Off with the service on. **Expected:** On.
-   Disable the service in Android's settings. **Expected:** Off on return.
-5. The reporter's scenario on #161: **Off (outside Tideo)**, phone idle for an hour, then profile
-   switches in another app. **Expected:** no toast.
+**The flash trigger.** Context loads cannot be restored (the profile tuple, `s13_44`), so the
+scenarios use `s13_44a`'s trigger. Set the debug level to 8 (Context Automation) through the UI
+with external control off, then send any control broadcast, and `ControlReceiver.flashDrop` posts
+one flash. The effect kinds already exist: `prefs_ui`, `broadcast` and `automation_events`.
 
-### Unit 4 — close-out
+**The oracles, all harness READs:**
+
+- **In-app pill:** a node with resource-id `aab_flash` in the uiautomator dump. `AabFlashHost` sits
+  inside `TideoRootSurface`'s `testTagsAsResourceId` (DD-018), so the tag is visible.
+- **Accessibility overlay:** a `TYPE_ACCESSIBILITY_OVERLAY` window owned by the debug package in
+  `dumpsys window windows`. The overlay view has no resource-id (`e2e/README.md` Known limits), but
+  its window is listed.
+- **Plain toast:** **unverified.** Since Android 11, SystemUI draws a text toast, and whether the
+  redacted `dumpsys notification` or `dumpsys window windows` shows it on the owner's phone is not
+  known. The scenario's parser accepts only a toast record attributed to the debug package. A
+  device-free unit test pins that shape against a sanitised sample the runner captures in Unit 4
+  (sanitised text only, into `e2e/evidence/`). Until that sample exists, this half of each row is
+  `partial`, with that reason.
+- **Absence** is read over a 3 s window, longer than the 2.5 s flash. Each absence check is paired
+  in the same test with a positive control under **On** using the same trigger, as `s13_42` pairs
+  quiet and control. Without the pair, a broken trigger would pass every absence check.
+
+**Harness changes** (`e2e/tideo_e2e/`, each with unit tests; `test_harness.py` checks every call
+against its row):
+
+- A `flash_prefs` effect kind in `effects.py`, covering the private store
+  `files/datastore/flash_prefs.preferences_pb`. That path already matches `_PRIVATE_FILE` in
+  `device.py`, so no new template is needed. A parser in `state.py` reads it.
+- A UI restore routine in `tideo.py` that selects the journaled state on the Live Debug card,
+  since "a preference is restorable only through a registered UI routine" (`e2e/README.md`).
+- `Target`s for the three options (`flash_visibility_everywhere`, `flash_visibility_inside`,
+  `flash_visibility_off`) in the rows' `UiAllowlist`.
+- Optional: `global/always_finish_activities` as a restorable `_BIT` in `device.py`'s `SETTINGS`,
+  to run step 62's destroyed-activity half. Without it, that half stays `manual`. The stopped half
+  is the bug, and it needs no new key.
+
+**Steps** (expected results as in the script):
+
+- **62 On.** Open Live Debug, press Home, trigger a flash. **Expected:** a plain toast, or the
+  overlay if the owner has enabled the service, over the launcher. Before Unit 1 this showed
+  nothing, because the activity was only stopped. Inside Tideo: the pill. Row `auto`; the toast
+  oracle is `partial` as above.
+- **63 Off (outside Tideo).** The same two cases. **Expected:** nothing over the launcher; the pill
+  inside Tideo. Row `auto`.
+- **64 Off (everywhere).** The same two cases. **Expected:** nothing in either place, and the debug
+  selector's note is shown. Row `auto`.
+- **65 Overlay status.** With the service switched on by the owner, the card reads On. After the
+  owner switches it off, the card reads Off on return. The harness reads both the card and the
+  setting, and the owner flips the switch. Row `partial`: "the harness never writes
+  enabled_accessibility_services".
+- **66 The reporter's scenario.** **Off (outside Tideo)**, phone idle for an hour, then context
+  switches in another app. **Expected:** no toast. Row `manual`: it needs a context load and an
+  hour of real use. The owner runs it, and the reporter on #161 if they will.
+
+**Acceptance:** `e2e/run.sh tests/unit` green (manifest, boundary, harness, the new parsers), and
+`scripts/ladder.sh` green. Neither the ladder nor CI runs the e2e unit tests, so the runner runs
+them explicitly.
+
+### Unit 4 — the phone run (runner and owner, RUNBOOK playbook 9)
+
+Preconditions, from the owner: the phone unlocked on wireless adb, `TIDEO_E2E_SERIAL` set,
+English, and display settings left alone for the run. `TIDEO_E2E_CONFIRM=automation` is enough,
+since no row needs `contexts` or `unlock`.
+
+1. `e2e/run.sh tests/unit`, then `e2e/run.sh --preflight`. Anything but exit 0 stops the run.
+2. Build the debug APK from the train's head. Install it with `e2e/run.sh --install <apk>`; the
+   owner types `INSTALL`.
+3. Capture the plain-toast sample for Unit 3's parser. Under On, trigger a flash with Tideo in the
+   background, take the READ dumps, and keep only the sanitised toast record. If the phone shows
+   no toast record, record that. Steps 62–64's toast halves then stay `partial`, and the owner
+   confirms them by eye during the run. If the record's shape differs from what Unit 3's parser
+   expects, fix the parser and its unit test, rerun `e2e/run.sh tests/unit`, and commit before
+   step 4.
+4. `e2e/run.sh tests --ignore=tests/unit -k "s19_" --junitxml=<private store>/junit-<date>.xml`,
+   with the service **off**. The owner then switches it **on**, and the runner repeats the
+   command, which covers the overlay branch and step 65.
+5. `e2e/run.sh --recover`, then `--preflight` again, and compare its record with step 1's field by
+   field (playbook 9 step 7). The new `flash_prefs` store must be back at its original state.
+6. Owner-only rows: 62's destroyed-activity half (unless the optional key was added) and 66.
+
+**Acceptance:** every `s19_` row passes or skips by a stated rule, the journal is empty, and step
+5 finds no unexplained difference. **Record:** a ledger row naming the build (versionName,
+versionCode and commit), the pass, skip and fail counts, and the Accessibility-entry form from
+Unit 1. Add a STATE Changelog line. A failure is classified per playbook 9; a Tideo defect goes
+back through playbook 4 before close-out.
+
+### Unit 5 — close-out
 
 Every durable fact is in a DE row or a STATE Changelog line; this file is deleted; the STATE
 Active-work entry is removed. The owner closes #161.

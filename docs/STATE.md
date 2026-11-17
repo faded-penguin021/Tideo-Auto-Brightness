@@ -62,8 +62,9 @@ investigation stays closed (DB-051…DB-060), and Scorecard.dev is a run-once lo
 - **Flash visibility: On, Off (outside Tideo), Off (everywhere), and two bugs (#161)** —
   `docs/plans/FLASH_VISIBILITY_TOGGLE.md`, spec only (owner, 2026-11-17; AAB-first waived on #161,
   DE-040). D1–D5 decided (DE-041); each unit runs on the owner's go-ahead.
+  Runs from the Docker host's plan-runner, phone on wireless adb, device work only via `e2e/run.sh`.
   [x] 0 plan · [ ] 1 predictable background flashes and a truthful status · [ ] 2 the three-state
-  setting and bump · [ ] 3 device checks · [ ] 4 close-out.
+  setting and bump · [ ] 3 §19 steps and e2e scenarios · [ ] 4 phone run · [ ] 5 close-out.
 
 ## Owner queue
 
@@ -117,7 +118,9 @@ Newest first; ledger rows are the durable detail.
 
 - 2026-11-17 — **#161's D1–D5 decided (owner, DE-041): flashes stay on over other apps by default,
   and Live Debug adds Off (outside Tideo) and Off (everywhere), each governing every flash; the
-  context-load flash becomes a translatable string. The plan's Units 2 and 3 are rewritten for it.**
+  context-load flash becomes a translatable string. The plan's Units 2 and 3 are rewritten for it.
+  The plan runs from the Docker host's plan-runner with the phone on wireless adb (owner), so
+  device work moves to e2e scenarios s19_62–66 (Unit 3) and a playbook-9 run (Unit 4).**
 - 2026-11-17 — **Issue #161 planned, spec only (owner): a toggle for flashes over other apps, and
   two bugs found on the way — a stopped activity swallows background flashes, and Live Debug's
   Accessibility status can read Off while the service is on; D1–D5 open (DE-040).**
