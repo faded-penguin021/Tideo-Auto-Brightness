@@ -492,3 +492,14 @@
   though the card's "Off (foreground only)" label and D-058's wording say otherwise. The plan
   leaves that default (D1), the toggle's scope (D2), its place (D3) and the context-load flash's
   untranslated text (D5) to the owner, and stores the toggle outside `AabSettings` (D4, as D-157).
+  → D1–D5 decided: DE-041.
+- DE-041: **#161's flash decisions (owner, 2026-11-17): one global setting with three states —
+  On (the default: over other apps, as AAB and D-093), Off (outside Tideo) and Off (everywhere) —
+  on Live Debug's flash card, in its own Preferences store rather than `AabSettings` (as D-157).**
+  The state governs every flash through `AabFlash`, the in-app confirmations through `Toaster`
+  included, so Off (everywhere) also silences the message a button press shows; the manual override
+  keeps its heads-up notification, and a debug category picked under it shows a note instead of
+  being overridden. The context-load flash's text moves into `strings.xml` as a translatable
+  `flash_context_loaded`, and `HardcodedStringCheckTest` scans `AabFlash.show("`. Until the store's
+  first value arrives, `AabFlash` behaves as Off (outside Tideo), so neither off state can leak a
+  cold-start toast over another app. `docs/plans/FLASH_VISIBILITY_TOGGLE.md` Units 2 and 3 carry it.

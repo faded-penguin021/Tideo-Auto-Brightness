@@ -1,15 +1,18 @@
-# Flashes over other apps: a toggle, and the two bugs under issue #161
+# Flash visibility: a three-state setting, and the two bugs under issue #161
 
 ## Status
 
 - **Spec only. No code has changed.** The owner asked for this plan on 2026-11-17, from issue
   [#161](https://github.com/faded-penguin021/Tideo-Auto-Brightness/issues/161). That request
-  authorised **Unit 0 only**: committing this file, ledger row DE-040 and the STATE entries on the
-  session branch `ccr-a2faaccb-6q3tw1`. Every later unit needs the owner's separate go-ahead.
+  authorised **Unit 0 only**: committing this file, ledger rows DE-040 and DE-041 and the STATE
+  entries on the session branch `ccr-a2faaccb-6q3tw1`. Every later unit needs the owner's separate
+  go-ahead.
 - **The owner's proposal (2026-11-17):** a toggle that turns flashes over other apps on or off,
   and, optionally, flashes shown only inside Tideo by default, unless a design decision, a ledger
-  row or the Tasker port already settled that. It did, partly: see "What is already decided". D1
-  asks the owner to choose.
+  row or the Tasker port already settled that. It did, partly: see "What is already decided".
+- **D1–D5 are decided (owner, 2026-11-17; DE-041).** Flashes show over other apps by default, and
+  Live Debug offers two separate off states: **Off (outside Tideo)** and **Off (everywhere)**. See
+  "Decisions".
 - **The AAB-first rule does not apply here (owner, #161, 2026-11-17).** The README sends features
   to AAB first. On #161 the owner wrote that this one will not be ported to AAB first, because
   both AAB designs (a state profile that tracks the foreground app, or a foreground-app poll before
@@ -76,7 +79,7 @@ under G2R-F50 in `docs/history/STATE_rebuild.md`) reads Enabled.
 **Also noticed:** `ToastContextLoadSink` builds its text in code — `Context "…" → profile "…"` —
 so the flash the reporter sees most is the one flash that is never translated.
 `HardcodedStringCheckTest` does not catch it, because it scans `toast("` and the sink calls
-`AabFlash.show`. D5 asks whether to fix it here.
+`AabFlash.show`. D5 fixes it in Unit 2.
 
 ## What is already decided
 
@@ -90,70 +93,51 @@ so the flash the reporter sees most is the one flash that is never translated.
   text and the service description describe the overlay as the way to see flashes over other apps,
   and D-058 calls the fallback "the foreground toast". The intent as written and the behaviour as
   built disagree. Today's code settles what the app does, not what it should do (AGENTS.md), so D1
-  goes to the owner.
+  went to the owner.
 - **The overlay stays.** The teal Accessibility overlay is an owner-binding keep (the S12.9 review
   rejections, LEDGER.md near D-072).
 
 So defaulting to local flashes is not free: it reverses D-093 and moves away from AAB, which is a
-recorded departure, not a cleanup. It is still the owner's call, and D1 lays it out.
+recorded departure, not a cleanup. The owner kept the default (D1 below).
 
-## Decisions for the owner
+## Decisions (owner, 2026-11-17; DE-041)
 
-**D1. What happens to a flash while Tideo is not on screen, by default?**
+**D1. One setting with three states, default On.** Flashes keep showing over other apps by
+default, so AAB's behaviour and D-093 stand. Live Debug adds two separate off states:
 
-- (a) **Shown over other apps (the default), and the new toggle turns that off.** This keeps AAB's
-  behaviour and D-093, and matches what most users already see once Android reclaims the activity.
-  The card's "Off (foreground only)" label is corrected to what it means.
-- (b) **Shown only inside Tideo (the default), and the toggle turns flashes over other apps on.**
-  This matches the card's current label and the reporter's expectation, and stops the toast for
-  every new and existing user who does nothing. It departs from AAB (a DE row), reverses D-093,
-  and users who rely on the profile-switch flash lose it until they find the toggle.
+| State (stored value) | Tideo on screen | Tideo not on screen |
+|---|---|---|
+| **On** (`EVERYWHERE`, default) | overlay if bound, else the in-app pill | overlay if bound, else a plain toast |
+| **Off (outside Tideo)** (`INSIDE_TIDEO`) | overlay if bound, else the in-app pill | nothing |
+| **Off (everywhere)** (`OFF`) | nothing | nothing |
 
-  Recommendation **(a)**: parity is binding unless the owner departs from it, and a user who never
-  opened Live Debug should not lose a flash they see today. If the owner prefers (b), Unit 2 is the
-  same code with the other default and one more ledger sentence. Either way, existing installs get
-  the default, since no stored value exists yet.
+Existing installs get On, since no stored value exists yet. The labels follow the owner's
+wording. The overlay's "Off (foreground only)" status label is retired, because the overlay's
+status no longer describes where flashes appear.
 
-**D2. What does the toggle silence?**
+**D2. The user chooses; the state governs every flash.** There are no per-kind exceptions. Context
+loads, hand-off and High Brightness Mode, the manual-override flash, the ten debug categories,
+`ControlReceiver`'s flashes and the in-app confirmations through `Toaster` (Applied, Copied, the
+location messages) all follow it. So **Off (everywhere)** also silences the message a button
+press would show. The manual override keeps its heads-up notification (`notifyManualOverride`).
+A debug category picked under **Off (everywhere)** would show nothing, so the debug selector shows
+one line saying so, without overriding the user's choice.
 
-- (a) **Every flash while Tideo is not visible:** context loads, hand-off and High Brightness Mode,
-  the manual-override flash, the debug categories and the control-intent flashes. Flashes while
-  Tideo is on screen always show.
-- (b) Only the context and profile-load flash.
-- (c) Everything in (a) except the debug categories, since a user picks those on purpose.
+**D3. Live Debug, in the Global flash card,** retitled for what it holds ("Flashes"). Tideo's
+other global switches already live on that screen and apply at once, without Apply/Discard. The
+Accessibility overlay stays in the same card as the way to get the teal, tap-to-dismiss surface
+instead of a plain toast. The design-tells plan (`DESIGN_TELLS_REDESIGN.md`) also touches Live
+Debug's headers and labels; whichever lands second adopts the other's wording.
 
-  Recommendation **(a)**: one rule a user can predict. A user debugging in other apps leaves the
-  toggle on. The manual-override flash duplicates the heads-up notification
-  (`notifyManualOverride`), so nothing is lost when it is silenced.
+**D4. Its own Preferences store,** as `ControlPrefsStore` does for external control and force-dark
+(D-157). It is not an `AabSettings` field, so it never enters a profile, an export, a Tasker
+legacy import or the context baseline (D-170), and the light-refactor plan's `keepGlobalsFrom`
+unit is untouched.
 
-**D3. Where does the toggle live?**
-
-- (a) **Live Debug's Global flash card, renamed for what it now holds** (for example, "Flashes over
-  other apps"). Tideo's other global switches (debug category, panic sensitivity, panic only while
-  charging) already live on that screen and apply at once, without Apply/Discard.
-- (b) Misc → Notifications. Easier to find, but Misc is a profile draft screen with Apply and
-  Discard, and this setting belongs to no profile.
-
-  Recommendation **(a)**, with the Accessibility overlay kept in the same card as the way to get
-  the teal, tap-to-dismiss surface instead of a plain toast. The design-tells plan
-  (`DESIGN_TELLS_REDESIGN.md`) also touches Live Debug's headers and labels; whichever lands
-  second adopts the other's wording.
-
-**D4. Where is the setting stored?**
-
-Recommendation, not a fork: a new key in its own Preferences store, as `ControlPrefsStore` does for
-external control and force-dark (D-157). It is not an `AabSettings` field, so it never enters a
-profile, an export, a Tasker legacy import or the context baseline (D-170), and the light-refactor
-plan's `keepGlobalsFrom` unit is untouched. The owner only needs to object if they want it in
-profiles.
-
-**D5. Translate the context-load flash in the same change?**
-
-- (a) **Yes, in Unit 2:** a `flash_context_loaded` string with two arguments, and the ratchet
-  extended to `AabFlash.show("`. It adds one string to the Chinese backlog (Owner queue item 1).
-- (b) No, leave it for its own unit.
-
-  Recommendation **(a)**: it is the flash this issue is about, and the change is a few lines.
+**D5. The context-load flash becomes a translatable string** in `strings.xml`:
+`flash_context_loaded`, with two arguments (context, profile). `HardcodedStringCheckTest` also
+scans `AabFlash.show("`, so the gap cannot reopen. It adds one string to the Chinese backlog
+(Owner queue item 1), alongside the strings Units 1 and 2 add.
 
 ## Units
 
@@ -173,7 +157,8 @@ no `domain/` change is planned, so that re-check is a re-pin.
 
 ### Unit 0 — this plan (done in this commit)
 
-This file, DE-040, and the STATE Active-work entry and Changelog line.
+This file, DE-040 (the plan) and DE-041 (the owner's decisions), and the STATE Active-work entry
+and Changelog lines.
 
 ### Unit 1 — make background flashes predictable, and the card truthful (bug fix, playbook 4)
 
@@ -190,8 +175,9 @@ This file, DE-040, and the STATE Active-work entry and Changelog line.
 3. **The card's status reads the component, not a string.** Each entry is parsed with
    `ComponentName.unflattenFromString` and compared with the service's `ComponentName`, so the
    short and long forms both match. The card shows three states: **On**, **Listed but not
-   running** (listed in settings, `AabFlash.isGlobal()` false), and **Off**. Two new strings; "Off
-   (foreground only)" is reworded per D1. That adds strings to Owner queue item 1.
+   running** (listed in settings, `AabFlash.isGlobal()` false), and **Off**. The overlay's
+   "Off (foreground only)" becomes a plain "Off" (D1), plus one new string for "Listed but not
+   running". Both go on Owner queue item 1's list.
 4. **Tests (Robolectric, failing first):**
    - `AabFlashTest`: after the host's lifecycle reaches `ON_STOP`, `AabFlash.show` posts a plain
      toast (ShadowToast) and the host's message stays null; after `ON_START`, the pill shows it.
@@ -202,42 +188,59 @@ This file, DE-040, and the STATE Active-work entry and Changelog line.
 5. **Acceptance:** `scripts/ladder.sh` green. Device checks are queued for Unit 3; this container
    has no emulator.
 
-### Unit 2 — the toggle (feature, playbook 5)
+### Unit 2 — the three-state setting (feature, playbook 5)
 
-1. **Store.** A `FlashPrefsStore` with one boolean, `flashes_over_other_apps`, default per D1, on a
-   new `flash_prefs` Preferences DataStore (D4). Registered in `AppModule` beside
-   `ControlPrefsStore`.
-2. **Channel.** `AabFlash` gains a `@Volatile` flag, set by a collector of the store started once
-   per process in `AppModule`. In `show`:
-   - Tideo visible (a foreground presenter is registered): as today. The overlay if bound, else
-     the pill.
-   - Tideo not visible and the flag on: as today. The overlay if bound, else a plain toast.
-   - Tideo not visible and the flag off: cancel any previous flash and show nothing.
-   - Before the store's first value arrives: treat the flag as **off** for background flashes, so
-     a user who turned it off never sees a cold-start toast. Under D1 (a) this can drop a
-     background flash in the process's first milliseconds, which is the cheaper error.
-   - Turning the flag off calls `AabFlash.cancel()`, so a toast already on screen goes.
-   Silencing happens in `AabFlash`, not in each sink, so D2 (a) is one rule. Under D2 (b) or (c)
-   the sinks pass a flash kind to `show` instead; the plan does not pre-build that.
-3. **UI (D3).** The Live Debug card becomes the toggle (a `SwitchRow`, test tag
-   `switch_flashesOverOtherApps`), with the overlay status and the Accessibility-settings button
-   beneath it, disabled while the toggle is off. The strings are new: the toggle label, its help
-   ("Profile switches and other messages from Tideo appear over the app you are using. Inside
-   Tideo they always show."), and a retitled card. The service's Accessibility description
-   (`global_toasts_a11y_description`) is reworded to match.
-4. **D5 (a), if chosen:** `flash_context_loaded`, and `HardcodedStringCheckTest` also scans
-   `AabFlash.show("`.
-5. **Tests:**
-   - `AabFlashTest`, a truth table of visible × flag × overlay bound × flag unknown: which surface
-     receives the text, or none (ShadowToast for the plain toast).
-   - `FlashPrefsStore` round-trips, and its default matches D1.
-   - A Live Debug UI test: the switch writes the store, and the overlay button is disabled while
-     it is off.
-   - `RuntimeDebugTest` and `ControlReceiverTest` still pass unchanged, which shows the sinks were
-     not touched.
-6. **Record:** the STATE departure line ("flashes over other apps can be turned off; AAB has no
-   such switch, owner waived AAB-first on #161"), a DE row stating D1–D5 as decided, the
-   `changelogs/34.txt` entry, and `codemap/features.toml`.
+1. **Store (D4).** A `FlashPrefsStore` on a new `flash_prefs` Preferences DataStore, holding one
+   string key `flash_visibility` that is read into an enum
+   `FlashVisibility { EVERYWHERE, INSIDE_TIDEO, OFF }`. A missing or unrecognised value reads as
+   `EVERYWHERE` (D1). Registered in `AppModule` beside `ControlPrefsStore`.
+2. **Channel.** `AabFlash` gains a `@Volatile visibility: FlashVisibility?`, set by a collector of
+   the store that `AppModule` starts once per process. `show` keeps its `cancel()` first (G2R-F51),
+   then applies D1's table:
+   - `OFF`: show nothing.
+   - `INSIDE_TIDEO`: if a foreground presenter is registered (Tideo on screen, after Unit 1), the
+     overlay if bound, else the pill; otherwise nothing.
+   - `EVERYWHERE`: as today. The overlay if bound, else the pill if Tideo is on screen, else a
+     plain toast.
+   - `null` (the store's first value has not arrived): behave as `INSIDE_TIDEO`. A user who chose
+     either off state never sees a cold-start toast over another app, and an On user can lose a
+     background flash only in the process's first milliseconds. Under `OFF`, an in-app flash can
+     slip through in that window only if the activity starts before the store loads. That is
+     accepted, since the store loads within a frame of process start.
+   - A change to a stricter state calls `AabFlash.cancel()`, so a flash already on screen goes.
+   The gate lives in `AabFlash`, not in each sink, so D2's "every flash" is one rule and the sinks
+   are not touched. That includes `Toaster`, which already calls `AabFlash.show`.
+3. **UI (D3).** The Live Debug card, retitled "Flashes" (test tag `flash_visibility_card`), opens
+   with a three-option single-choice row (`SingleChoiceSegmentedButtonRow`, or the radio list the
+   debug selector uses if the design rules prefer it), with test tags `flash_visibility_everywhere`,
+   `flash_visibility_inside`, `flash_visibility_off`, and these labels:
+   - **On**: "Flashes show over the app you are using."
+   - **Off (outside Tideo)**: "Flashes show only while Tideo is open."
+   - **Off (everywhere)**: "No flashes, including confirmations inside Tideo."
+
+   The help line under the row changes with the state. The overlay status and the
+   Accessibility-settings button follow, and the button is disabled unless the state is On (the
+   overlay only matters for flashes over other apps). While the state is **Off (everywhere)** and
+   the debug category is not Off, the debug selector shows "Flashes are off, so debug messages
+   will not show." The service's Accessibility description (`global_toasts_a11y_description`) is
+   reworded to say the setting lives in Live Debug. Every label is a `strings.xml` resource (D-131).
+4. **D5.** `ToastContextLoadSink` formats `flash_context_loaded` through
+   `notificationLanguageContext`, as `ToastHandoffSink` does. `HardcodedStringCheckTest` adds
+   `AabFlash.show("` to the shapes it scans.
+5. **Tests (Robolectric, failing first):**
+   - `AabFlashTest`: a truth table of visibility (the three states and `null`) × Tideo on screen ×
+     overlay bound, checking which surface receives the text, or none (ShadowToast for the plain
+     toast). Also: a change to a stricter state cancels a flash already showing.
+   - `FlashPrefsStore`: each state round-trips, and missing and unknown values read as `EVERYWHERE`.
+   - A Live Debug UI test: each option writes its state, the overlay button is enabled only under
+     On, and the debug note appears only under **Off (everywhere)** with a category selected.
+   - `ToastContextLoadSink`: the flash text comes from the resource, with both arguments.
+   - `RuntimeDebugTest` and `ControlReceiverTest` pass unchanged, which shows the sinks' gating did
+     not move.
+6. **Record:** the STATE departure line ("flashes can be limited to inside Tideo or turned off;
+   AAB has no such switch; owner waived AAB-first on #161"), a DE row for what shipped, the
+   `changelogs/34.txt` entry, the new strings on Owner queue item 1's list, and
+   `codemap/features.toml`.
 7. **Acceptance:** `scripts/ladder.sh` green.
 
 ### Unit 3 — device checks (owner; the reporter on #161 if they will)
@@ -245,17 +248,22 @@ This file, DE-040, and the STATE Active-work entry and Changelog line.
 Added to `docs/rebuild/DEVICE_TEST_SCRIPT.md` and its row in `e2e/scenarios.toml` in the **same
 commit** (RUNBOOK playbook 5, "Device steps change in two places"); Unit 2 writes both.
 
-1. Toggle **on**, overlay off. Open Tideo, press Home, trigger a context switch (for example a
-   battery or app rule). **Expected:** a plain toast over the launcher. Repeat with Developer
-   options → "Don't keep activities" on, so the activity is destroyed when it leaves the screen.
+1. **On**, overlay off. Open Tideo, press Home, trigger a context switch (for example a battery
+   or app rule). **Expected:** a plain toast over the launcher. Repeat with Developer options →
+   "Don't keep activities" on, so the activity is destroyed when it leaves the screen.
    **Expected:** the same toast both ways. Before Unit 1 the first case showed nothing, because
-   the activity was only stopped.
-2. Toggle **off**, overlay off and then on. Same triggers. **Expected:** nothing over other apps.
-   Inside Tideo the teal pill (or overlay) still shows the flash.
-3. Live Debug's status on the phone that read Off with the service on. **Expected:** On.
+   the activity was only stopped. Turn the overlay on and repeat. **Expected:** the teal overlay
+   instead of the plain toast.
+2. **Off (outside Tideo)**, overlay off and then on. Same triggers with Tideo in the background.
+   **Expected:** nothing over other apps. With Tideo open, trigger the same switch, or press Apply
+   on any settings screen. **Expected:** the teal pill shows.
+3. **Off (everywhere)**. Same triggers in the background, then Apply inside Tideo. **Expected:**
+   nothing in either place. Pick a debug category. **Expected:** the note that debug messages will
+   not show.
+4. Live Debug's overlay status on the phone that read Off with the service on. **Expected:** On.
    Disable the service in Android's settings. **Expected:** Off on return.
-4. The reporter's scenario on #161: toggle off, phone idle for an hour, then profile switches in
-   another app. **Expected:** no toast.
+5. The reporter's scenario on #161: **Off (outside Tideo)**, phone idle for an hour, then profile
+   switches in another app. **Expected:** no toast.
 
 ### Unit 4 — close-out
 
@@ -264,7 +272,7 @@ Active-work entry is removed. The owner closes #161.
 
 ## Out of scope
 
-- Porting the toggle to AAB (owner, #161).
+- Porting the setting to AAB (owner, #161).
 - Replacing the plain toast with a notification or any new surface.
 - Why the Accessibility service sometimes disables itself on Android 16 / OnePlus 13 (G2R-F50
   note, owner wontfix). Unit 1 only reports it truthfully.

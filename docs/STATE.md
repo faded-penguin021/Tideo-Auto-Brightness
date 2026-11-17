@@ -59,11 +59,11 @@ investigation stays closed (DB-051…DB-060), and Scorecard.dev is a run-once lo
   [ ] 4 Dashboard card and bump · [ ] 5 labels and mono · [ ] 6 status · [ ] 7 headers ·
   [ ] 8 copy · [ ] 9 Claude Design catch-up · [ ] 10 device check and close-out.
 
-- **Flashes over other apps: a toggle and two bugs (#161)** —
+- **Flash visibility: On, Off (outside Tideo), Off (everywhere), and two bugs (#161)** —
   `docs/plans/FLASH_VISIBILITY_TOGGLE.md`, spec only (owner, 2026-11-17; AAB-first waived on #161,
-  DE-040). D1–D5 open; each unit runs on the owner's go-ahead.
-  [x] 0 plan · [ ] 1 predictable background flashes and a truthful status · [ ] 2 the toggle and
-  bump · [ ] 3 device checks · [ ] 4 close-out.
+  DE-040). D1–D5 decided (DE-041); each unit runs on the owner's go-ahead.
+  [x] 0 plan · [ ] 1 predictable background flashes and a truthful status · [ ] 2 the three-state
+  setting and bump · [ ] 3 device checks · [ ] 4 close-out.
 
 ## Owner queue
 
@@ -115,6 +115,9 @@ proposing work; changing it is legislation under RUNBOOK's rule-review protocol.
 
 Newest first; ledger rows are the durable detail.
 
+- 2026-11-17 — **#161's D1–D5 decided (owner, DE-041): flashes stay on over other apps by default,
+  and Live Debug adds Off (outside Tideo) and Off (everywhere), each governing every flash; the
+  context-load flash becomes a translatable string. The plan's Units 2 and 3 are rewritten for it.**
 - 2026-11-17 — **Issue #161 planned, spec only (owner): a toggle for flashes over other apps, and
   two bugs found on the way — a stopped activity swallows background flashes, and Live Debug's
   Accessibility status can read Off while the service is on; D1–D5 open (DE-040).**
