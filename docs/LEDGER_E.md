@@ -479,3 +479,16 @@
   message. The diff starts from the guide's own pin, not the latest tag, so a skipped bump cannot
   hide a release; the PR template's Release impact comment asks for the outcome, re-pin included.
   Prose-only by choice: no guard yet compares the guide's version with `versionName`.
+- DE-040: **Issue #161 asks to stop Tideo's flashes appearing over other apps; the owner asked for a
+  plan, `docs/plans/FLASH_VISIBILITY_TOGGLE.md`, and waived the README's AAB-first rule for it
+  (owner, #161, 2026-11-17).** Whether a background flash shows is decided by whether Android has
+  destroyed Tideo's activity, not by any choice: `AabFlashHost` registers for its composition, so a
+  stopped activity swallows every flash in an invisible pill and a destroyed one lets D-093's plain
+  toast draw over other apps — read from the code, unconfirmed on a device. Live Debug's
+  Accessibility check compares setting entries as strings with the long component form, so a
+  short-form entry would read Off with the service on, as the owner saw; the cause awaits the
+  owner's `settings get secure enabled_accessibility_services`. Defaulting flashes to inside-Tideo
+  only is not a cleanup: AAB flashes everywhere (G2R-F50) and D-093 chose the background toast,
+  though the card's "Off (foreground only)" label and D-058's wording say otherwise. The plan
+  leaves that default (D1), the toggle's scope (D2), its place (D3) and the context-load flash's
+  untranslated text (D5) to the owner, and stores the toggle outside `AabSettings` (D4, as D-157).
