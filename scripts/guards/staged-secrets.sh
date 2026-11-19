@@ -47,9 +47,9 @@ fi
 
 # Staged paths, NUL-separated: a word-split list silently skips names with spaces or non-ASCII
 # characters, and a scan with a silent hole is worse than no scan.
-list=$(mktemp)
-tmpblob=$(mktemp)
-cmperr=$(mktemp)
+list=$(mktemp) || { echo "staged-secrets: mktemp failed — this guard checked nothing" >&2; exit 1; }
+tmpblob=$(mktemp) || { echo "staged-secrets: mktemp failed — this guard checked nothing" >&2; exit 1; }
+cmperr=$(mktemp) || { echo "staged-secrets: mktemp failed — this guard checked nothing" >&2; exit 1; }
 trap 'rm -f "$list" "$tmpblob" "$cmperr"' EXIT
 
 if git rev-parse --verify -q HEAD >/dev/null 2>&1; then

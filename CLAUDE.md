@@ -1,7 +1,9 @@
 # CLAUDE.md — pointer
 
-**Read [`AGENTS.md`](AGENTS.md) in full.** It is the canonical constitution for every agent
-working in this repository; this file only points at it and must never diverge from it.
+@AGENTS.md
+
+If `AGENTS.md` is not already in your context above, read it in full now: it is this
+repository's constitution, and this file only points at it and must never diverge from it.
 
 `.claude/settings.json` wires the session bootstrap, the pre-execution command guard and the
 deny rails. If you are running an agent whose harness has no session-start hook, run

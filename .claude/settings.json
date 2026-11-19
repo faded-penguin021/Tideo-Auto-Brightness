@@ -10,7 +10,7 @@
           {
             "type": "command",
             "shell": "bash",
-            "command": "bash -c 'if [ \"$CLAUDE_CODE_REMOTE\" = true ]; then export AAB_REMOTE=1; fi; exec \"$CLAUDE_PROJECT_DIR/scripts/session-start.sh\"'"
+            "command": "bash -c 'if [ \"$CLAUDE_CODE_REMOTE\" = true ]; then export AAB_REMOTE=1; fi; exec bash \"${CLAUDE_PROJECT_DIR}\"/scripts/session-start.sh'"
           },
           {
             "type": "command",
@@ -27,7 +27,8 @@
           {
             "type": "command",
             "shell": "bash",
-            "command": "\"$CLAUDE_PROJECT_DIR/scripts/command-guard.sh\""
+            "command": "bash \"${CLAUDE_PROJECT_DIR}\"/scripts/command-guard.sh # On Windows AMH requires Git Bash: install Git for Windows, or AMH is not usable",
+            "onFailure": "block"
           }
         ]
       },
@@ -47,7 +48,8 @@
           {
             "type": "command",
             "shell": "bash",
-            "command": "\"$CLAUDE_PROJECT_DIR/scripts/command-guard.sh\" --pre-task"
+            "command": "bash \"${CLAUDE_PROJECT_DIR}\"/scripts/command-guard.sh --pre-task # On Windows AMH requires Git Bash: install Git for Windows, or AMH is not usable",
+            "onFailure": "block"
           }
         ]
       }
@@ -59,7 +61,7 @@
           {
             "type": "command",
             "shell": "bash",
-            "command": "\"$CLAUDE_PROJECT_DIR/scripts/redact-tool-output.sh\""
+            "command": "bash \"${CLAUDE_PROJECT_DIR}\"/scripts/redact-tool-output.sh"
           }
         ]
       },
@@ -133,6 +135,8 @@
       "Bash(declare -x)",
       "Bash(typeset -p)",
       "Bash(typeset -x)",
+      "Bash(gh auth token:*)",
+      "Bash(git credential fill:*)",
       "Read(/proc/*/environ)",
       "Read(/proc/**/environ)",
       "Read(.env)",
@@ -150,7 +154,23 @@
       "Read(id_ed25519)",
       "Read(**/id_ed25519)",
       "Read(id_ed25519_sk)",
-      "Read(**/id_ed25519_sk)"
+      "Read(**/id_ed25519_sk)",
+      "Read(~/.git-credentials)",
+      "Read(**/.git-credentials)",
+      "Read(~/.config/git/credentials)",
+      "Read(~/.netrc)",
+      "Read(**/.netrc)",
+      "Read(~/_netrc)",
+      "Read(**/_netrc)",
+      "Read(~/.npmrc)",
+      "Read(~/.aws/credentials)",
+      "Read(~/.config/gh/hosts.yml)",
+      "Read(~/.docker/config.json)",
+      "Read(~/.kube/config)",
+      "Read(~/.config/gcloud/application_default_credentials.json)",
+      "Read(~/.cargo/credentials)",
+      "Read(~/.cargo/credentials.toml)",
+      "Edit(//**/.git/hooks/**)"
     ]
   }
 }

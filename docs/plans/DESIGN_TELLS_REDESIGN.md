@@ -276,7 +276,7 @@ Each code or docs unit ends shippable: STATE Changelog line, ladder green, commi
 **Scope.**
 - In scope: the test and each verdict in its table, the Keep list, D1–D10, the label rules, the
   Claude Design units, the implicit decisions below, the unit order, the evidence strategy, and
-  the fit with AGENTS.md and RUNBOOK (design-coherence block, playbooks 4–6, rule review).
+  the fit with AGENTS.md, RUNBOOK and PROTOCOLS (design-coherence block, playbooks 4–6, rule review).
   Check that each cited file and line says what the table claims.
 - Out of scope: the README and its images (owner), the out-of-scope items (check only their
   reasons), runtime and domain code, and the release process.

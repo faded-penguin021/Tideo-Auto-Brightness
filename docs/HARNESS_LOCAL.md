@@ -2,12 +2,12 @@
 
 This repository runs the **Agentic Maintenance Harness**
 ([`faded-penguin021/AMH`](https://github.com/faded-penguin021/AMH)), adopted at **amh-v9.1.0**
-and upgraded to **amh-v15.1.0** in full — shipped scripts copied, and the hand-applied seed prose
-and adapter steps of 15.0.0 and 15.1.0 applied in the same commit (DD-066), on top of 14.1.0's
-hook shell pin (DC-051) — under the `full` profile.
-`AGENTS.md` is the constitution, `docs/STATE.md` the working memory,
-`docs/LEDGER*.md` the permanent registry, `docs/RUNBOOK.md` the playbooks, `scripts/ladder.sh`
-the one verification entrypoint.
+and upgraded to **amh-v17.0.0** in full — shipped scripts copied, and the hand-applied seed prose
+and adapter steps of 16.0.0 to 17.0.0 applied in the same commit (DE-042), on top of 15.1.0's
+(DD-066) — under the `full` profile.
+`AGENTS.md` is the constitution, `docs/PROTOCOLS.md` the procedures every session is bound by,
+`docs/STATE.md` the working memory, `docs/LEDGER*.md` the permanent registry, `docs/RUNBOOK.md`
+the playbooks, `scripts/ladder.sh` the one verification entrypoint.
 
 **This file exists so an upgrade stays a file copy.** It is the single place recording every
 way this repo differs from a stock install — so whoever upgrades can diff the shipped scripts,
@@ -21,7 +21,7 @@ any of it.
 |---|---|---|
 | **Shipped** | `scripts/{ladder,session-start,command-guard,redact,redact-tool-output,test-ladder-guards}.sh`, `scripts/MANIFEST.sha256` | **Never edit.** Parameter-free, they read `amh.conf` at runtime. The ladder's integrity rung hashes them against the manifest every run, so a local edit is reported rather than discovered a year later by whoever upgrades. |
 | **Ours** | `amh.conf`, `scripts/verify.sh`, `scripts/guards/*.sh`, `scripts/bootstrap.sh`, `scripts/session-facts.sh`, `scripts/codemap.py`, `scripts/tests/local-guards.sh`, `scripts/tests/codemap/` | The extension points. Everything repo-specific goes in one of these — if a change fits none of them, the harness is missing an extension point; raise it upstream rather than carrying a local patch. |
-| **Ours (prose)** | `AGENTS.md`, `CLAUDE.md`, `docs/{STATE,RUNBOOK,LEDGER*}.md`, `docs/history/` | Seeded once, ours thereafter. Upgrades arrive as hand-applied notes, never a re-sync. |
+| **Ours (prose)** | `AGENTS.md`, `CLAUDE.md`, `docs/{PROTOCOLS,STATE,RUNBOOK,LEDGER*}.md`, `docs/history/` | Seeded once, ours thereafter. Upgrades arrive as hand-applied notes, never a re-sync. |
 | **Ours (config)** | `.github/workflows/*`, `.claude/settings.json`, `.codex/*` | Written only when absent. Diff each against its upstream template on an upgrade and take what applies. |
 
 ## Where our old harness went
@@ -237,7 +237,7 @@ which you chose and why.
 
 | Key | Ours | Why |
 |---|---|---|
-| `AMH_PROSE_VERSION` | `15.1.0` (no stock key) | **Ours entirely.** The version whose binding prose the tree follows, against `AMH_VERSION` for the shipped scripts. The two are **equal today** — the 15.1.0 upgrade landed scripts and seed prose in one commit (DD-066), as DC-036 had closed the earlier 9.2.0…14.0.0 split — so `doc-facts.sh` is silent on the pair. The key stays because the **Upgrading** section below reads the changelog forward from it, which is the reason it exists; while the two differ the guard warns every run and fails if `AGENTS.md` drops its disclosure sentence first. Set them equal only in the commit that lands the prose (DC-031, DC-036). |
+| `AMH_PROSE_VERSION` | `17.0.0` (no stock key) | **Ours entirely.** The version whose binding prose the tree follows, against `AMH_VERSION` for the shipped scripts. The two are **equal today** — the 17.0.0 upgrade landed scripts and seed prose in one commit (DE-042), as 15.1.0 did (DD-066) and DC-036 had closed the earlier 9.2.0…14.0.0 split — so `doc-facts.sh` is silent on the pair. The key stays because the **Upgrading** section below reads the changelog forward from it, which is the reason it exists; while the two differ the guard warns every run and fails if `AGENTS.md` drops its disclosure sentence first. Set them equal only in the commit that lands the prose (DC-031, DC-036). |
 | `BRANCH_PREFIX` | `claude` | Session branches are `claude/<codename>`, named in each session's directive. |
 | `MERGE_MODE` | `branch-train` | DA-002: branches are cut from the newest session branch, superseded ones deleted unmerged, only the final superset squash-merged. |
 | `REMOTE_FLAG` | `AAB_REMOTE` | Pre-existing neutral flag (D-176). See the adapter note below. |
@@ -257,7 +257,16 @@ which you chose and why.
 **`.claude/settings.json` translates `CLAUDE_CODE_REMOTE=true` into `AAB_REMOTE=1`.** Claude
 Code on the web sets its own variable, and the shipped bootstrap reads only the neutral flag
 `amh.conf` names. The translation belongs in the adapter — a vendor's environment variable must
-never reach a shipped script or `amh.conf`.
+never reach a shipped script or `amh.conf`. Since 16.0.0 its `exec` runs `bash
+"${CLAUDE_PROJECT_DIR}"/scripts/session-start.sh`, as the stock hook does, so a lost execute bit
+cannot stop the bootstrap.
+
+**No `sandbox` block, by owner decision (2026-11-19, DE-042).** AMH 17.0.0's adapter turns on
+Claude Code's shell sandbox; the owner declined it here because sessions already run inside a
+Docker container, so a second sandbox inside it adds a layer without a new boundary. So
+`.claude/settings.json` has no `sandbox` key and `bwrap socat` are not in `REQUIRED_TOOLS`. The two repo-local hooks
+(`python-edit.sh`, `comment-budget.sh`) keep their own spelling and no `onFailure`, because the
+16.0.0 note reaches only the four AMH hooks.
 
 > **Adoption hazard, learned the hard way.** Our pre-AMH `command-guard.sh` took a
 > `--claude-hook` flag; the shipped one reads the hook payload on stdin with no flag. The moment

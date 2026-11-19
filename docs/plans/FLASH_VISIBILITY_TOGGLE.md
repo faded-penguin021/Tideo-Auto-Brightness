@@ -166,8 +166,8 @@ playbook 9 and `e2e/README.md`:
 ## Units
 
 Each unit ends shippable: STATE Changelog line, `scripts/ladder.sh` green, commit,
-`scripts/ladder.sh --guards-only`, push (RUNBOOK Session discipline 3). Units 1 and 2 touch
-`:app` runtime glue, so each runs the **glue-review protocol** (RUNBOOK). Unit 3 touches only
+`scripts/ladder.sh --guards-only`, push (PROTOCOLS Session discipline 3). Units 1 and 2 touch
+`:app` runtime glue, so each runs the **glue-review protocol** (PROTOCOLS). Unit 3 touches only
 `e2e/` and the device script. Before editing, run
 `python3 scripts/codemap.py impact` on each file named below. No flash feature is registered in
 `codemap/features.toml` yet; Unit 2 registers one (`flash`: `AabFlash`, `AabFlashHost`,

@@ -5,16 +5,20 @@ Tideo Auto Brightness is a native Kotlin/Compose Android app. It recreates the T
 now in maintenance.
 
 Maintenance uses the [Agentic Maintenance Harness](https://github.com/faded-penguin021/AMH).
-This constitution records **AMH 15.1.0**. The authoritative version is `AMH_VERSION` in `amh.conf`,
+This constitution records **AMH 17.0.0**. The authoritative version is `AMH_VERSION` in `amh.conf`,
 and the version here must change with it; `scripts/guards/doc-facts.sh` fails on a mismatch.
 
-The 14.1.0 -> 15.1.0 upgrade landed whole in one commit: the shipped scripts and the hand-applied
-seed prose of MAJOR 15.0.0 and 15.1.0 (the **Destructive work** section, the reordered checkpoint
-in **Session protocol**, the ground-truth and pre-push corrections), so `AMH_PROSE_VERSION` and
-`AMH_VERSION` in `amh.conf` are equal and `doc-facts.sh` is silent on the pair (DD-066). Two
-hand-applied adapter notes carry no rung either way, which is why the record is prose here: every
-Claude hook carries its bash shell pin (14.1.0, DC-050, DC-051), and the Claude and Codex adapters
-wire `scripts/redact-tool-output.sh` as a `PostToolUse` hook (15.0.0). Should the keys
+The 15.1.0 -> 17.0.0 upgrade landed whole in one commit: the shipped scripts and the hand-applied
+seed prose of MAJOR 16.0.0 and 17.0.0 (Session discipline 10–12, the move of the six binding
+procedures into `docs/PROTOCOLS.md`, the test-first convention, the hook-failure paragraph under
+**Harness**), so `AMH_PROSE_VERSION` and `AMH_VERSION` in `amh.conf` are equal and `doc-facts.sh`
+is silent on the pair (DE-042). Three hand-applied adapter notes carry no rung either way, which is
+why the record is prose here: the Claude and Codex adapters wire `scripts/redact-tool-output.sh`
+as a `PostToolUse` hook (15.0.0); the Claude adapter's AMH hooks run as `bash
+"${CLAUDE_PROJECT_DIR}"/scripts/...` and its two `PreToolUse` guards refuse on failure (16.0.0);
+and Claude Code's shell sandbox is deliberately off here, by owner decision (17.0.0, DE-042). Every
+Claude hook carries its bash shell pin (14.1.0, DC-050, DC-051); since 16.0.0 a ladder rung checks
+it on the AMH hooks only, so the repo-local hooks' pins are still prose-held. Should the keys
 ever diverge, `AMH_PROSE_VERSION` names the version whose rules this tree's prose actually follows,
 and the guard requires a disclosure sentence here for as long as the gap stands.
 The disclosure it requires is a literal sentence — **"the binding prose is AMH
@@ -49,8 +53,8 @@ documentation.
 never edited in place — write a new row and append one pointer line to the old one. Without this
 carve-out the two rules contradict each other, since the ledger is a document. **And the code
 settles only what the app DOES, never what it SHOULD do** (AMH 15.0.0): a binding rule or value
-this file or the runbook states is a requirement, and when the code disagrees with one, that is a
-finding against the code, not a document to repair. Changing a binding rule to match the code is
+this file, `docs/PROTOCOLS.md` or the runbook states is a requirement, and when the code
+disagrees with one, that is a finding against the code, not a document to repair. Changing a binding rule to match the code is
 a rule change and takes the rule-review protocol like any other.
 
 The Tasker source XML is stored in `docs/rebuild/extraction/_source/` (gitignored, 1.6 MB and about
@@ -69,10 +73,13 @@ instead. The migration narrative in `docs/history/` is frozen.
    legacy sentence about the world — merged, tagged, released, CI, branch protection — may predate
    that rule, so check one against a live source before acting on it or repeating it.
 3. Open the relevant playbook in `docs/RUNBOOK.md` and read the reference documents it names.
-4. Work in small, checkpointed units as required by RUNBOOK **Session discipline** (D-161).
-5. Update `docs/STATE.md` with what stays true of the checked-out tree, honouring RUNBOOK
-   **Working-memory compression** — which holds both its length rules and the rule on what may sit
-   in `Current state` at all. Never cache world-controlled status (merged, tagged, released, PR/CI,
+4. Do the work under `docs/PROTOCOLS.md` → **Session discipline** (D-161): sequential, small
+   checkpointed units, binary acceptance. That file holds the procedures every session is bound
+   by — the session discipline, both review protocols, the leaked-credential incident, the
+   acceptance ladder and working-memory compression — whatever playbook the task took.
+5. Update `docs/STATE.md` with what stays true of the checked-out tree, honouring
+   `docs/PROTOCOLS.md` → **Working-memory compression** — which holds both its length rules and
+   the rule on what may sit in `Current state` at all. Never cache world-controlled status (merged, tagged, released, PR/CI,
    deployments, remote branches, forge settings) as current truth: point at the live probe, route it
    to the Owner queue, or keep it as an observation scoped in the sentence to when it was seen. If
    the runbook did not cover the work you just completed, improve the runbook in the same change.
@@ -174,7 +181,7 @@ or `platform/`, and `python3 scripts/codemap.py feature <name>` before adding be
 registered feature's area (`features` lists them; other areas have no entry yet); reuse its owners and read the ledger rows it lists. When you add a class that owns
 a feature's logic, or a new feature, add it to `codemap/features.toml` and run
 `python3 scripts/codemap.py write`. The answers are lexical candidates from Kotlin sources: an
-empty one means none were found in the scanned scope, not that nothing exists (RUNBOOK Session
+empty one means none were found in the scanned scope, not that nothing exists (PROTOCOLS Session
 discipline 9), and two files sharing a feature does not mean their behaviour must be unified.
 `scripts/guards/codemap.sh` fails the ladder on a stale `codemap/map.json` or a broken anchor;
 running the queries and registering new owners are prose-only (DE-021).
@@ -238,6 +245,15 @@ Golden vectors and the reference implementations under `domain/src/test` are imm
 Production code must conform to them. Changing one requires evidence that the extraction was wrong
 and a matching STATE entry; `release-preflight.yml` enforces that pairing.
 
+**A fix's test comes first, and the tests that already existed are not the fix's to change**
+(AMH 17.0.0, P21). Reproduce a defect in a test and watch it fail on the unfixed tree, for the
+reason the report names, before writing the fix. A test that existed before the fix is changed,
+skipped, loosened or deleted only as a decision of its own: the unit that does it owes a
+fresh-context review pass with no self-review fallback, which judges the old test against the
+specification and never against the fix. The fixture rule above may forbid the change outright,
+and then it does. Prose-only: no guard checks either half. See `docs/PROTOCOLS.md` → **Session
+discipline** 12.
+
 ## Invariants to keep in mind
 
 The complete catalogue is in `docs/LEDGER*.md`; search it as needed. These are the invariants most
@@ -294,7 +310,7 @@ Claiming enforcement that does not exist discourages the next reader from checki
 
 If a secret leaks, stop normal work and refer to the secret only by key name. Add an Owner-queue
 item immediately. The owner rotates the credential first and then decides whether to rewrite
-history. Any rewrite is performed by the owner, never an agent. Follow `docs/RUNBOOK.md` section
+history. Any rewrite is performed by the owner, never an agent. Follow `docs/PROTOCOLS.md` section
 "Incident: leaked credential" (DA-006).
 
 ## Destructive work
@@ -306,7 +322,7 @@ this repository; they bind here exactly as written.
   that deletes, truncates or resets is run against a tree made for the run — a `mktemp -d`, a
   fixture directory, a scratch DataStore — never against the working tree, a home directory, a
   connected device's data, or anything whose loss would matter. This covers the demonstration a
-  guard is expected to ship with (`docs/RUNBOOK.md` "Incident: leaked credential" step 5, and
+  guard is expected to ship with (`docs/PROTOCOLS.md` "Incident: leaked credential" step 5, and
   every guard added under `scripts/guards/` with its fixture in `scripts/tests/local-guards.sh`):
   proving a fixture fails without its guard is done by removing the **behaviour** and re-running
   the **suite**, never by performing the unguarded operation for real.
@@ -414,3 +430,12 @@ pre-push hook or under `core.hooksPath`, and hooks are not cloned, so a fresh cl
 until `scripts/session-start.sh` has run; `--no-verify` bypasses it; and it
 judges refs only, never a commit message or an identity. No repository check can detect whether a
 pre-execution hook exists.
+
+**A hook that fails refuses the call, where the adapter says so** (AMH 16.0.0). The Claude
+adapter anchors its AMH hooks at the project root and makes both pre-execution hooks refuse the
+call when the guard itself fails (`"onFailure": "block"`), so a crashed, timed-out or missing
+guard is a stop instead of a silent pass — on Claude Code 2.1.295 or later; an older build
+ignores the key and lets the call run, as before. Under that adapter on Windows, Git for Windows is a hard
+requirement: without Git Bash every shell call is refused, and AMH is not usable. A refusal that
+names a failed hook or Git Bash is reported to the owner, never worked around — never remove a
+hook, its failure mode or its shell pin to get past it.

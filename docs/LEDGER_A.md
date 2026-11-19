@@ -23,7 +23,7 @@
 > committed row's target may later move or disappear, and that drift leaves the historical text
 > alone. Append a correction pointer only when meaning changed, and update editable documentation —
 > including this preamble — to follow the target. A new path that does not resolve, and any citation
-> of a plan's path (RUNBOOK **Session discipline** 5), are both forbidden — and both are
+> of a plan's path (PROTOCOLS **Session discipline** 5), are both forbidden — and both are
 > **prose-only here**: this repository ships no path-reference guard and nothing scans rows for plan
 > paths, so the rule-review pass is the whole enforcement.
 >

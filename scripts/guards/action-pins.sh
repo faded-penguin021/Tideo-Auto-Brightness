@@ -42,7 +42,7 @@ if [ "${#files[@]}" -eq 0 ]; then
 	exit 1
 fi
 
-pins=$(mktemp)
+pins=$(mktemp) || { echo "action-pins: mktemp failed — this guard checked nothing" >&2; exit 1; }
 trap 'rm -f "$pins"' EXIT
 
 checked=0

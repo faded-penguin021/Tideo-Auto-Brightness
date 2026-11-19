@@ -245,7 +245,7 @@ matcher_says_no 'prose mentioning python' 'git commit -m "port the python helper
 matcher_says_no 'gradle' './gradlew :app:testDebugUnitTest'
 
 # The one-time bookkeeping: armed once, then silent — the property the whole design rests on.
-tmp_state=$(mktemp -u)
+tmp_state=$(mktemp -u) && [ -n "$tmp_state" ] || { echo "python-edit: mktemp failed — the fixture checked nothing" >&2; exit 1; }
 PYTHON_EDIT_ADVISORY_STATE=$tmp_state
 edit_cmd="python3 -c \"open('a','w').write('x')\""
 needs_advisory "$edit_cmd" || {
