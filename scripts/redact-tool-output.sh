@@ -331,13 +331,22 @@ except Exception:
 sys.stdout.write(rendered)
 PY
 
+# `-I`, because a `-c` program puts the current directory first on the module path and the hook
+# runs in whatever folder the session is in: a `json.py` there would replace the JSON module and
+# stand redaction down, silently, by this script's own fail-open design (AMH ledger row DD065 is
+# the same class in the command guard). `-I` also ignores `PYTHON*` variables and the user site
+# directory, the same trade the guard made.
+run_walker() {
+	"$PY" -I -c "$WALKER" "$REDACT" "$MAX_BYTES" "$MAX_LEAVES" "$BASH_BIN"
+}
+
 run_hook() {
 	[ -n "$PY" ] || exit 0
 	[ -f "$REDACT" ] || exit 0
 	# stderr is NOT discarded. The host ignores a zero-exit hook's stderr except in its debug
 	# log, and that log is the only place a stand-down reason can be read at all — swallowing
 	# it made "I did not manage to look" and "nothing to redact" the same observation.
-	"$PY" -c "$WALKER" "$REDACT" "$MAX_BYTES" "$MAX_LEAVES" "$BASH_BIN" || exit 0
+	run_walker || exit 0
 	exit 0
 }
 
@@ -381,13 +390,13 @@ st_codex_payload() { # <tool_response JSON>
 }
 
 st_run() { # <payload> -> stdout of the hook
-	printf '%s' "$1" | "$PY" -c "$WALKER" "$REDACT" "$MAX_BYTES" "$MAX_LEAVES" "$BASH_BIN" 2>/dev/null
+	printf '%s' "$1" | run_walker 2>/dev/null
 }
 
 # Extract a field with Python rather than grep: this suite is about JSON shape, and a
 # grep over a JSON document cannot tell a value from a key that happens to spell it.
 st_jq() { # <json> <python expression over `d`>
-	printf '%s' "$1" | "$PY" -c 'import json,sys
+	printf '%s' "$1" | "$PY" -I -c 'import json,sys
 d = json.load(sys.stdin)
 sys.stdout.write(str(eval(sys.argv[1])))' "$2" 2>/dev/null
 }
@@ -568,9 +577,9 @@ self_test() {
 	#     depth cap stands down rather than raising. Each is a path the matrix would otherwise
 	#     never enter, so a regression in any of them would be invisible.
 	st_silent 'stands down past the leaf ceiling' \
-		"$(st_payload "$("$PY" -c 'import json;print(json.dumps(["x"] * 600))')")"
+		"$(st_payload "$("$PY" -I -c 'import json;print(json.dumps(["x"] * 600))')")"
 	st_silent 'stands down past the depth cap' \
-		"$(st_payload "$("$PY" -c 'import json
+		"$(st_payload "$("$PY" -I -c 'import json
 d = "leaf"
 for _ in range(80):
     d = [d]
@@ -599,7 +608,7 @@ print(json.dumps(d))')")"
 	#     version-manager shim (pyenv, asdf) is itself an `env bash` script, and routed through
 	#     the refusing `bash` it would fail this case for a reason that is not the code's.
 	local shim real_py
-	real_py=$("$PY" -c 'import sys; print(sys.executable)' 2>/dev/null)
+	real_py=$("$PY" -I -c 'import sys; print(sys.executable)' 2>/dev/null)
 	if [ -n "$real_py" ] && command -v cygpath >/dev/null 2>&1; then
 		real_py=$(cygpath -u "$real_py" 2>/dev/null) || real_py=''
 	fi
@@ -648,6 +657,28 @@ print(json.dumps(d))')")"
 			st_pass 'a Python 2 is passed over'
 		else
 			st_fail 'a Python 2 is passed over' 'the hook did not redact: it accepted the Python 2 and stood down'
+		fi
+	fi
+
+	# 15. A module named like one the walker imports, in the folder the session is in. Through the
+	#     real entry point, because what matters is how the hook launches its interpreter. The
+	#     planted `json.py` exits 0 and prints nothing, which is the stand-down this must not be.
+	local shadow
+	shadow=$(mktemp -d "${TMPDIR:-/tmp}/amh-rto-shadow.XXXXXX") || shadow=''
+	if [ -z "$shadow" ]; then
+		st_fail "a json.py in the session's folder does not stand redaction down" \
+			'could not build the directory — this case checked NOTHING'
+	else
+		printf 'raise SystemExit(0)\n' >"$shadow/json.py"
+		tok="AKIA$(rand_upper 16)"
+		out=$(cd "$shadow" && printf '%s' "$(st_payload "$(printf '{"stdout":"key %s\\n"}' "$tok")")" |
+			"$BASH" "$HERE/${BASH_SOURCE[0]##*/}" 2>/dev/null)
+		rm -rf -- "$shadow"
+		if [ -n "$out" ] && ! printf '%s' "$out" | grep -qF "$tok"; then
+			st_pass "a json.py in the session's folder does not stand redaction down"
+		else
+			st_fail "a json.py in the session's folder does not stand redaction down" \
+				'the hook did not redact: the planted module replaced the JSON module'
 		fi
 	fi
 

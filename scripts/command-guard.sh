@@ -15,7 +15,9 @@
 # none — is driving the shell, closing the hole this script's hook mode leaves open for
 # an agent whose harness runs no pre-execution hook. It is a guardrail, not a boundary:
 # `--no-verify` skips it, and it sees git-CLI pushes only, never a push made through a
-# forge API. NEITHER rail carries a branch-prefix check (AMH ledger row DA022).
+# forge API. The command rail denies the common spellings of that skip (see THE PRE-PUSH
+# RAIL'S OFF SWITCHES below), but only for an agent whose harness runs it. NEITHER rail
+# carries a branch-prefix check (AMH ledger row DA022).
 #
 # Design rules this guard is bound by — each one paid for in false positives:
 #   * Judge only the LEADING command of each simple-command segment, with quoting
@@ -39,11 +41,19 @@
 # every spelling inside them:
 #
 #   * SECRET-FILE NAMES ARE A LIST TOO. The block tier fires on `.env` and its path forms,
-#     `/proc/*/environ`, and the OpenSSH private keys `id_rsa`, `id_dsa`, `id_ecdsa`,
-#     `id_ed25519` and the `_sk` variants — nothing else. A key stored under any other name
-#     (`deploy_key`, `id_rsa.bak`, `~/.ssh/work`) is not recognised, and neither are the
-#     other private-key containers (`.p12`, `.pfx`, `.jks`, `.keystore`): they carry no
-#     name convention this scanner could read. `.pem` and `.key` are handled one tier down,
+#     `/proc/*/environ`, the OpenSSH private keys `id_rsa`, `id_dsa`, `id_ecdsa`,
+#     `id_ed25519` and the `_sk` variants, and the credential stores that tools keep at a
+#     fixed path — `.git-credentials`, `.netrc` and `_netrc` anywhere; `.aws/credentials`,
+#     `.config/gh/hosts.yml`, `.config/git/credentials`, `.docker/config.json`,
+#     `.kube/config`, `.config/gcloud/application_default_credentials.json` and
+#     `.cargo/credentials[.toml]` under any directory; and `.npmrc` in a home directory only
+#     (`names_credential_store` says why each is shaped as it is) — nothing else. Two commands
+#     that print a stored credential by design are in the same tier: `gh auth token` (and
+#     `gh auth status -t`), and `git credential fill` (and a helper's `get`). A key stored
+#     under any other name (`deploy_key`, `id_rsa.bak`, `~/.ssh/work`) is not recognised, nor
+#     a store its tool's environment variable moved, nor a project-level `.npmrc` even when
+#     it holds a token, and neither are the other private-key containers (`.p12`, `.pfx`,
+#     `.jks`, `.keystore`): they carry no name convention this scanner could read. `.pem` and `.key` are handled one tier down,
 #     as a one-time advisory rather than a block, because both are CONTAINER extensions
 #     rather than secret markers — `fullchain.pem`, `cert.pem` and a CA bundle are public
 #     by design, and a block reason claiming they expose credential values would be false
@@ -85,7 +95,9 @@
 #     with an option list, and it is read the way POSIX defines it: given a utility to run
 #     it is a prefix, given none it PRINTS the environment and is blocked on its own
 #     account — so `env`, `env -i`, `env -0`, `env FOO=1` and `env -u FOO` are dumps while
-#     `env -u FOO cmd` and `env -i cmd` are prefixes whose `cmd` is judged. Three shapes of
+#     `env -u FOO cmd` and `env -i cmd` are prefixes whose `cmd` is judged — by the secret and
+#     push rails only: the destructive and interpreter rails stop at any `env` option, so
+#     `env -i rm -rf /` reaches neither the denial nor the advisory. Three shapes of
 #     that option walk are worth naming because they are the honest edges rather than the
 #     rule: `env -S 'cat .env'` and `--split-string=` hide the utility inside a string this
 #     guard cannot split, so they get past exactly as `bash -c` does; `env -u` and the other
@@ -96,9 +108,29 @@
 #     model would have `env -X VALUE cat .env` judge `VALUE` and miss the read. What gets
 #     past is otherwise every wrapper outside that set: `xargs cat .env`, `timeout 5 cat .env`,
 #     `ssh host cat .env`, `bash -c 'cat .env'`, and any shell function or alias standing in
-#     for the command. Do not read this bullet as "wrappers defeat the guard" — several do
+#     for the command. `xargs` is that kind of miss for these rails only: the destructive rail
+#     reads through it (the destructive bullet below says how far). Do not read this bullet as
+#     "wrappers defeat the guard" — several do
 #     not, and deleting the strip loop because a comment said it was useless would remove
-#     real coverage the self-test asserts.
+#     real coverage the self-test asserts. The command word and each of those prefixes are
+#     judged by the name bash looks up: a path (`/usr/bin/env`, `/usr/bin/sudo`), one leading
+#     backslash (`\rm`, the alias bypass) and one more after the path (`/bin/\rm`) are folded
+#     away. A backslash elsewhere in the word (`r\m`) is not, and that command gets past every
+#     rail but the text-only `.env` advisory — it is evasion, not a mistake. A Windows `.exe`
+#     suffix, which Git Bash runs as the bare name, is folded too, in any case, and a name
+#     carrying it is lowered whole (`RM.EXE` is `rm`); a backslashed Windows path keeps both,
+#     for the `cmd` and PowerShell arms that read it. Not folded: the same name with no
+#     suffix in another case (`RM`, `Printenv`), which a case-insensitive Windows filesystem
+#     also finds, and the other runnable suffixes (`.com`, `.bat`, `.cmd`).
+#   * RESERVED WORDS ARE READ AS PREFIXES. `if`, `then`, `else`, `elif`, `while`, `until`, `do`
+#     and `!` leading a segment are skipped like the wrappers above, so the command after one
+#     is judged by every rail — `if true; then git push --force origin main; fi` and
+#     `while true; do printenv; done` are blocked, and a deletion in a `for` body reaches the
+#     destructive rail. They are skipped in COMMAND position only, so `echo then printenv`
+#     stays prose; a quoted `'if'`, which bash runs as a command of that name, is skipped too,
+#     in the safe direction. Not read: `coproc printenv` still hides its command.
+#     `{ ...; }`, `( ... )` and `case` arms were already read, because the segment splitter
+#     breaks on them (AMH ledger row DD042).
 #   * CONSTRUCTED AND ENCODED COMMANDS. `eval`, base64/hex payloads decoded at runtime,
 #     and any command assembled from variables are text at scan time, not commands.
 #   * A COMMAND SUBSTITUTION INSIDE DOUBLE QUOTES RUNS, AND NO WALKER LOOKS IN. Bash executes
@@ -109,7 +141,48 @@
 #     backslash rule beside it and belongs to whoever takes it (AMH ledger row DC028).
 #   * HEREDOCS AND LONG LINES. `cmd <<EOF` hides its body until the delimiter, and the
 #     window-based scanners give up past `CHAR_LOOKAHEAD` characters — a variable name or
-#     redirection target longer than the window is not classified.
+#     redirection target longer than the window is not classified. A body ENDS where bash ends
+#     it: every operator on a line opens a body, read in order; the terminator matches the
+#     whole line, `<<-` stripping tabs only; and an unquoted body joins a backslash-newline
+#     before the comparison (AMH ledger row DD057). A body still open when the command ends is
+#     REFUSED, with its own reason, though bash runs it with a warning: the guard judged nothing
+#     after the line that opened it (AMH ledger row DD058). A body STARTS where bash starts it:
+#     one stack of open contexts runs across the whole command, and a body starts at the next
+#     newline that is a token at its operator's level — the command line, a `$(…)`, a backtick
+#     substitution — so a continuation, a newline inside a quote, `${…}`, arithmetic, `$[…]` or
+#     a substitution opened after the operator does not start it: `cat <<EOF \⏎&& printenv`,
+#     `cat <<EOF "x⏎y"; printenv` and `echo <<EOF $(printf x⏎); printenv` are judged. Quotes
+#     nest inside `"$(…)"` as bash nests them, so the commit-message heredoc opens its body and
+#     a `<<` in the message opens none. The delimiter word gets bash's quote removal, wherever
+#     its quotes sit (`<<E"O"F`, `<<'E'OF` and `<<$'EOF'` wait for `EOF`, `<<''` for an empty
+#     line). Inside `$(…)` a body also ends at `EOF)`, the rest of that line is code, and a
+#     substitution that closes with a body still waiting hands it to the next newline; a
+#     backtick substitution's closing backtick ends every body read inside it that is still
+#     waiting, and a comment inside one ends at that backtick (AMH ledger row DD059). Known misreads left: a word this guard cannot spell — an escape inside `$'…'`,
+#     which bash translates, or a backtick or `$(` inside the word — is refused rather than
+#     read. A `<<` inside a comment, under the first comment reading, opens a body bash never
+#     opens: refused when no later line matches, hidden up to the line that does. An unquoted
+#     digit-led word (`cat <<8`) is read as a shift's operand and opens nothing, so its body is
+#     judged as commands, where a quote in it can hide the line after the terminator. A `)`
+#     that ends a `case` pattern inside `$(…)` closes the substitution early. And an accurate
+#     body hands the walkers text they misread exactly as they misread it without a heredoc —
+#     a quote inside `"$(…)"` (the bullet above) or inside backticks — so a command the guard
+#     used to refuse only through a misread body can now pass.
+#   * COMMENTS ARE READ TWICE, AND THE STRICTER VERDICT WINS. A command with a `#` in it is
+#     judged once with its comments as text, as before, and once with each comment inert, its
+#     quotes deleted, so `echo a # don't⏎printenv` is refused (see COMMENT_READING). Neither
+#     reading drops a comment, so its text is judged as it always was, and a quote no longer
+#     hides any of it: `echo a # ; printenv` and `echo a # " < id_rsa` are refused. Where the
+#     walkers misread the quotes around a `#` — they do not nest the quotes inside `"$(…)"` —
+#     the inert reading can refuse prose bash only echoes:
+#     `echo "$(printf "fix #1")" "; printenv "`. What neither reading catches is what the
+#     first already let through: a comment inside `"$(…)"`, where no walker looks (the `"$(…)"`
+#     bullet above). The second reading costs a second run of every rail on any command whose
+#     comments, outside heredoc bodies, hold a quote: measured on one host, 3.2s became 7.9s
+#     for 32 KB of such lines, against a hook timeout of ten (AMH ledger row DD056).
+#   * A QUOTE INSIDE BACKTICKS. Bash ends a backtick substitution at the first unescaped
+#     backtick, quotes or not; every walker here reads a `'` inside one as opening a string, so
+#     `` echo `echo 'x`; printenv `` passes.
 #   * POWERSHELL IS READ BY ITS OWN READER, AND A SHORTER ONE. A PowerShell tool payload (and the
 #     text behind `powershell -Command` or `pwsh -c` from bash) goes to the PowerShell arm, which
 #     judges `Remove-Item` and its aliases and `cmd /c` deletions itself and hands every other
@@ -129,15 +202,26 @@
 #     `del|erase /s` behind `cmd /c` or `/k` (see `cmd_inner_deletion` for that arm's misses,
 #     a `.bat` file first among them). Anything else that empties a
 #     path reaches the filesystem unadvised — `mv` over a target, `truncate`, `dd`, `find
-#     -delete`, `shred`, a `>` redirection, and every one of these run through an
-#     interpreter — though an interpreter handed a deletion INLINE now gets its own one-time
-#     advisory, the tier described two bullets down; it is a word in a command line, not a
+#     -delete`, `find -exec rm -rf {} +`, `shred`, a `>` redirection, and every one of these
+#     run through an interpreter — though an interpreter handed a deletion INLINE now gets its
+#     own one-time advisory, the tier described two bullets down; it is a word in a command line, not a
 #     reading of the program. Two further limits INSIDE the list: the git verbs added after
 #     `git clean` are armed only when the target is unknown at scan time (see
 #     `operands_unknown_target`), so a fully literal `git reset --hard origin/main` is
 #     deliberately silent; and `git checkout -- "$f"` carries no force flag and is not
 #     recognised at all. The rail is a speed bump on the shapes an agent actually
 #     mistypes, never an inventory of ways to lose a file.
+#     BEHIND `xargs` EVERY VERB ABOVE IS JUDGED, and always as a target unknown at scan time,
+#     because `xargs` adds operands from its input when it runs: `… | xargs rm -rf` and
+#     `xargs -0 git rm -r -f` get the one-time advisory, keyed on a digest of the whole
+#     command text so a different pipeline rearms it, and a literal operand written after
+#     the verb is still judged, so `xargs rm -rf ~` is denied like `rm -rf ~` (AMH ledger row
+#     DD062). Its options are skipped by a LIST, GNU's and BSD's together (see the `xargs` arm
+#     in `is_destructive_segment`); `gxargs` is read as `xargs`. Not read: a prefix that arm
+#     does not peel on EITHER side of `xargs` — `timeout`, `bash -c`, a prefix carrying
+#     options (`env -i`, `nice -n 5`, `xargs sudo -u root rm -rf`) — `xargs sh -c 'rm -rf "$@"'`,
+#     which is `sh -c` again, the interpreter tier's inline-program advisory, which does not look
+#     behind `xargs`, and `parallel`, which is not `xargs`.
 #     ONE TARGET LIST INSIDE IT IS NOT A SPEED BUMP. An `rm -r -f`, a `git clean -f -d` or a
 #     `cmd /c` recursive deletion whose operand names the filesystem root, a home directory, or
 #     a directory holding home directories is blocked every time and never clears on a rerun —
@@ -147,7 +231,11 @@
 #     clean -fd -- build` is `$HOME/build` and gets the ordinary advisory, while the same `-C`
 #     with no pathspec, with `.` or with a glob such as `*/`, or a `--work-tree` naming home,
 #     is the home directory and is denied; a `--git-dir` is never the target (see
-#     `record_destructive_targets`). That and ONE spelling are the only permanent denials this
+#     `record_destructive_targets`). A glob that matches EVERY entry of a listed directory, or
+#     every hidden one, is that directory — `/*`, `~/?*`, `~/.*`, `~/.?*`, `/[!.]*` — and one
+#     that matches only some keeps the advisory (`~/.c*`, `/[a-m]*`, `~/??`); a brace expansion
+#     is judged as each word it expands to, within the bounds `names_catastrophic_target` names,
+#     so `~/{,.cache}` is denied and `~/{.cache,.npm}` is advised (AMH ledger row DD044). That and ONE spelling are the only permanent denials this
 #     guard issues: a recursive `cmd.exe` deletion whose text carries `\"` nested quotes, denied
 #     whatever its path because the path written is not the path `cmd.exe` receives (AMH ledger
 #     row DD038). The target list is affordable exactly because it is
@@ -198,10 +286,13 @@
 #     cleared prompt read as a judgement about the script, and it says it for any kind reached
 #     through `run`/`run-script`, not just the ones on the name list: `npm run dropdb` gets the
 #     same disclosure, because the guard read a script name there too.
-#     WHAT IS STILL OUTSIDE, and why it is not an oversight: a verb enters this tier when a
-#     public report shows it destroying data, and a web search for reported incidents naming
-#     `alembic downgrade base`, `manage.py flush`, `redis-cli flushall`, `mysql -e`, `mongosh
-#     --eval` or `drizzle-kit drop` returned none, so they stay out (AMH ledger row DC027).
+#     WHAT IS STILL OUTSIDE, and why: `alembic downgrade base`, `manage.py flush`, `redis-cli
+#     flushall`, `mysql -e`, `mongosh --eval` and `drizzle-kit drop` are not advised. They were
+#     kept out when a verb entered this tier only on a public report of it destroying data, and
+#     a web search for such reports returned none (AMH ledger row DC027). That bar no longer
+#     gates this guard (AMH ledger row DD074): a verb now enters once what it destroys is shown
+#     and what ordinary work it would newly advise is measured, and no change has done that for
+#     these yet. Their absence is unmeasured, not a finding that they are safe.
 #     `psql -f script.sql` and a migration run from application code stay out for the older
 #     reason — the verb is not in the command text at all. And one reported shape is outside any
 #     list a command scanner could hold: the PocketOS wipe was a `curl` GraphQL call carrying a
@@ -231,10 +322,19 @@
 #     of the three spellings git resolves to it (`main`, `heads/main`, `refs/heads/main`, on
 #     either side of a colon), force, deletion, an explicit `refs/tags/` push, exactly two
 #     unresolvable destinations (`HEAD` and `@`), and a second ref. Every one of those is a
-#     fact of the command standing in front of it. It does NOT check that the branch sits
-#     under `BRANCH_PREFIX`: the harness assigns session branch names the repository may not
-#     itself prefix, so a namespace rail rejects the very branches it exists to protect (AMH
-#     P13, AMH ledger row DA022) — and this one did, blocking a correctly assigned branch.
+#     fact of the command standing in front of it. Force and deletion are read inside a
+#     short-flag cluster the way git reads one (`-uf`, `-qd`), with `-o` taking the rest of
+#     its cluster or the next word as its value. A long option is read by unique prefix, as
+#     git reads it: `--del` is `--delete`, `--force-w` is `--force-with-lease`, `--mir`, `--al`
+#     and `--b` are `--mirror`, `--all` and `--branches`, and the value of `--repo`,
+#     `--recurse-submodules`, `--receive-pack`, `--exec` and `--push-option`, however
+#     shortened, is never read as the remote. A prefix git calls ambiguous and refuses
+#     (`--d`, `--forc`) is denied as the option it could name (AMH ledger row DD054). Every
+#     word after `--` or `--end-of-options` is read as a refspec, as git reads it.
+#     It does NOT check that the branch sits under `BRANCH_PREFIX`: the harness assigns
+#     session branch names the repository may not itself prefix, so a namespace rail rejects
+#     the very branches it exists to protect (AMH P13, AMH ledger row DA022) — and this one
+#     did, blocking a correctly assigned branch.
 #     Read the loss that bought, because the namespace test had been stopping these as a side
 #     effect of stopping everything unfamiliar, and nothing stops them here now:
 #       - ONE explicitly named off-convention ref. `git push -u origin work` is allowed, and
@@ -252,6 +352,31 @@
 #     The trade was made knowingly: a rail that cannot tell an assigned name from an invented
 #     one blocks both, and the two-item unresolvable list is the honest size of what this
 #     scanner can decide rather than a claim to cover the category.
+#   * THE PRE-PUSH RAIL'S OFF SWITCHES ARE READ ON THE COMMAND LINE ONLY. Denied: `git push
+#     --no-verify`; a `core.hooksPath` override on a push (`-c`, `--config-env` in either
+#     spelling, any case); and `git config` SETTING `core.hooksPath` in any scope, which
+#     switches the rail off for every later push. Reading or unsetting the key passes. An
+#     agent once used `--no-verify` across six consecutive commits against explicit
+#     instructions, and retrying a refused push with its check off is the respelling AMH
+#     forbids (AMH ledger row DD048). `--no-verify` shortened to a prefix git accepts
+#     (`--no-veri`) is denied with it, as the push rail reads every long option. Not read,
+#     and passing: the `GIT_CONFIG_COUNT`/`GIT_CONFIG_KEY_n` and `GIT_CONFIG_PARAMETERS` environment, an
+#     `include.path`, `git config --edit`, or a hand edit of a config file; a tool that sets
+#     the key itself (a hook manager's install step); and `git commit --no-verify`, which
+#     skips no AMH rail because AMH installs no pre-commit hook. Removing or disabling the
+#     hook file is the next bullet.
+#   * THE HOOK FILE ITSELF GETS A ONE-TIME ADVISORY, NEVER A DENIAL. `rm`, `mv` or `chmod`
+#     naming `.git/hooks/pre-push` — or `.git/hooks`, or an entry there a glob would match it
+#     with (`.git/hooks/*`), case folded — is stopped once per command text, as is
+#     `Remove-Item`, `Move-Item`, `Rename-Item`, an alias of them, or `chmod` in PowerShell. An advisory,
+#     because the owner may legitimately replace or chain the hook, and the bootstrap writes a
+#     missing one again; the text says which of the three outcomes does NOT come back. Reported
+#     incident: an agent rewrote the hook that guarded it, to weaken it — a Claude Code hook,
+#     not this file, so this rail rests on the class (AMH ledger row DD051). Not read, and
+#     passing: any other way to reach the file — `cp`, `ln`, `tee`, `truncate`, a `>`
+#     redirect, an interpreter, a `..` component, `hooks/pre-push` from inside `.git`, a path built by
+#     `$(git rev-parse --git-path hooks)` or a variable — and any hook directory named by
+#     `core.hooksPath`. The file-editing tools are the adapter's to deny, not this script's.
 #   * THE SUBAGENT RAIL SEES ONE SPAWN, NEVER THE FLEET. `--pre-task` fires per spawn and holds
 #     no view of what is already running, so it cannot tell a second spawn beside a live first
 #     from a second after the first finished — it advises every spawn and records the ones that
@@ -267,9 +392,48 @@
 # see the shape it chose. Treat a green run as "no mistake this scanner recognises", never
 # as "this command is safe".
 #
+# MACHINE MODE (`--machine`, given as the FIRST argument) is this same script installed once for
+# a whole machine — in Claude Code, from the user-level settings file — so that a session in a
+# project that does not use AMH still meets the rails whose damage no project contains. A
+# deletion destroys the machine's disk, not the project's tree: the reported Windows drive wipes
+# ran in scratch directories and took whole drives with them. And a credential an agent prints is
+# the user's, whatever repository printed it (AMH ledger row DD063). It keeps three things:
+#   * the destructive rail's TWO PERMANENT verdicts — a deletion aimed at the target list
+#     (`names_catastrophic_target`), and a recursive `cmd.exe` deletion carrying `\"` nested
+#     quotes — and nothing else of that rail. An ordinary deletion, the git verbs on an unknown
+#     target, the data-plane tier and the `xargs` advisory all pass without a word;
+#   * the credential block tier whole: secret-file reads and copies through the reader list and
+#     `<` redirections, environment dumps, a credential-shaped variable echoed, `source .env`,
+#     `gh auth token` and `git credential fill`;
+#   * the refusals that say the guard did not manage to read the command — a heredoc that never
+#     closes, a parse that produced nothing — because a command it could not read may hold
+#     either of the above.
+# It DROPS everything that encodes AMH's own process, which a project chooses and a machine does
+# not: the push rails (default branch, force, tags, deletion, an implicit or second ref), the
+# pre-push rail's off switches, the forge/API rail, every one-time advisory (`.env`, `.pem` and
+# `.key` mentions, deletions, interpreter deletions, the hook file) and the ladder warning. It
+# reads NO `amh.conf`: the copy sits beside no project, and sourcing whatever file sits beside it
+# would run another file's code in every session on the machine. Dropping the advisories is also
+# what keeps one copy from leaking between projects: their state files are keyed by this
+# script's own location and the command's text, never by project, so a single shared copy would
+# let a rerun in one project clear the same command in every other. Machine mode writes no state
+# file at all. Its verdicts are a SUBSET of the project guard's at the same version, so where both
+# run — an AMH repository on a machine with the user-level hook — it repeats a refusal the
+# project guard already gave and adds none. At different versions the two can disagree, which is
+# the price of a copy no ladder checks: nothing inside a repository can see a user-level hook.
+# Read what it does NOT change. It is still this guard, with every miss listed above (`bash -c`,
+# interpreters, script files, `Start-Process`, `Invoke-Expression`, `.NET` deletions), and a host
+# mode that skips settings hooks skips a user-level one too: Claude Code's `--safe-mode` and
+# `--bare` skip every settings hook, and `--restricted` ignores the user settings file, though not
+# managed settings. It is a speed bump on two mistakes in every project, not containment; a container, a
+# VM, or an account that cannot write the disk, is containment.
+#
 # Usage:
 #   command-guard.sh                  read a hook payload (JSON) on stdin
 #   command-guard.sh --command 'CMD'  check one command directly
+#   command-guard.sh --powershell 'CMD'  check one PowerShell command directly
+#   command-guard.sh --machine        read a hook payload in machine mode (see MACHINE MODE)
+#   command-guard.sh --machine --command 'CMD'     (or --powershell 'CMD') check one in machine mode
 #   command-guard.sh --pre-push       read git's pre-push stdin and judge each ref
 #   command-guard.sh --pre-task       one-time advisory before a subagent spawn
 #   command-guard.sh --self-test      blocked + allowed fixture matrix
@@ -298,10 +462,24 @@ export LC_ALL=C
 
 ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 
+# Decided before `amh.conf` is read, because machine mode reads none (see MACHINE MODE above).
+MACHINE_MODE=0
+if [ "${1:-}" = --machine ]; then
+	MACHINE_MODE=1
+	shift
+fi
+
 DEFAULT_BRANCH=main
 BRANCH_PREFIX=session
 # shellcheck source=/dev/null
-[ -f "$ROOT/amh.conf" ] && . "$ROOT/amh.conf"
+[ "$MACHINE_MODE" -eq 0 ] && [ -f "$ROOT/amh.conf" ] && . "$ROOT/amh.conf"
+
+# The first line of every refusal. Machine mode names itself there, because an agent in a project
+# that does not use AMH would otherwise read a reason citing an AMH rule, a constitution or "the
+# owner" and look for them in a repository that has none.
+BLOCK_HEADING='BLOCKED by the AMH command guard.'
+# shellcheck disable=SC2016 # the backticks are prose, not a command substitution.
+[ "$MACHINE_MODE" -eq 1 ] && BLOCK_HEADING='BLOCKED by the AMH command guard in machine mode: a user-level hook that judges every session on this machine, whatever the project, and keeps only the permanent deletion denials, the credential rails, and its refusals to pass a command it could not read. Where the reason cites an AMH rule, a constitution or "the owner", read it as this machine'"'"'s owner; the project you are in may not use AMH, and the refusal stands either way. Do not retry it in another spelling.'
 
 # --- windowed character scanning --------------------------------------------
 # Every scanner below walks a string one character at a time. `${s:i:1}` re-walks the
@@ -318,12 +496,164 @@ BRANCH_PREFIX=session
 #
 # Accepted miss: a variable name or redirection target longer than CHAR_LOOKAHEAD is
 # truncated before it is judged. That is the fail-open direction in `redirect_targets`
-# and `heredoc_delim`, but NOT uniformly: a name truncated mid-`${VAR:+…}` loses the
+# and `heredoc_word`, but NOT uniformly: a name truncated mid-`${VAR:+…}` loses the
 # modifier and blocks, and a truncated `.env.example` stops looking like a template and
 # blocks. Both need a 512-character token to reach, so the direction is stated honestly
 # rather than defended.
 CHAR_WINDOW=2048
 CHAR_LOOKAHEAD=512
+
+# --- where a `#` starts a comment, and the two readings -------------------------
+# Whether an unquoted `#` outside `${…}` that follows the character $1 starts a comment. Only
+# at the start of a word: `$#`, `${#x}` and `a#b` open no comment. Not `[[:space:]]`: a
+# carriage return is no shell blank, so `\r#x` is a word. Bash starts a comment at every place
+# this says yes (bash 5.2: after a blank, a newline, `;`, `&`, `|`, `(`, an opening backtick, a
+# `)` that closes a subshell or a case pattern, and after `<` or `>`, where it then refuses the
+# line for a redirection with no target). The rule is broader than bash's: it also says yes
+# after the `)` of `$(`, `<(`, `>(` or `$((`, after a closing backtick, and inside arithmetic
+# or an extglob, where bash reads `#` as part of a word. One shared rule for both readers that act on a
+# comment, `join_continuations` and `heredoc_walk`, so that the two never disagree about one.
+comment_starts_after() { # comment_starts_after <the character before the `#`>
+	case $1 in
+	' ' | $'\t' | $'\n' | ';' | '&' | '|' | '(' | ')' | '<' | '>' | '`') return 0 ;;
+	esac
+	return 1
+}
+
+# Every command with a `#` in it is read TWICE, and the stricter verdict wins (`check_command`).
+# Reading 1 keeps every comment as text with its quotes live: its verdicts are the guard's
+# before comments were read at all, so whatever it refuses stays refused. Reading 2 makes each
+# comment inert — `join_continuations` deletes its quotes and `heredoc_walk` opens no body on a
+# `<<` inside it — so `echo a # don't⏎printenv` is judged. Neither reading is safe alone. The
+# walkers misplace comments (no walker nests the quotes inside `"$(…)"`), and a misplaced
+# comment made inert can turn a later closing quote into an opener and hide what follows it:
+# `echo "$(printf "fix #1")⏎"; printenv`. Reading 1 refuses that. So a misplaced comment costs
+# at most a refusal, never a command let through (AMH ledger row DD056).
+COMMENT_READING=1
+
+# --- line continuations -----------------------------------------------------
+# Bash deletes an unquoted backslash-newline pair before it splits a line into words, so
+# `rm \⏎-rf /` runs `rm -rf /`. The walkers below read the backslash as escaping the next
+# character instead and keep both characters in the word, which judged words bash never
+# produces, in both directions: `rm -rf \⏎/` got the one-time advisory instead of the
+# permanent denial, `rm \⏎-rf /` and `git \⏎-C /repo push --force` passed, and the legal
+# `git push \⏎-u origin session/x` was denied as a push naming two refs. So the pairs go
+# before `split_segments` walks the text, and every walker behind it reads what bash runs.
+# Two readers sit in front of it and still see the raw text: `strip_heredocs`, which removes
+# the continuations it reads operators across itself (`heredoc_walk`) and never a body
+# line's, and the one-time `.pem`/`.key` advisory's substring test, which `id.pe\⏎m` slips.
+#
+# The pair is removed outside quotes and inside DOUBLE quotes, where bash removes it too, and
+# kept inside SINGLE quotes, where it is literal. An escaped backslash (`\\⏎`) is no
+# continuation: the walk consumes backslash pairs, so its newline stays a separator. A `#`
+# comment ends at the newline whatever precedes it, so `# note \⏎rm -rf /` and
+# `# C:\temp\\⏎rm -rf /` both run the `rm`; there EVERY backslash the comment ends in is
+# dropped and the newline stays, because the walker behind would read the last one left as
+# escaping the newline. A comment starts only where bash starts one: after a space, tab,
+# newline or operator character, never inside `${…}` (`${x:- #}` is a word). The quote model
+# is `split_segments`'s, so the two never disagree about where a string ends — including
+# where both disagree with bash: neither honours `\'` inside `$'…'`. Called from
+# `split_segments`, after `strip_heredocs`: a heredoc body is data, and joining a body line
+# onto its delimiter would hide the delimiter, so body mode would discard everything after it
+# (AMH ledger row DD046).
+#
+# Under the second reading (see COMMENT_READING) this pass also makes every comment INERT: it
+# walks any text holding a `#`, and in each comment region it deletes every `'` and `"`, with
+# the backslashes right before one, and keeps every other character. Every walker behind this
+# one reads quotes and none knows a comment, so the `'` in `echo a # don't` opened a string
+# that ran past the newline and hid the next line from every rail. Deleted, not replaced, because
+# deleting is bash's own quote removal: where the region is really code — the walkers misplace
+# comments, `"$(printf "fix #1")"` above all — `"printenv"` still reads as `printenv`.
+# Nothing else in the region goes, so a misplaced comment keeps its commands in view (AMH
+# ledger row DD055).
+join_continuations() { # join_continuations <text> -> sets JOINED_COMMAND
+	local s=$1
+	JOINED_COMMAND=$s
+	case $s in
+	*\\$'\n'*) ;;
+	*'#'*) [ "$COMMENT_READING" -eq 2 ] || return 0 ;;
+	*) return 0 ;;
+	esac
+	# Every rail hands this the same text, and the second reading walks every text with a `#`
+	# in it, so the last answer is kept: five walks of a long commented command were most of
+	# its time (see the timing note at the top of this file).
+	if [ "$COMMENT_READING" = "$JOIN_MEMO_READING" ] && [ "$s" = "$JOIN_MEMO_INPUT" ]; then
+		JOINED_COMMAND=$JOIN_MEMO_OUTPUT
+		return 0
+	fi
+	JOIN_MEMO_READING=$COMMENT_READING
+	JOIN_MEMO_INPUT=$s
+	JOIN_MEMO_OUTPUT=''
+	local i=0 n=${#s} c q='' start=0 out='' prev=' ' parameter_depth=0 kept
+	local wbase=0 wbuf='' wsafe=0
+	while [ "$i" -lt "$n" ]; do
+		if [ "$i" -ge "$wsafe" ]; then # windowed scan — see CHAR_WINDOW
+			wbase=$i
+			wbuf=${s:wbase:CHAR_WINDOW}
+			wsafe=$((wbase + CHAR_WINDOW - CHAR_LOOKAHEAD))
+		fi
+		c=${wbuf:i-wbase:1}
+		case $q in
+		"'")
+			[ "$c" = "'" ] && q=''
+			prev=$c
+			i=$((i + 1))
+			continue
+			;;
+		'#')
+			if [ "$c" = $'\n' ]; then
+				if [ "$prev" = "\\" ]; then
+					kept=${s:start:i-start}
+					while [ "${kept: -1}" = "\\" ]; do kept=${kept%?}; done
+					out+=$kept
+					start=$i
+				fi
+				q=''
+			elif [ "$COMMENT_READING" -eq 2 ] && { [ "$c" = "'" ] || [ "$c" = '"' ]; }; then
+				# The backslashes before the quote go with it: kept, they would sit before the
+				# next character, and before the newline they would read as joining a line.
+				kept=${s:start:i-start}
+				while [ "${kept: -1}" = "\\" ]; do kept=${kept%?}; done
+				out+=$kept
+				start=$((i + 1))
+			fi
+			prev=$c
+			i=$((i + 1))
+			continue
+			;;
+		esac
+		if [ "$c" = "\\" ]; then
+			# The backslash rule — see `split_segments`. A removed pair leaves `prev` alone:
+			# the character before it is what the next one follows once the pair is gone.
+			if [ "${wbuf:i-wbase+1:1}" = $'\n' ]; then
+				out+=${s:start:i-start}
+				start=$((i + 2))
+			else
+				prev=x
+			fi
+			i=$((i + 2))
+			continue
+		fi
+		if [ "$q" = '"' ]; then
+			[ "$c" = '"' ] && q=''
+		else
+			case $c in
+			"'" | '"') q=$c ;;
+			'$') [ "${wbuf:i-wbase+1:1}" = '{' ] && parameter_depth=$((parameter_depth + 1)) ;;
+			'}') [ "$parameter_depth" -gt 0 ] && parameter_depth=$((parameter_depth - 1)) ;;
+			'#') [ "$parameter_depth" -eq 0 ] && comment_starts_after "$prev" && q='#' ;;
+			esac
+		fi
+		prev=$c
+		i=$((i + 1))
+	done
+	JOINED_COMMAND=$out${s:start}
+	JOIN_MEMO_OUTPUT=$JOINED_COMMAND
+}
+JOINED_COMMAND=''
+JOIN_MEMO_READING=''
+JOIN_MEMO_INPUT=''
+JOIN_MEMO_OUTPUT=''
 
 # --- segment splitting ------------------------------------------------------
 # Emit one line per simple-command segment, splitting on UNQUOTED shell operators.
@@ -332,9 +662,11 @@ CHAR_LOOKAHEAD=512
 # Slices, never accumulates: `seg+=$c` per character reallocates the segment on
 # every byte, which is the second half of the quadratic blow-up (the first is the
 # locale, above). Splitting on index boundaries copies each segment exactly once.
+# Line continuations are gone before the walk starts — see `join_continuations`.
 split_segments() { # sets SEGMENTS
-	local s=$1
-	local i=0 n=${#s} c q='' start=0 parameter_depth=0
+	join_continuations "$1"
+	local s=$JOINED_COMMAND
+	local i=0 n=${#s} c q='' start=0 parameter_depth=0 brace_depth=0 group
 	SEGMENTS=()
 	local wbase=0 wbuf='' wsafe=0
 	local out=()
@@ -381,26 +713,55 @@ split_segments() { # sets SEGMENTS
 			fi
 			out+=("${s:start:i-start}")
 			start=$((i + 1))
+			brace_depth=0
 			;;
 		';' | '|' | $'\n' | '(' | ')' | '`')
 			out+=("${s:start:i-start}")
 			start=$((i + 1))
+			brace_depth=0
 			;;
+		' ' | $'\t') brace_depth=0 ;;
 		'{')
 			# A `{` immediately consumed by the `$` arm below opens a parameter
 			# expansion, not a command group. Nested `${...}` expansions are counted.
-			# Other braces remain simple-command separators.
+			#
+			# A command group opens only where bash reads `{` as a reserved WORD: at the
+			# start of a word and followed by a blank, a newline, an operator or a redirection
+			# (`{>log cmd; }` is a group), or the end. Anywhere else it
+			# is part of a word — a brace expansion, usually — and splitting there cut
+			# `rm -rf ~/{.cache,.npm}` down to `rm -rf ~/`, which the permanent denial then
+			# read as the home directory itself and refused forever (AMH ledger row DD044).
+			# Such a brace is counted so that its `}` stays in the word too; a blank or an
+			# operator ends the word, and the count with it, exactly as it ends bash's.
 			if [ "$parameter_depth" -eq 0 ]; then
-				out+=("${s:start:i-start}")
-				start=$((i + 1))
+				case ${s:i+1:1} in
+				' ' | $'\t' | $'\n' | '' | ';' | '&' | '|' | '(' | ')' | '<' | '>') group=0 ;;
+				*) group=1 ;;
+				esac
+				[ "$group" -eq 0 ] && [ "$i" -gt 0 ] && ! brace_word_start "${s:i-1:1}" && group=1
+				if [ "$group" -eq 0 ]; then
+					out+=("${s:start:i-start}")
+					start=$((i + 1))
+				else
+					brace_depth=$((brace_depth + 1))
+				fi
 			fi
 			;;
 		'}')
+			# The closing brace is a reserved word on the same terms: a word of its own. A `}`
+			# inside one — closing a brace expansion, or a stray one in a name — is a character
+			# of the word, and splitting there read `rm -rf ~/}x` as `rm -rf ~/`.
 			if [ "$parameter_depth" -gt 0 ]; then
 				parameter_depth=$((parameter_depth - 1))
-			else
-				out+=("${s:start:i-start}")
-				start=$((i + 1))
+			elif [ "$brace_depth" -gt 0 ]; then
+				brace_depth=$((brace_depth - 1))
+			elif [ "$i" -eq 0 ] || brace_word_start "${s:i-1:1}"; then
+				case ${s:i+1:1} in
+				' ' | $'\t' | $'\n' | '' | ';' | '&' | '|' | '(' | ')' | '<' | '>')
+					out+=("${s:start:i-start}")
+					start=$((i + 1))
+					;;
+				esac
 			fi
 			;;
 		'$')
@@ -426,6 +787,17 @@ split_segments() { # sets SEGMENTS
 }
 SEGMENTS=()
 
+# Whether a brace after the character $1 starts a word for `split_segments`: one after a blank
+# or an operator does. A brace can be a reserved word only there, and a brace is not an operator,
+# so `}}` is one word to bash — and so is the `}` that ends `~/{a,}}`. Handed the one character
+# rather than the command, because a call per brace that copied the command was quadratic.
+brace_word_start() { # brace_word_start <the character before the brace>
+	case $1 in
+	' ' | $'\t' | $'\n' | ';' | '&' | '|' | '(' | ')' | '`') return 0 ;;
+	esac
+	return 1
+}
+
 # Remove here-document BODIES before segmenting. A heredoc body is data — a
 # commit message, a doc block, a file being written — and it routinely quotes
 # the very commands this guard blocks. Backticks split segments (command
@@ -439,98 +811,763 @@ SEGMENTS=()
 # agent mistake this guard targets.
 #
 # Opening body mode is the most dangerous thing this file does: every line until the
-# delimiter goes UNJUDGED, so a delimiter no line can ever match discards the rest of
-# the command whole. A substring test for `<<` matched three things that open no body
+# delimiter goes UNJUDGED. A delimiter no line can ever match used to discard the rest of
+# the command whole; that body is now reported and the command refused (AMH ledger row
+# DD058), which turns such a misread into a refusal of text bash runs, and leaves a
+# delimiter that some LATER line matches hiding every line up to it. A substring test for `<<` matched three things that open no body
 # at all — `<<<` here-strings, `$((1<<8))` shifts, and `<<` inside quoted prose — and
 # each resolved to a delimiter (`<`, `8))`, a word) that never recurred, so
 # `grep -q x <<<"$v"; git push --force origin main` was ALLOWED. That voided every
 # rail, force-push and push-to-`main` included. So: this scan is fail-CLOSED. When the
 # operator is not unmistakably a here-document, do not open body mode.
 #
-# Sets HEREDOC_DELIM and returns 0 when $1 opens a here-document body.
-HEREDOC_DELIM=''
-heredoc_delim() {
-	local s=$1
-	local i=0 n=${#s} c q='' rest delim
-	local wbase=0 wbuf='' wsafe=0
-	HEREDOC_DELIM=''
-	case $s in *'<<'*) ;; *) return 1 ;; esac # no operator at all: skip the scan
+# EVERY operator on the line counts, in order: bash reads `cat <<A <<B` as two bodies, one
+# after the other, once the line ends. Stopping at the first made `A` the terminator of
+# everything, so B's body was judged as commands and a `'` in it opened a string that hid the
+# command after `B` from every rail (AMH ledger row DD057).
+#
+# WHERE a body starts is bash's rule, not a line's: bash keeps the operators it has read but
+# not yet given a body in one list per parser level — the command line, each `$(…)`, `<(…)` or
+# `>(…)`, each backtick substitution — and reads their bodies at the next newline that is a
+# TOKEN at that level, in the order the operators came. A newline inside a quote, `${…}`,
+# arithmetic or `$[…]`, a backslash-newline, and a newline inside a deeper substitution are no
+# token there. Read line by line instead, a body started early: `echo <<EOF $(printf x⏎)`
+# ⏎ `; printenv` ⏎ `EOF` hid the `printenv`, which bash runs, and a `<<` in a string's later
+# line or a commit message's text inside `"$(…)"` opened a body bash never opens (AMH ledger
+# row DD059). So `strip_heredocs_into` walks the whole text once, with one stack of the
+# contexts that are open, and measured against bash 5.2.21 it also reads:
+#   - a substitution that closes on the line holding its operator (`echo $(cat <<EOF)`) hands
+#     its bodies on, and they start at the very next NEWLINE, whatever context it is in, a
+#     quote or a continuation included, before those of the level it is read at;
+#   - a backtick substitution is a separate script: a body it opened and did not finish ends
+#     at its closing backtick, a body line included, and the lines after it are commands;
+#   - inside `$(…)` a body also ends at a line that is the delimiter, blanks and the `)` that
+#     closes it, `EOF)`; the rest of that line, from the `)`, is read as code, and the
+#     substitution's bodies still waiting are handed on, as above, to the newline after it;
+#   - a `((`, `$((` or `$[` is arithmetic, where a `<<` is a shift and a newline no token, when
+#     its `))` comes, adjacent, within CHAR_LOOKAHEAD characters, across lines or not, as bash
+#     decides it (`((true <<EOF ) )` is two subshells and its heredoc is real).
+# The stack nests quotes as bash does where the walkers do not: inside `"$(…)"` a quote opens a
+# new string. That is deliberate — this pass decides where the walkers' text comes from, and
+# the walkers' own reading of `"$(…)"` is the gap the header names (AMH ledger row DC028) —
+# and it holds only for `$(`, `<(`, `>(` and backticks; inside `"…"` a `${` is read as the
+# walkers read it, as text. A `'` ends at the next `'`, `$'…'` included, also as they read it.
+# A comment ends at its newline and its quotes open nothing, under both comment readings, as
+# `join_continuations` reads one; under the first reading a `<<` in it still opens a body.
+#
+# Each pending operator is one entry of HEREDOC_PEND_DELIM, with HEREDOC_PEND_DASH (1 for
+# `<<-`), HEREDOC_PEND_UNQUOTED (1 when the word holds no quote and no backslash, which is when
+# bash joins backslash-newlines inside the body) and HEREDOC_PEND_LEVEL (the depth of the stack
+# entry of its level, 0 for the command line, -1 once its substitution has closed) and
+# HEREDOC_PEND_INB (1 when a backtick substitution was open as it was read) beside it. At most
+# one backtick substitution is ever open, because any backtick inside one ends it.
+HEREDOC_PEND_INB=()
+HEREDOC_PEND_DELIM=()
+HEREDOC_PEND_DASH=()
+HEREDOC_PEND_UNQUOTED=()
+HEREDOC_PEND_LEVEL=()
+
+# Whether the text after a `((` closes it with an adjacent `))`, which is what makes it arithmetic
+# to bash rather than two nested parens. Parens are counted from two and quoted text is skipped.
+# No close within CHAR_LOOKAHEAD characters means no, so a `<<` there opens a body.
+arith_closes_double() { # arith_closes_double <the text after `((`>
+	local s=$1 i=0 n=${#1} c q='' depth=2 one=-2
 	while [ "$i" -lt "$n" ]; do
-		if [ "$i" -ge "$wsafe" ]; then # windowed scan — see CHAR_WINDOW
-			wbase=$i
-			wbuf=${s:wbase:CHAR_WINDOW}
-			wsafe=$((wbase + CHAR_WINDOW - CHAR_LOOKAHEAD))
-		fi
-		c=${wbuf:i-wbase:1}
+		c=${s:i:1}
 		if [ -n "$q" ]; then
-			# The backslash rule — see `split_segments` for why this is not a patch.
 			if [ "$c" = "\\" ] && [ "$q" = '"' ]; then
 				i=$((i + 2))
 				continue
 			fi
 			[ "$c" = "$q" ] && q=''
-			i=$((i + 1))
-			continue
+		else
+			case $c in
+			"'" | '"') q=$c ;;
+			\\) i=$((i + 1)) ;;
+			'(') depth=$((depth + 1)) ;;
+			')')
+				depth=$((depth - 1))
+				[ "$depth" -eq 1 ] && one=$i
+				[ "$depth" -eq 0 ] && { [ "$i" -eq $((one + 1)) ]; return; }
+				;;
+			esac
 		fi
-		case $c in
-		"'" | '"') q=$c ;;
-		\\) i=$((i + 1)) ;;
-		'<')
-			# `<<<` is a here-STRING: it redirects one line of text and opens no body.
-			if [ "${wbuf:i-wbase+1:1}" = '<' ] && [ "${wbuf:i-wbase+2:1}" != '<' ]; then
-				rest=${wbuf:i-wbase+2}
-				rest=${rest#-}
-				rest=${rest#"${rest%%[![:space:]]*}"}
-				delim=${rest%%[[:space:];|&<>)(\`]*}
-				# An operand the arithmetic close-paren terminates is a SHIFT, not a
-				# delimiter: `$((mask << bits))` names no here-document, and a digit
-				# test alone only catches the literal `$((1 << 8))` form. Checked
-				# before the quote and backslash strips below, which change the length.
-				case ${rest:${#delim}:1} in ')') delim='' ;; esac
-				delim=${delim#[\'\"]}
-				delim=${delim%[\'\"]}
-				# `cat <<\EOF` is a real here-document whose terminator is `EOF`: bash
-				# removes the quoting backslash from the delimiter word. Keeping it
-				# stores `\EOF`, which no line ever matches — body mode then never
-				# closes and every remaining line goes unjudged.
-				delim=${delim//\\/}
-				case $delim in
-				# A digit-led operand is an arithmetic shift (`$((1 << 8))`), not a
-				# delimiter — no shell accepts `8` as a here-document terminator word.
-				'' | [0-9]*) ;;
-				*)
-					HEREDOC_DELIM=$delim
-					return 0
-					;;
-				esac
-			fi
-			# Skip the whole operator either way, so `<<<` is never re-read as `<`.
-			i=$((i + 1))
-			;;
-		esac
 		i=$((i + 1))
 	done
 	return 1
 }
 
-strip_heredocs() {
-	local s=$1
-	local line trimmed delim='' body=1
-	local out=()
+# The delimiter word that starts $1, read the way bash reads it: quote removal over the whole
+# word, wherever the quotes sit, so `E"O"F`, `'E'OF` and `$'EOF'` are `EOF` and `"E O F"` is
+# `E O F`; an unquoted backslash goes and the character after it stays, and inside `"…"` only
+# a backslash before `"`, `\`, `$` or a backtick goes. A backslash-newline outside `'…'` is a
+# continuation and goes whole, so `<<EO\⏎F` waits for `EOF`. The word ends at an unquoted blank
+# or metacharacter, a `)` included: bash opens the body of `$(cat <<EOF)` after the line, and
+# with $2 set, inside a backtick substitution, at any backtick, which ends that substitution.
+# An empty word that holds a quote, `<<''`, is a word: its body ends at the first empty line.
+# The quotes end where the walkers end them, so `$'…'` ends at its next `'`. A word this cannot
+# spell — an escape inside `$'…'`, which bash translates, a backtick or `$(` inside it, a quote
+# that never closes, or a word that fills the CHAR_LOOKAHEAD slice — is stored after a newline,
+# which no line can equal: its body never closes, and `heredoc_left_open` refuses the command
+# rather than guess where bash ends it.
+# Sets HEREDOC_WORD, HEREDOC_WORD_LENGTH (raw characters read) and HEREDOC_WORD_QUOTED (1 when
+# any part of the word was quoted or escaped).
+HEREDOC_WORD=''
+HEREDOC_WORD_LENGTH=0
+HEREDOC_WORD_QUOTED=0
+heredoc_word() { # heredoc_word <the text from the delimiter word on> [1 inside backticks]
+	local s=$1 inb=${2:-0} i=0 n=${#1} c q='' word='' quoted=0 unreadable=0
+	while [ "$i" -lt "$n" ]; do
+		c=${s:i:1}
+		if [ "$c" = '`' ] && [ "$inb" -eq 1 ]; then
+			[ -n "$q" ] && unreadable=1
+			q=''
+			break
+		fi
+		case $q in
+		"'" | '$')
+			if [ "$c" = "'" ]; then
+				q=''
+			else
+				[ "$q" = '$' ] && [ "$c" = "\\" ] && unreadable=1
+				word+=$c
+			fi
+			i=$((i + 1))
+			continue
+			;;
+		'"')
+			case $c in
+			'"') q='' ;;
+			\\)
+				case ${s:i+1:1} in
+				'"' | \\ | '$' | '`')
+					i=$((i + 1))
+					word+=${s:i:1}
+					;;
+				$'\n') i=$((i + 1)) ;;
+				*) word+=$c ;;
+				esac
+				;;
+			'`') unreadable=1 ;;
+			'$') [ "${s:i+1:1}" = '(' ] && unreadable=1 ;;
+			esac
+			case $c in '"' | \\) ;; *) word+=$c ;; esac
+			i=$((i + 1))
+			continue
+			;;
+		esac
+		case $c in
+		' ' | $'\t' | $'\n' | ';' | '|' | '&' | '<' | '>' | '(' | ')') break ;;
+		"'" | '"')
+			q=$c
+			quoted=1
+			;;
+		\\)
+			i=$((i + 1))
+			if [ "${s:i:1}" != $'\n' ]; then
+				quoted=1
+				word+=${s:i:1}
+			fi
+			;;
+		'$')
+			case ${s:i+1:1} in
+			"'")
+				q='$'
+				quoted=1
+				i=$((i + 1))
+				;;
+			'"')
+				q='"'
+				quoted=1
+				i=$((i + 1))
+				;;
+			'(')
+				unreadable=1
+				word+=$c
+				;;
+			*) word+=$c ;;
+			esac
+			;;
+		'`')
+			unreadable=1
+			word+=$c
+			;;
+		*) word+=$c ;;
+		esac
+		i=$((i + 1))
+	done
+	[ "$i" -gt "$n" ] && i=$n
+	[ -n "$q" ] && unreadable=1
+	[ "$i" -ge "$n" ] && [ "$n" -ge "$CHAR_LOOKAHEAD" ] && unreadable=1
+	[ "$unreadable" -eq 1 ] && word=$'\n'$word
+	HEREDOC_WORD=$word
+	HEREDOC_WORD_LENGTH=$i
+	HEREDOC_WORD_QUOTED=$quoted
+}
+
+# Up to CHAR_LOOKAHEAD characters of HEREDOC_LINES from line $1, character $2 on, the lines
+# joined by their newlines. Sets HEREDOC_AHEAD.
+HEREDOC_LINES=()
+HEREDOC_AHEAD=''
+heredoc_ahead() { # heredoc_ahead <line index> <character index>
+	local t=$1 m=${#HEREDOC_LINES[@]}
+	HEREDOC_AHEAD=${HEREDOC_LINES[t]:$2:CHAR_LOOKAHEAD}
+	while [ "${#HEREDOC_AHEAD}" -lt "$CHAR_LOOKAHEAD" ] && [ $((t + 1)) -lt "$m" ]; do
+		t=$((t + 1))
+		HEREDOC_AHEAD+=$'\n'${HEREDOC_LINES[t]}
+	done
+	HEREDOC_AHEAD=${HEREDOC_AHEAD:0:CHAR_LOOKAHEAD}
+}
+
+# The `<<` operators the text from line $1, character $2 on opens, the first `<` at $2: it reads
+# the operator, `<<-` and the word through any backslash-newline, registers a heredoc at stack
+# depth $3 unless the word is no delimiter, and sets HEREDOC_OP_LENGTH to the characters read,
+# newlines counted, or to 1 for a lone `<`. `<<<` is a here-STRING, no body, read whole so it is
+# never re-read as `<<`. Inside arithmetic this is never called: a `<<` there is a shift.
+HEREDOC_OP_LENGTH=1
+heredoc_operator() { # heredoc_operator <line index> <character index> <depth> <1 inside backticks>
+	local a p=1 dash=0
+	heredoc_ahead "$1" "$2"
+	a=$HEREDOC_AHEAD
+	HEREDOC_OP_LENGTH=1
+	while [ "${a:p:2}" = "\\"$'\n' ]; do p=$((p + 2)); done
+	[ "${a:p:1}" = '<' ] || return 0
+	p=$((p + 1))
+	while [ "${a:p:2}" = "\\"$'\n' ]; do p=$((p + 2)); done
+	if [ "${a:p:1}" = '<' ]; then
+		HEREDOC_OP_LENGTH=$((p + 1))
+		return 0
+	fi
+	[ "${a:p:1}" = - ] && dash=1 && p=$((p + 1))
+	while :; do
+		case ${a:p:1} in
+		' ' | $'\t') p=$((p + 1)) ;;
+		\\)
+			[ "${a:p+1:1}" = $'\n' ] || break
+			p=$((p + 2))
+			;;
+		*) break ;;
+		esac
+	done
+	heredoc_word "${a:p}" "$4"
+	HEREDOC_OP_LENGTH=$((p + HEREDOC_WORD_LENGTH))
+	# A word that runs to the end of a full slice may go on past it: unreadable, as above.
+	case $HEREDOC_WORD in $'\n'*) ;; *)
+		[ "$HEREDOC_OP_LENGTH" -ge "${#a}" ] && [ "${#a}" -ge "$CHAR_LOOKAHEAD" ] &&
+			HEREDOC_WORD=$'\n'$HEREDOC_WORD
+		;;
+	esac
+	case $HEREDOC_WORD in
+	# No word is no heredoc, and bash refuses the line. A digit-led operand is an arithmetic
+	# shift whose `((` the stack did not see close, not a delimiter, unless it is quoted.
+	'' | [0-9]*) [ "$HEREDOC_WORD_QUOTED" -eq 1 ] || return 0 ;;
+	esac
+	HEREDOC_PEND_DELIM+=("$HEREDOC_WORD")
+	HEREDOC_PEND_DASH+=("$dash")
+	HEREDOC_PEND_UNQUOTED+=($((1 - HEREDOC_WORD_QUOTED)))
+	HEREDOC_PEND_LEVEL+=("$3")
+	HEREDOC_PEND_INB+=("$4")
+}
+
+# Forget the waiting heredoc $1.
+heredoc_forget() { # heredoc_forget <index>
+	unset 'HEREDOC_PEND_DELIM[$1]' 'HEREDOC_PEND_DASH[$1]' 'HEREDOC_PEND_UNQUOTED[$1]' \
+		'HEREDOC_PEND_LEVEL[$1]' 'HEREDOC_PEND_INB[$1]'
+}
+
+# Move the heredocs pending at stack depth $1 to the closed list (-1) when $2 is `s`, a `$(…)`
+# that closed. When it is `b`, a backtick substitution, bash read it as a script of its own, and
+# every body read inside it that is still waiting ends with it, one a `$(…)` inside it handed on
+# included: `` echo `echo $(cat <<EOF)` `` ⏎ `printenv` runs the `printenv`.
+heredoc_level_closed() { # heredoc_level_closed <depth> <s|b>
+	local k
+	for k in "${!HEREDOC_PEND_LEVEL[@]}"; do
+		if [ "$2" = b ]; then
+			[ "${HEREDOC_PEND_INB[k]}" -eq 1 ] && heredoc_forget "$k"
+		elif [ "${HEREDOC_PEND_LEVEL[k]}" -eq "$1" ]; then
+			HEREDOC_PEND_LEVEL[k]=-1
+		elif [ "${HEREDOC_PEND_LEVEL[k]}" -gt "$1" ]; then
+			heredoc_forget "$k"
+		fi
+	done
+}
+
+# Each body ends where bash ends it, because every way of ending one early hands body text to
+# the walkers as commands, and a quote in that text then hides the real command after the
+# terminator (AMH ledger row DD057):
+#   - the terminator matches the WHOLE line. `<<-` strips leading TABS only, so `  EOF` ends no
+#     body, under either operator;
+#   - under an unquoted delimiter, a line ending in an odd run of backslashes is joined to the
+#     next before the comparison, as bash joins it: `foo\⏎EOF` reads as `fooEOF` and ends
+#     nothing, and `\⏎EOF` reads as `EOF` and does. `<<-` strips tabs from the joined line.
+#     A quoted delimiter joins nothing. This is bash's rule INSIDE a body, not a join of body
+#     text before the delimiter is found (AMH ledger row DD046);
+#   - the bodies are read one after another, in the order their operators came.
+# A body still open when the text ends has swallowed every line after its operator, unjudged.
+# That is reported in HEREDOC_LEFT_OPEN (1, with the delimiter wanted in HEREDOC_OPEN_DELIM),
+# and `heredoc_left_open` blocks on it: bash would run such a command, with a warning, but the
+# guard has not read it, and a delimiter the guard misreads closes no body at all (AMH ledger
+# rows DC002, DD058). The output is unchanged, so a caller in a `$(…)` loses nothing.
+#
+# Every rail reads the command through this, most of them in a `$(…)`, and the walk visits every
+# character of a multi-line string, a commit message above all. So the last answer under each
+# comment reading is kept, and `heredoc_left_open`, which runs in the parent shell before any
+# rail does, primes it for every subshell after it.
+HEREDOC_LEFT_OPEN=0
+HEREDOC_OPEN_DELIM=''
+HEREDOC_STRIPPED=''
+STRIP_MEMO_INPUT=()
+STRIP_MEMO_OUTPUT=()
+STRIP_MEMO_OPEN=()
+STRIP_MEMO_DELIM=()
+strip_heredocs() { # strip_heredocs <text>: prints it without its heredoc bodies
+	strip_heredocs_into "$1"
+	printf '%s' "$HEREDOC_STRIPPED"
+}
+strip_heredocs_into() { # strip_heredocs_into <text> -> sets HEREDOC_STRIPPED
+	local s=$1 r=$COMMENT_READING
+	if [ "${STRIP_MEMO_INPUT[r]+set}" = set ] && [ "$s" = "${STRIP_MEMO_INPUT[r]}" ]; then
+		HEREDOC_STRIPPED=${STRIP_MEMO_OUTPUT[r]}
+		HEREDOC_LEFT_OPEN=${STRIP_MEMO_OPEN[r]}
+		HEREDOC_OPEN_DELIM=${STRIP_MEMO_DELIM[r]}
+		return 0
+	fi
+	HEREDOC_LEFT_OPEN=0
+	HEREDOC_OPEN_DELIM=''
+	HEREDOC_STRIPPED=''
+	case $s in
+	*'<<'* | *"<\\"$'\n'*) ;;
+	*)
+		# No operator can be read, so there is no body: the text is its own answer.
+		printf -v HEREDOC_STRIPPED '%s\n' "$s"
+		return 0
+		;;
+	esac
+	heredoc_walk "$s"
+	[ "${#HEREDOC_OUT[@]}" -gt 0 ] && printf -v HEREDOC_STRIPPED '%s\n' "${HEREDOC_OUT[@]}"
+	STRIP_MEMO_INPUT[r]=$s
+	STRIP_MEMO_OUTPUT[r]=$HEREDOC_STRIPPED
+	STRIP_MEMO_OPEN[r]=$HEREDOC_LEFT_OPEN
+	STRIP_MEMO_DELIM[r]=$HEREDOC_OPEN_DELIM
+	return 0
+}
+
+# The walk itself: HEREDOC_OUT gets every line of $1 that is no body line. The stack `frames`
+# holds one character per open context: `'` and `"`, `s` for `$(`, `<(` or `>(`, `b` for a
+# backtick, `c` for a subshell's `(`, `p` for `${`, `a` for arithmetic, one per paren, and `k`
+# for `$[`. Code is read where the top is none of the quotes, `p`, `a` or `k`; a newline is a
+# token where the top is none, `s`, `c` or `b`, at the level of the nearest `s` or `b`.
+HEREDOC_OUT=()
+heredoc_walk() { # heredoc_walk <text>
+	local s=$1 t=0 m last=-1 line n i c prev top frames='' cont from=0 level kind skip rest
+	local wbase wbuf wsafe pattern k order=() token
+	HEREDOC_OUT=()
+	HEREDOC_LINES=()
+	HEREDOC_PEND_DELIM=()
+	HEREDOC_PEND_DASH=()
+	HEREDOC_PEND_UNQUOTED=()
+	HEREDOC_PEND_LEVEL=()
+	HEREDOC_PEND_INB=()
+	# Only a line holding `<<`, or a `<` a backslash-newline splits from the next `<`, can open a
+	# body; past the last of them, with no body waiting, the rest is copied, unwalked.
 	while IFS= read -r line; do
-		if [ "$body" -eq 0 ]; then
-			trimmed=${line#"${line%%[![:space:]]*}"} # <<- strips leading tabs
-			[ "$trimmed" = "$delim" ] && body=1
+		HEREDOC_LINES+=("$line")
+		case $line in *'<<'* | *"<\\") last=$t ;; esac
+		t=$((t + 1))
+	done <<<"$s"
+	m=$t
+	t=0
+	prev=$'\n'
+	while [ "$t" -lt "$m" ]; do
+		if [ "$t" -gt "$last" ] && [ "${#HEREDOC_PEND_DELIM[@]}" -eq 0 ]; then
+			HEREDOC_OUT+=("${HEREDOC_LINES[@]:t}")
+			break
+		fi
+		line=${HEREDOC_LINES[t]}
+		n=${#line}
+		i=$from
+		from=0
+		cont=0
+		wsafe=-1
+		while [ "$i" -lt "$n" ]; do
+			if [ "$i" -ge "$wsafe" ]; then # windowed scan — see CHAR_WINDOW
+				wbase=$i
+				wbuf=${line:wbase:CHAR_WINDOW}
+				wsafe=$((wbase + CHAR_WINDOW - CHAR_LOOKAHEAD))
+			fi
+			top=${frames: -1}
+			# Jump to the next character this walk acts on: the walk is one pass over every string
+			# in the text, and a commit message is mostly text no rule here reads.
+			case $top in
+			"'") case $frames in *b*) pattern="['\`]" ;; *) pattern="[']" ;; esac ;;
+			'"') pattern='["\\$`]' ;;
+			p | a | k) pattern='[]'"'"'"\\$`()}]' ;;
+			*) pattern='[]'"'"'"\\#$`()}<]' ;;
+			esac
+			rest=${wbuf:i-wbase}
+			# shellcheck disable=SC2295 # `pattern` is a bracket expression and must match as one.
+			skip=${rest%%$pattern*}
+			if [ -n "$skip" ]; then
+				i=$((i + ${#skip}))
+				prev=${skip: -1}
+				continue
+			fi
+			c=${wbuf:i-wbase:1}
+			# A backtick inside a substitution's backticks ends it, inside a quote or not: bash
+			# finds the end of a backtick substitution before it reads what is inside.
+			if [ "$c" = '`' ]; then
+				case $frames in
+				*b*)
+					rest=${frames%b*}
+					heredoc_level_closed $((${#rest} + 1)) b
+					frames=$rest
+					;;
+				*) frames+=b ;;
+				esac
+				prev=$c
+				i=$((i + 1))
+				continue
+			fi
+			if [ "$top" = "'" ]; then
+				frames=${frames%?}
+				prev=$c
+				i=$((i + 1))
+				continue
+			fi
+			if [ "$c" = "\\" ]; then
+				# The backslash rule — see `split_segments`. Before the newline it continues the line,
+				# outside quotes and inside double quotes alike, and `prev` stays.
+				if [ $((i + 1)) -eq "$n" ]; then
+					cont=1
+					break
+				fi
+				prev=x
+				i=$((i + 2))
+				continue
+			fi
+			if [ "$c" = '$' ]; then
+				case ${wbuf:i-wbase+1:1} in
+				'(')
+					[ "${wbuf:i-wbase+2:1}" = '(' ] && heredoc_ahead "$t" $((i + 3))
+					if [ "${wbuf:i-wbase+2:1}" = '(' ] && arith_closes_double "$HEREDOC_AHEAD"; then
+						frames+=aa
+						i=$((i + 3))
+					else
+						frames+=s
+						i=$((i + 2))
+					fi
+					prev='('
+					continue
+					;;
+				'{')
+					if [ "$top" != '"' ]; then
+						frames+=p
+						prev='{'
+						i=$((i + 2))
+						continue
+					fi
+					;;
+				'[')
+					if [ "$top" != '"' ]; then
+						frames+=k
+						prev='['
+						i=$((i + 2))
+						continue
+					fi
+					;;
+				esac
+				prev=$c
+				i=$((i + 1))
+				continue
+			fi
+			if [ "$top" = '"' ]; then
+				[ "$c" = '"' ] && frames=${frames%?}
+				prev=$c
+				i=$((i + 1))
+				continue
+			fi
+			case $c in
+			"'" | '"') frames+=$c ;;
+			'(')
+				case $top in
+				p | k) ;;
+				a) frames+=a ;;
+				*)
+					[ "${wbuf:i-wbase+1:1}" = '(' ] && heredoc_ahead "$t" $((i + 2))
+					if [ "$prev" = '<' ] || [ "$prev" = '>' ]; then
+						frames+=s
+					elif [ "${wbuf:i-wbase+1:1}" = '(' ] && arith_closes_double "$HEREDOC_AHEAD"; then
+						frames+=aa
+						i=$((i + 1))
+					else
+						frames+=c
+					fi
+					;;
+				esac
+				;;
+			')')
+				case $top in
+				s)
+					heredoc_level_closed "${#frames}" s
+					frames=${frames%?}
+					;;
+				c | a) frames=${frames%?} ;;
+				esac
+				;;
+			'}') [ "$top" = p ] && frames=${frames%?} ;;
+			']') [ "$top" = k ] && frames=${frames%?} ;;
+			'#')
+				# Only in code, where the top is none of `p`, `a` and `k`: the pattern sees to that.
+				if comment_starts_after "$prev"; then
+					# Inside a backtick substitution the comment ends at the first backtick no
+					# backslash escapes, because bash finds that backtick before it reads the
+					# comment: `` echo `cat <<EOF # hi` `` ⏎ `printenv` runs the `printenv`.
+					rest=$n
+					case $frames in *b*) heredoc_backtick_at "${line:i}" && rest=$((i + HEREDOC_BACKTICK)) ;; esac
+					[ "$COMMENT_READING" -eq 1 ] && heredoc_comment_operators "$t" "$i" "$frames" $((rest - i))
+					[ "$rest" -lt "$n" ] || break
+					prev=$c
+					i=$rest
+					continue
+				fi
+				;;
+			'<')
+				rest=${frames%[sb]*}
+				level=0
+				[ "$rest" != "$frames" ] && level=$((${#rest} + 1))
+				kind=0
+				case $frames in *b*) kind=1 ;; esac
+				heredoc_operator "$t" "$i" "$level" "$kind"
+				if [ "$HEREDOC_OP_LENGTH" -gt 1 ]; then
+					# The operator and its word may cross newlines, a continuation's or one inside a
+					# quoted word. None is a token, but a body handed on by a closed substitution
+					# would start at one: refuse that rather than misplace it.
+					rest=$((i + HEREDOC_OP_LENGTH))
+					if [ "$rest" -gt "$n" ]; then
+						for k in "${!HEREDOC_PEND_LEVEL[@]}"; do
+							if [ "${HEREDOC_PEND_LEVEL[k]}" -eq -1 ]; then
+								order=("$k")
+								heredoc_unclosed
+								return 0
+							fi
+						done
+						rest=$((rest - n - 1))
+						HEREDOC_OUT+=("$line")
+						t=$((t + 1))
+						while [ "$t" -lt "$m" ] && [ "$rest" -gt "${#HEREDOC_LINES[t]}" ]; do
+							rest=$((rest - ${#HEREDOC_LINES[t]} - 1))
+							HEREDOC_OUT+=("${HEREDOC_LINES[t]}")
+							t=$((t + 1))
+						done
+						from=$rest
+						cont=2
+						break
+					fi
+					prev=${line:rest-1:1}
+					i=$rest
+					continue
+				fi
+				;;
+			esac
+			prev=$c
+			i=$((i + 1))
+		done
+		[ "$cont" -eq 2 ] && continue
+		HEREDOC_OUT+=("${HEREDOC_LINES[t]}")
+		t=$((t + 1))
+		[ "$cont" -eq 0 ] && prev=$'\n'
+		# The newline that ends line t-1. Bodies handed on by a closed substitution start at it
+		# whatever it is; those pending at the current level, only when it is a token there.
+		token=0
+		if [ "$cont" -eq 0 ]; then
+			case ${frames: -1} in '' | s | c | b) token=1 ;; esac
+		fi
+		rest=${frames%[sb]*}
+		level=0
+		[ "$rest" != "$frames" ] && level=$((${#rest} + 1))
+		order=()
+		for k in "${!HEREDOC_PEND_LEVEL[@]}"; do
+			[ "${HEREDOC_PEND_LEVEL[k]}" -eq -1 ] && order+=("$k")
+		done
+		if [ "$token" -eq 1 ]; then
+			for k in "${!HEREDOC_PEND_LEVEL[@]}"; do
+				[ "${HEREDOC_PEND_LEVEL[k]}" -eq "$level" ] && order+=("$k")
+			done
+		fi
+		[ "${#order[@]}" -gt 0 ] || continue
+		kind=''
+		[ "$level" -gt 0 ] && kind=${frames:level-1:1}
+		heredoc_bodies || return 0
+	done
+	# A body still waiting when the text ends never closed.
+	for k in "${!HEREDOC_PEND_DELIM[@]}"; do
+		order=("$k")
+		heredoc_unclosed
+		return 0
+	done
+}
+
+# Under the first comment reading, the `<<` operators in the comment that starts at line $1,
+# character $2 still open bodies, at the level the stack $3 is at, as they did before comments
+# were read: a quote in the comment still hides a `<<` after it on that line, so
+# `echo a # it's <<B` opens none, as before. The quote ends with the line and opens nothing in
+# the stack: the newline ends the comment.
+heredoc_comment_operators() { # heredoc_comment_operators <line index> <character index> <frames> <length>
+	local text=${HEREDOC_LINES[$1]:$2:$4} pre p=0 dash level=0 rest=${3%[sb]*} x q='' inb=0
+	[ "$rest" != "$3" ] && level=$((${#rest} + 1))
+	case $3 in *b*) inb=1 ;; esac
+	while :; do
+		case ${text:p} in *'<<'*) ;; *) return 0 ;; esac
+		pre=${text:p}
+		pre=${pre%%'<<'*}
+		# The quotes before this `<<`, read by the walkers' rules.
+		x=0
+		while [ "$x" -lt "${#pre}" ]; do
+			case $q${pre:x:1} in
+			"'" | '"') q=${pre:x:1} ;;
+			"''" | '""') q='' ;;
+			"\"\\" | \\) x=$((x + 1)) ;;
+			esac
+			x=$((x + 1))
+		done
+		p=$((p + ${#pre} + 2))
+		if [ -n "$q" ] || [ "${text:p:1}" = '<' ]; then
+			[ -z "$q" ] && p=$((p + 1))
 			continue
 		fi
-		out+=("$line")
-		if heredoc_delim "$line"; then
-			delim=$HEREDOC_DELIM
-			body=0
+		dash=0
+		[ "${text:p:1}" = - ] && dash=1 && p=$((p + 1))
+		while [ "${text:p:1}" = ' ' ] || [ "${text:p:1}" = $'\t' ]; do p=$((p + 1)); done
+		heredoc_word "${text:p:CHAR_LOOKAHEAD}" "$inb"
+		p=$((p + HEREDOC_WORD_LENGTH))
+		case $HEREDOC_WORD in
+		'' | [0-9]*) [ "$HEREDOC_WORD_QUOTED" -eq 1 ] || continue ;;
+		esac
+		HEREDOC_PEND_DELIM+=("$HEREDOC_WORD")
+		HEREDOC_PEND_DASH+=("$dash")
+		HEREDOC_PEND_UNQUOTED+=($((1 - HEREDOC_WORD_QUOTED)))
+		HEREDOC_PEND_LEVEL+=("$level")
+		HEREDOC_PEND_INB+=("$inb")
+	done
+}
+
+# Where the first backtick no backslash escapes sits in $1: sets HEREDOC_BACKTICK, and returns
+# 1 when there is none.
+HEREDOC_BACKTICK=0
+heredoc_backtick_at() { # heredoc_backtick_at <text>
+	local x=0 n=${#1}
+	while [ "$x" -lt "$n" ]; do
+		case ${1:x:1} in
+		\\) x=$((x + 1)) ;;
+		'`')
+			HEREDOC_BACKTICK=$x
+			return 0
+			;;
+		esac
+		x=$((x + 1))
+	done
+	return 1
+}
+
+# Read the bodies of the heredocs `order` names, in that order, from line t of `heredoc_walk`,
+# whose variables it shares; `kind` is the level they are read at: `s` inside `$(…)`, `b`
+# inside backticks, empty on the command line. Leaves t at the first line after them, which
+# may be the rest of a line a closing `)` or backtick cut. Returns 1 when one never closes.
+heredoc_bodies() {
+	local k raw body joined run end x q
+	for k in "${order[@]}"; do
+		joined=''
+		end=0
+		while [ "$t" -lt "$m" ]; do
+			raw=${HEREDOC_LINES[t]}
+			t=$((t + 1))
+			# While a backtick substitution is open, the first backtick no backslash escapes ends
+			# it, in a body too, and in the body of a `$(…)` inside it as well. The bodies read
+			# inside it that are still waiting end with it, when the walk reads that backtick.
+			case $frames in
+			*b*)
+				if heredoc_backtick_at "$raw"; then
+					t=$((t - 1))
+					HEREDOC_LINES[t]=${raw:HEREDOC_BACKTICK}
+					end=3
+					break
+				fi
+				;;
+			esac
+			body=$raw
+			if [ "${HEREDOC_PEND_UNQUOTED[k]}" -eq 1 ]; then
+				case $body in
+				*\\)
+					run=${body##*[!\\]}
+					if [ $((${#run} % 2)) -eq 1 ]; then
+						joined+=${body%?}
+						continue
+					fi
+					;;
+				esac
+			fi
+			body=$joined$body
+			joined=''
+			if [ "${HEREDOC_PEND_DASH[k]}" -eq 1 ]; then
+				while [ "${body:0:1}" = $'\t' ]; do body=${body:1}; done
+			fi
+			# Inside `$(…)` bash also ends the body at the delimiter, blanks and the `)` that closes
+			# the substitution, and the rest of that line is code: `x=$(cat <<EOF` ⏎ `hi` ⏎
+			# `EOF); printenv` runs the `printenv`. Only the rest, from the `)`, is read again,
+			# because a quote in the delimiter, `<<'E"F'`, would open a string in the walkers that
+			# hid what follows.
+			if [ "$kind" = s ]; then
+				case $body in
+				"${HEREDOC_PEND_DELIM[k]}"*)
+					x=${body#"${HEREDOC_PEND_DELIM[k]}"}
+					x=${x#"${x%%[!$' \t']*}"}
+					if [ "${x:0:1}" = ')' ]; then
+						t=$((t - 1))
+						HEREDOC_LINES[t]=$x
+						end=2
+						break
+					fi
+					;;
+				esac
+			fi
+			if [ "$body" = "${HEREDOC_PEND_DELIM[k]}" ]; then
+				end=1
+				break
+			fi
+		done
+		if [ "$end" -eq 0 ]; then
+			order=("$k")
+			heredoc_unclosed
+			return 1
 		fi
-	done <<<"$s"
-	[ "${#out[@]}" -gt 0 ] && printf '%s\n' "${out[@]}"
+		heredoc_forget "$k"
+		[ "$end" -eq 3 ] && break
+		if [ "$end" -eq 2 ]; then
+			# A `)` closed the substitution: its bodies still waiting are handed on, as when one
+			# closes on its operator's line, and start at the next newline.
+			for x in "${order[@]}"; do
+				[ "${HEREDOC_PEND_LEVEL[x]+set}" = set ] && HEREDOC_PEND_LEVEL[x]=-1
+			done
+			break
+		fi
+	done
+	prev=$'\n'
 	return 0
+}
+
+# Report the first heredoc `order` names as the one that never closed.
+heredoc_unclosed() {
+	HEREDOC_LEFT_OPEN=1
+	HEREDOC_OPEN_DELIM=${HEREDOC_PEND_DELIM[${order[0]}]}
+}
+
+# Whether a heredoc body in the command never reaches its terminator, under the current
+# COMMENT_READING. Run in this shell, not a `$(…)`, so strip_heredocs' report survives. Text
+# that cannot hold an operator opens no body, and pays nothing.
+heredoc_left_open() { # heredoc_left_open <command>
+	case $1 in *'<<'* | *"<\\"$'\n'*) ;; *) return 1 ;; esac
+	strip_heredocs_into "$1"
+	[ "$HEREDOC_LEFT_OPEN" -eq 1 ]
 }
 
 # --- rails ------------------------------------------------------------------
@@ -583,6 +1620,76 @@ names_private_key_file() {
 	esac
 }
 
+# True if a path names a well-known credential STORE: the fixed file a tool writes its login
+# token or password to. These are block-tier for the reason `id_rsa` is — the path alone says
+# what the file holds — and an agent printing `~/.netrc` and `~/.npmrc` into a conversation
+# while checking for a stored token is the reported incident behind the list (AMH ledger row
+# DD052). Three shapes, each as narrow as the name allows:
+#   * a basename that is a credential store wherever it sits: `.git-credentials`, and `.netrc`
+#     with `_netrc`, its Windows spelling. Neither name has a benign use.
+#   * a tool's directory plus its credential file, matched as a path SUFFIX so `~/`, `$HOME/`,
+#     an absolute home and a relative spelling from the home directory all count:
+#     `.aws/credentials`, `.config/gh/hosts.yml`, `.config/git/credentials` (git's other
+#     credential-store file), `.docker/config.json`, `.kube/config`,
+#     `.config/gcloud/application_default_credentials.json`, and `.cargo/credentials` with its
+#     `.toml` form. The directory is what makes `config` or `credentials` a secret.
+#   * `.npmrc` only in a HOME directory (`~`, `~user`, `$HOME`, `${HOME}`, `/root`, `/home/<u>`,
+#     `/Users/<u>`, `<drive>:/Users/<u>`). A project's `.npmrc` is commonly committed and
+#     commonly holds no token, so `cat .npmrc` and `cat packages/web/.npmrc` stay allowed.
+# Backslashes are read as separators first, for the PowerShell arm's re-quoted Windows paths, and
+# `//` and `/./` are folded.
+#
+# Accepted misses, fail-open: a store moved by its tool's environment variable
+# (`AWS_SHARED_CREDENTIALS_FILE`, `KUBECONFIG`, `DOCKER_CONFIG`, `GH_CONFIG_DIR`,
+# `XDG_CONFIG_HOME`, `CARGO_HOME`); `cat .npmrc` run FROM the home directory, which no word in
+# the command can tell from a project's; a case-folded spelling (`~/.NETRC`) on a
+# case-insensitive filesystem; gcloud's `credentials.db` and `legacy_credentials/`; and every
+# tool that prints its own secret on request (`kubectl config view --raw`, `docker login`'s
+# helpers) other than the `gh` and `git credential` verbs judged in `check_segment`.
+names_credential_store() {
+	local p=${1//\\//} dir rest
+	# `~/.aws//credentials` and `~/.aws/./credentials` open the same file.
+	while :; do
+		case $p in
+		*//*) p=${p//\/\//\/} ;;
+		*/./*) p=${p//\/.\//\/} ;;
+		*) break ;;
+		esac
+	done
+	case ${p##*/} in
+	.git-credentials | .netrc | _netrc) return 0 ;;
+	.npmrc) ;;
+	*)
+		case $p in
+		.aws/credentials | */.aws/credentials | \
+			.config/gh/hosts.yml | */.config/gh/hosts.yml | \
+			.config/git/credentials | */.config/git/credentials | \
+			.docker/config.json | */.docker/config.json | \
+			.kube/config | */.kube/config | \
+			.config/gcloud/application_default_credentials.json | */.config/gcloud/application_default_credentials.json | \
+			.cargo/credentials | */.cargo/credentials | .cargo/credentials.toml | */.cargo/credentials.toml)
+			return 0
+			;;
+		esac
+		return 1
+		;;
+	esac
+	# `.npmrc`: only the one in a home directory.
+	dir=${p%/*}
+	[ "$dir" != "$p" ] || return 1
+	# shellcheck disable=SC2016 # the home spellings are matched as written, unexpanded.
+	case $dir in
+	'~' | '$HOME' | '${HOME}' | /root) return 0 ;;
+	'~'*) rest=${dir#\~} ;;
+	/home/?*) rest=${dir#/home/} ;;
+	/Users/?*) rest=${dir#/Users/} ;;
+	[A-Za-z]:/Users/?*) rest=${dir#?:/Users/} ;;
+	*) return 1 ;;
+	esac
+	case $rest in */*) return 1 ;; esac
+	return 0
+}
+
 
 # A broad, one-time speed bump for commands that merely CONTAIN `.env`, including
 # interpreter snippets this guard deliberately cannot parse as file reads. This is an
@@ -590,26 +1697,90 @@ names_private_key_file() {
 # allowed through to the normal rails so false positives do not brick the agent.
 #
 # Session identity is not portable across agent vendors, so the default state is a
-# per-repository, per-category file under /tmp. Tests may override either category's
-# file explicitly; DOTENV_ADVISORY_STATE remains supported for compatibility.
+# per-repository, per-category file in advisory_state_dir: TMPDIR when it names an absolute,
+# writable directory, /tmp otherwise. A host sandbox can leave /tmp read-only while TMPDIR stays
+# writable, and a TMPDIR that is missing or unwritable must not leave the marker unwritable too
+# (AMH ledger row DD093). A process may see no TMPDIR where another sees one, a hook outside the
+# sandbox against a ladder inside it, so every reader looks in both (advisory_state_files), and
+# scripts/session-start.sh clears both. Both are one directory when TMPDIR names /tmp by another
+# spelling (`/tmp/.`, a symlink), and the readers then read it once, judged by filesystem
+# identity: read twice, every spawn counted double. The two REPORTS take the union across the
+# directories: a deletion advised in one and resumed in the other came back, and is not
+# abandoned. The advisory itself still reads and writes only its own process's file. For the
+# `.env` and key-material tiers a spent marker is a regular FILE; anything else at its path — a
+# directory above all, or a dangling symlink — is state the guard cannot use, and the advisory
+# fires as for a marker it cannot write (AMH ledger row DD097); the other tiers already fire on
+# a directory there, since their reads and appends fail on it. Tests may override any category's
+# file explicitly through its *_ADVISORY_STATE variable; DOTENV_ADVISORY_STATE remains
+# supported for compatibility. An overridden file, with its `.resumed` companion, is the only
+# state the reports read for its category, wherever it sits: no /tmp sibling is looked for,
+# even when the override names a file directly under TMPDIR.
+advisory_state_dir() {
+	local dir=${TMPDIR:-}
+	case $dir in /*) ;; *) dir= ;; esac
+	while [ "$dir" != "${dir%/}" ]; do dir=${dir%/}; done
+	if [ -n "$dir" ] && [ -d "$dir" ] && [ -w "$dir" ]; then
+		printf '%s' "$dir"
+	else
+		printf '/tmp'
+	fi
+}
+
+# advisory_state_files <name> : set ADVISORY_STATES to the state file, then its /tmp sibling
+# when the file is the default one and its directory is not /tmp itself. An array, never lines
+# on stdout: a path is not a line, and an override holding a newline would read as two files.
+# Whether the file is overridden is asked of the override variable, never inferred from where
+# the file sits: an override that happens to name a file directly under TMPDIR is still the
+# only file read. Identity is the filesystem's (`-ef`), not the spelling's, so a TMPDIR of
+# `/tmp/.` or a symlink to /tmp yields one file.
+advisory_state_files() {
+	local own dir
+	ADVISORY_STATES=()
+	own=$(advisory_state_file "$1") || return 1
+	[ -n "$own" ] || return 1
+	ADVISORY_STATES=("$own")
+	advisory_state_override "$1" >/dev/null && return 0
+	dir=$(advisory_state_dir)
+	[ "$dir" = /tmp ] && return 0
+	[ "$dir" -ef /tmp ] && return 0
+	ADVISORY_STATES=("$own" "/tmp/${own##*/}")
+}
+
+# advisory_state_override <name> : print the category's explicitly set state file and succeed;
+# fail when its *_ADVISORY_STATE variable is unset or the category is unknown.
+advisory_state_override() {
+	case $1 in
+	dotenv) [ -n "${DOTENV_ADVISORY_STATE+x}" ] && printf '%s' "$DOTENV_ADVISORY_STATE" ;;
+	keymaterial) [ -n "${KEYMATERIAL_ADVISORY_STATE+x}" ] && printf '%s' "$KEYMATERIAL_ADVISORY_STATE" ;;
+	destructive) [ -n "${DESTRUCTIVE_ADVISORY_STATE+x}" ] && printf '%s' "$DESTRUCTIVE_ADVISORY_STATE" ;;
+	interpreter) [ -n "${INTERPRETER_ADVISORY_STATE+x}" ] && printf '%s' "$INTERPRETER_ADVISORY_STATE" ;;
+	subagent) [ -n "${SUBAGENT_ADVISORY_STATE+x}" ] && printf '%s' "$SUBAGENT_ADVISORY_STATE" ;;
+	hookfile) [ -n "${HOOKFILE_ADVISORY_STATE+x}" ] && printf '%s' "$HOOKFILE_ADVISORY_STATE" ;;
+	*) return 1 ;;
+	esac
+}
+
 advisory_state_file() { # advisory_state_file <name>
 	local name=$1 slug uid
 	case $name in
-	dotenv) [ -n "${DOTENV_ADVISORY_STATE+x}" ] && { printf '%s' "$DOTENV_ADVISORY_STATE"; return 0; } ;;
-	keymaterial) [ -n "${KEYMATERIAL_ADVISORY_STATE+x}" ] && { printf '%s' "$KEYMATERIAL_ADVISORY_STATE"; return 0; } ;;
-	destructive) [ -n "${DESTRUCTIVE_ADVISORY_STATE+x}" ] && { printf '%s' "$DESTRUCTIVE_ADVISORY_STATE"; return 0; } ;;
-	interpreter) [ -n "${INTERPRETER_ADVISORY_STATE+x}" ] && { printf '%s' "$INTERPRETER_ADVISORY_STATE"; return 0; } ;;
-	subagent) [ -n "${SUBAGENT_ADVISORY_STATE+x}" ] && { printf '%s' "$SUBAGENT_ADVISORY_STATE"; return 0; } ;;
+	dotenv | keymaterial | destructive | interpreter | subagent | hookfile) ;;
 	*) return 1 ;;
 	esac
+	advisory_state_override "$name" && return 0
 	slug=${ROOT//\//_}
 	slug=${slug// /_}
 	uid=${UID:-unknown}
-	printf '/tmp/amh-command-guard-%s-advisory-%s-%s' "$name" "$uid" "$slug"
+	printf '%s/amh-command-guard-%s-advisory-%s-%s' "$(advisory_state_dir)" "$name" "$uid" "$slug"
 }
 
 needs_one_time_advisory() { # needs_one_time_advisory <name> <command>
 	local name=$1 cmd=$2 state sig when
+	# Machine mode keeps no one-time tier, only the destructive rail's two permanent verdicts
+	# below (see MACHINE MODE in the header). This line is a shortcut that spares the other
+	# categories their detectors; it decides nothing. The machine-mode gate after the permanent
+	# verdicts returns for every category too. The fixtures pin that gate for deletions; for the
+	# other four categories either line alone keeps them silent, so the fixtures pin the pair.
+	[ "$MACHINE_MODE" -eq 1 ] && [ "$name" != destructive ] && return 1
 	case $name in
 	dotenv) case $cmd in *.env*) ;; *) return 1 ;; esac ;;
 	# `.pem` and `.key` must be followed by a non-alphanumeric character or end the word.
@@ -633,6 +1804,13 @@ needs_one_time_advisory() { # needs_one_time_advisory <name> <command>
 		fi
 		;;
 	interpreter) is_interpreter_deletion "$cmd" || return 1 ;;
+	hookfile)
+		if [ "${GUARD_SHELL:-bash}" = powershell ]; then
+			is_ps_hook_file_command "$cmd" || return 1
+		else
+			is_hook_file_command "$cmd" || return 1
+		fi
+		;;
 	# No condition to test: the caller only invokes this category when a subagent spawn is
 	# actually about to happen, and the spawn itself is the whole trigger.
 	subagent) ;;
@@ -671,8 +1849,20 @@ needs_one_time_advisory() { # needs_one_time_advisory <name> <command>
 		ADVISORY_REASON='BLOCKED, and this one does NOT clear on a rerun: this recursive `cmd.exe` deletion wraps a path in `\"` nested quotes. `\"` is an escape to bash and to the C runtime, NOT to `cmd.exe` and not to Windows PowerShell 5.1, so somewhere between this text and `cmd.exe` the string closes early and the path `rmdir /s` receives is not the one you wrote. In two reported incidents it was a bare `\`, and `rmdir /s /q \` is the root of the current drive. The path you can read here is not evidence of what will be deleted, which is why a rerun cannot settle it. Do the same deletion in a spelling that needs NO nested quoting: a leftover git worktree with `git worktree remove --force <path>` (and `git worktree prune` for entries whose directory is gone); from bash, `rm -rf -- '"'"'/c/path/to/dir'"'"'` in single quotes; from PowerShell, `Remove-Item -LiteralPath '"'"'C:\path\to\dir'"'"' -Recurse -Force` in single quotes. Print the path first and read it. What is NOT an answer: another nesting of the same quotes, `^` escapes, or moving this text into a `.bat` file — those are the same guess about a parser you cannot see, and a script file is not read here at all.'
 		return 0
 	fi
+	# Machine mode stops here, BEFORE any state file is named: a deletion that is neither of the
+	# two permanent verdicts above passes, and nothing is recorded. One copy serves every project
+	# on the machine, and a state file keyed by this script's location would let a rerun in one
+	# project clear the same deletion in all of them (AMH ledger row DD063).
+	[ "$MACHINE_MODE" -eq 0 ] || return 1
 	state=$(advisory_state_file "$name")
 	[ -n "$state" ] || return 1
+	# A marker that cannot be written FIRES the advisory, and says why, instead of passing the
+	# command: "I could not record it" is not "nothing to advise". It used to be read that way,
+	# and a read-only /tmp inside a host sandbox turned every one-time advisory off (AMH ledger
+	# rows DD096, DD097). Where no marker can ever be written the same command is then refused
+	# on every attempt, as the no-digest arm already is (AMH ledger row DD071): loud, the
+	# direction an advisory may fail (owner, 2026-11-18).
+	ADVISORY_UNRECORDED=0
 	if [ "$name" = destructive ]; then
 		# Rearm per TARGET SET, not per category — the one place this rail's state
 		# deliberately diverges from the other two.
@@ -693,16 +1883,20 @@ needs_one_time_advisory() { # needs_one_time_advisory <name> <command>
 			# the line. No gate reads it, and none may (P3, AMH ledger row DC004).
 			if [ "$HOOK_INVOCATION" -eq 1 ] &&
 				{ [ ! -e "$state.resumed" ] || ! LC_ALL=C grep -qxF -- "$sig" "$state.resumed" 2>/dev/null; }; then
-				printf '%s\n' "$sig" >>"$state.resumed" 2>/dev/null || :
+				printf '%s\n' "$sig" 2>/dev/null >>"$state.resumed" || :
 			fi
 			return 1
 		fi
 		# If `grep` is unavailable the test above fails and the advisory re-fires — the
 		# right direction — at the cost of a duplicate line per attempt. Bounded by the
 		# session, and the bootstrap deletes the file; not worth a second mechanism.
-		printf '%s\n' "$sig" >>"$state" 2>/dev/null || return 1
-	elif [ "$name" = interpreter ]; then
-		# Rearmed per COMMAND TEXT, for the reason AMH ledger row DC004 forced on the
+		# An `xargs` deletion with no digest to key it on is never recorded, so it never matches
+		# and re-fires on every attempt (see `record_destructive_targets`).
+		[ "${DESTRUCTIVE_UNKEYABLE:-0}" -eq 1 ] || printf '%s\n' "$sig" 2>/dev/null >>"$state" || ADVISORY_UNRECORDED=1
+	elif [ "$name" = interpreter ] || [ "$name" = hookfile ]; then
+		# The hook-file tier rearms the same way, per command text: removing the hook at minute
+		# two must not buy silence for moving it aside at minute forty.
+		# Rearmed per COMMAND TEXT, for the reason AMH ledger row DB030 forced on the
 		# destructive rail: a per-session one-shot is spent by the first harmless match and
 		# silent for every deletion after it. Two different one-liners are two decisions.
 		# A DIGEST, and never the command text, for two reasons the other tiers do not have.
@@ -715,11 +1909,18 @@ needs_one_time_advisory() { # needs_one_time_advisory <name> <command>
 		# and turn "rerun to proceed" into a command that can never run. Flattening newlines
 		# first closes that; hashing closes both. No digest tool means no signature, and the
 		# advisory then re-fires on every attempt: loud, and the direction an advisory may fail.
-		sig=$(interpreter_signature "$cmd") || return 1
-		if [ -e "$state" ] && LC_ALL=C grep -qxF -- "$sig" "$state" 2>/dev/null; then
-			return 1
+		# An EMPTY digest is the same case: the function's pipeline ends in `cut` or `tr`, which
+		# exit 0 when the tool before them failed, and one blank line recorded as a signature
+		# would match every later command's empty digest and clear them all.
+		ADVISORY_UNKEYABLE=0
+		if sig=$(interpreter_signature "$cmd") && [ -n "$sig" ]; then
+			if [ -e "$state" ] && LC_ALL=C grep -qxF -- "$sig" "$state" 2>/dev/null; then
+				return 1
+			fi
+			printf '%s\n' "$sig" 2>/dev/null >>"$state" || ADVISORY_UNRECORDED=1
+		else
+			ADVISORY_UNKEYABLE=1
 		fi
-		printf '%s\n' "$sig" >>"$state" 2>/dev/null || return 1
 	elif [ "$name" = subagent ]; then
 		# Rearm per SPAWN, not per session — the same correction AMH ledger row DC004 forced on the
 		# destructive rail, for the same reason. A per-session one-shot is spent at exactly
@@ -736,18 +1937,33 @@ needs_one_time_advisory() { # needs_one_time_advisory <name> <command>
 		# turn three times over, with a line recorded for each. Nothing reads that file as
 		# evidence of anything (P3): it says a prompt fired and a spawn went ahead, never
 		# that anyone thought about it.
+		# Here the marker's write is its REMOVAL: one that cannot be cleared would let every later
+		# spawn pass unadvised, so it fires like any unwritable marker (AMH ledger row DD097).
 		if [ -e "$state" ]; then
-			rm -f -- "$state" 2>/dev/null || :
-			if [ "$HOOK_INVOCATION" -eq 1 ]; then
-				when=$(date -u +%Y-%m-%dT%H:%M:%SZ 2>/dev/null) || when='unknown-time'
-				printf '%s spawn proceeded past the advisory\n' "$when" >>"$state.resumed" 2>/dev/null || :
+			if rm -f -- "$state" 2>/dev/null && [ ! -e "$state" ]; then
+				if [ "$HOOK_INVOCATION" -eq 1 ]; then
+					when=$(date -u +%Y-%m-%dT%H:%M:%SZ 2>/dev/null) || when='unknown-time'
+					printf '%s spawn proceeded past the advisory\n' "$when" 2>/dev/null >>"$state.resumed" || :
+				fi
+				return 1
 			fi
-			return 1
+			ADVISORY_UNRECORDED=1
+		else
+			: 2>/dev/null >"$state" || ADVISORY_UNRECORDED=1
 		fi
-		: >"$state" 2>/dev/null || return 1
 	else
-		[ -e "$state" ] && return 1
-		: >"$state" 2>/dev/null || return 1
+		# Only a regular FILE is a spent marker. A directory at its path used to count as one,
+		# so whatever planted it, the `.env` and key-material advisories never fired again; it
+		# is state the guard cannot use, and an unusable marker fires (AMH ledger row DD097). A
+		# dangling symlink is unusable too: writing through it would create its target, and the
+		# rerun would then find a spent marker the guard never chose the place of.
+		if [ -f "$state" ]; then
+			return 1
+		elif [ -e "$state" ] || [ -L "$state" ]; then
+			ADVISORY_UNRECORDED=1
+		else
+			: 2>/dev/null >"$state" || ADVISORY_UNRECORDED=1
+		fi
 	fi
 	case $name in
 	dotenv)
@@ -773,6 +1989,14 @@ needs_one_time_advisory() { # needs_one_time_advisory <name> <command>
 		ADVISORY_REASON="This command hands \`${INTERPRETER_LEAD}\` a program that names \`${INTERPRETER_CALL}\`, and the command guard is stopping it once. Deletions written inside an interpreter are the half of the destructive rail no command scanner reaches: the verb tiers judge a command, and this is program text, so nothing here knows what path that call resolves to at run time. Spend the turn on that question. The harness rule is that an unguarded destructive path is exercised against a fixture tree — a fresh \`mktemp -d\`, a directory the test itself made — and never against the working tree, a home directory or anything whose loss would matter, and that a safety check is never removed from the source to observe what it prevents."
 		# shellcheck disable=SC2016 # the examples must print literally, unexpanded.
 		ADVISORY_REASON="$ADVISORY_REASON"' Rerun the same command to proceed; a different one-liner gets its own advisory. Then read what this does NOT see, because a cleared prompt is not a safe command: a deletion inside a SCRIPT FILE or a test suite (`python3 cleanup.py`, `pytest` — the shape of the most widely reported incident of this kind, in which an agent asked to add a delete feature removed its own guard, ran the test against a live path, and the user lost a repository, a home directory, SSH private keys and a GPG keyring), a heredoc body, anything behind `bash -c` or `xargs`, and every language and spelling off this list — `os.system("rm -rf /")` above all. This rail saw a word in a command line. It did not read your program. And read the asymmetry with the tier above rather than around it: `rm -rf /` is denied permanently and never clears, while this spelling of the same deletion clears on your rerun — not because it is safer, but because judging program text cannot be made safe enough to deny on, so the rerun is the only thing standing between this command and the filesystem.'
+		;;
+	hookfile)
+		# The plan for this rail said "it is reinstalled at the next boot", and that is true of
+		# only one of the three outcomes: the bootstrap writes the hook when it is MISSING, leaves
+		# any file already there alone, and never restores an execute bit. Said of `chmod -x`, the
+		# promise would be false and would make the advisory read as harmless.
+		# shellcheck disable=SC2016 # the backticked names are markdown, not substitutions.
+		ADVISORY_REASON='This command removes, moves, replaces or changes the mode of the git pre-push hook (`.git/hooks/pre-push`, or the directory holding it). That file is the pre-push rail: the one check on a push that runs whatever drives the shell, so taking it away switches the rail off as surely as `--no-verify` does. If the rail refused a push, the refusal is the answer — read what it objected to and fix the push; removing a check to get past it is the respelling the harness forbids. What happens next depends on the command: a hook that is REMOVED or moved aside is written again by `scripts/session-start.sh` at the next session start, but until then pushes are unguarded; a hook with its execute bit taken STAYS off, because the bootstrap never touches a hook that exists; and a different file moved into its place is a foreign hook the bootstrap will never overwrite. If the owner asked for this — replacing a foreign hook, chaining the rail into a hook manager — run the same command again; a different command gets its own advisory.'
 		;;
 	keymaterial)
 		# shellcheck disable=SC2016 # the backticked file names are markdown, not substitutions.
@@ -842,6 +2066,18 @@ needs_one_time_advisory() { # needs_one_time_advisory <name> <command>
 			# shellcheck disable=SC2016 # the backticked commands must print literally.
 			ADVISORY_REASON="$ADVISORY_REASON"' A path here names a `worktrees` directory. If it is a git worktree, `git worktree remove --force <path>` removes it and its metadata together, and `git worktree prune` clears entries whose directory is already gone — neither needs a path nested inside another shell'"'"'s quotes, which is where the reported drive-root deletion of a leftover worktree went wrong.'
 		fi
+		# ADDITIVE as well: an `xargs` deletion can also carry a literal operand or a variable,
+		# and those paragraphs still describe it. This one says what none of them can — that
+		# the targets are not in the command at all — and names the splitting that turned the
+		# reported incident's paths into a parent nobody wrote (AMH ledger row DD062).
+		if [ "${DESTRUCTIVE_XARGS:-0}" -eq 1 ]; then
+			# shellcheck disable=SC2016 # the examples must print literally, unexpanded.
+			ADVISORY_REASON="$ADVISORY_REASON"' This runs behind `xargs`, so what it acts on is not in the command: `xargs` adds operands it reads from its input at run time, and neither this guard nor a reader of your transcript can see them. Before you rerun, run the same pipeline with `printf '"'"'[%s]\n'"'"'` in place of the destructive command and read every line it prints. Read them for SPLITTING above all: by default `xargs` splits its input at blanks as well as newlines and gives quotes and backslashes meaning, so a path containing a space arrives as two operands, and the first half names a directory you never wrote. Prefer input no file name can split — `find … -print0 | xargs -0 …` — or GNU `xargs -d '"'"'\n'"'"'`, which splits at newlines only; that rewrite is a new command text, so it is stopped once more, and that turn is cheaper than a split path. The reported incident behind this paragraph was exactly that: paths under `~/Library/Application Support` went through `xargs -n1 dirname` into `xargs rm -rf`, `dirname` of `~/Library/Application` was `~/Library`, and `~/Library` was deleted. Rerunning clears this for this exact command text, and the same text run later acts on whatever its input produces by then.'
+			if [ "${DESTRUCTIVE_UNKEYABLE:-0}" -eq 1 ]; then
+				# shellcheck disable=SC2016 # the backticked tool names must print literally.
+				ADVISORY_REASON="$ADVISORY_REASON"' No digest tool (`sha256sum`, `shasum` or `cksum`) was found to key this command on, so this advisory fires on every attempt and a rerun will not clear it: install one, or ask the owner.'
+			fi
+		fi
 		if [ "${DESTRUCTIVE_POWERSHELL:-0}" -eq 1 ] &&
 			{ [ "$DESTRUCTIVE_ROOTISH" -eq 1 ] || [ "$DESTRUCTIVE_UNEXPANDED" -eq 1 ]; }; then
 			# The bash paragraphs below prescribe `${S:?}`, which PowerShell does not have; handing
@@ -891,6 +2127,21 @@ needs_one_time_advisory() { # needs_one_time_advisory <name> <command>
 		fi
 		;;
 	esac
+	# Last, because it overrides the "rerun to proceed" each of these two tiers has just said.
+	if { [ "$name" = interpreter ] || [ "$name" = hookfile ]; } && [ "${ADVISORY_UNKEYABLE:-0}" -eq 1 ]; then
+		# shellcheck disable=SC2016 # the backticked tool names must print literally.
+		ADVISORY_REASON="$ADVISORY_REASON"' No digest tool (`sha256sum`, `shasum` or `cksum`) was found to key this command on, so this advisory fires on every attempt and a rerun will not clear it: install one, or ask the owner.'
+	fi
+	# Last of all, for every tier: it overrides each tier's "rerun to proceed". The path is not
+	# printed; it carries this repository's location, and the directory is what can be fixed.
+	if [ "${ADVISORY_UNRECORDED:-0}" -eq 1 ]; then
+		# shellcheck disable=SC2016 # the backticked names must print literally.
+		ADVISORY_REASON="$ADVISORY_REASON"' The guard could not write the marker that records this advisory (in `TMPDIR` when that is an absolute, writable directory, else in `/tmp`), or found something other than a regular file at its path, so it fires on every attempt and a rerun will not clear it: make one of those writable for this process, or, when something already occupies the marker'"'"'s path, ask the owner to clear it.'
+		case $name in
+		dotenv) DOTENV_ADVISORY_REASON=$ADVISORY_REASON ;;
+		keymaterial) KEYMATERIAL_ADVISORY_REASON=$ADVISORY_REASON ;;
+		esac
+	fi
 	return 0
 }
 
@@ -1223,6 +2474,28 @@ UNQUOTED=''
 # rather than
 # from a file and are skipped; a digit prefix (`0<file`) is just an fd number and
 # needs no special case, since the `<` is what this scan looks for.
+# The word a redirection names, read as bash reads it: a quoted run is part of the word, spaces
+# and all, so `< "/home/Example User/.netrc"` is one target and not `"/home/Example`. It ends at
+# the first unquoted blank or metacharacter, and the scan stops at CHAR_LOOKAHEAD characters,
+# longer than any path a store sits at.
+redirect_word() { # sets REDIRECT_WORD
+	local r=$1 k=0 m=${#1} ch qq=''
+	[ "$m" -le "$CHAR_LOOKAHEAD" ] || m=$CHAR_LOOKAHEAD
+	while [ "$k" -lt "$m" ]; do
+		ch=${r:k:1}
+		if [ -n "$qq" ]; then
+			[ "$ch" = "$qq" ] && qq=''
+		else
+			case $ch in
+			"'" | '"') qq=$ch ;;
+			[[:space:]] | ';' | '|' | '&' | '<' | '>' | ')' | '(' | '`') break ;;
+			esac
+		fi
+		k=$((k + 1))
+	done
+	REDIRECT_WORD=${r:0:k}
+}
+
 redirect_targets() { # sets REDIRECT_TARGETS
 	local s=$1
 	local i=0 n=${#s} c q='' rest target
@@ -1254,9 +2527,11 @@ redirect_targets() { # sets REDIRECT_TARGETS
 				i=$((i + 1)) # a here-doc or here-string, not a file
 			else
 				rest=${wbuf:i-wbase+1}
+				# `<>` opens the file for reading AND writing, so it is still a read.
+				case $rest in '>'*) rest=${rest#>} ;; esac
 				rest=${rest#"${rest%%[![:space:]]*}"}
-				target=${rest%%[[:space:];|&<>)(\`]*}
-				strip_quotes "$target"
+				redirect_word "$rest"
+				strip_quotes "$REDIRECT_WORD"
 				[ -n "$UNQUOTED" ] && REDIRECT_TARGETS+=("$UNQUOTED")
 			fi
 			;;
@@ -1282,6 +2557,10 @@ reads_env_operand() {
 			BLOCK_REASON="Reading \`$UNQUOTED\` prints private key material (AMH P17). \`redact.sh\` redacts a key block header and body, but only where output is actually piped through it — nothing here guarantees that. Check that the file exists (\`[ -f $UNQUOTED ] && echo present\`) or read the public half (\`$UNQUOTED.pub\`), or ask the owner for a narrower evidence contract via the Owner queue."
 			return 1
 		fi
+		if names_credential_store "$UNQUOTED"; then
+			BLOCK_REASON="Reading \`$UNQUOTED\` prints the login tokens or passwords a tool stored there (AMH P17), and filtering the output with \`grep\` or \`head\` does not keep them out: in these formats a secret shares a line with what you were looking for. Check that the file exists (\`[ -f $UNQUOTED ] && echo present\`), or ask the tool whether it is logged in (\`gh auth status\`, \`npm whoami\`), or ask the owner for a narrower evidence contract via the Owner queue."
+			return 1
+		fi
 	done
 	return 0
 }
@@ -1301,6 +2580,10 @@ copies_env_operand() {
 		fi
 		if names_private_key_file "$UNQUOTED"; then
 			BLOCK_REASON="\`$cmd\` copies \`$UNQUOTED\` — private key material — to another path, where no rail here can see what reads them next (AMH P17). Leave the key where it is; if a tool needs it, point the tool at this path, or ask the owner for a narrower evidence contract via the Owner queue."
+			return 1
+		fi
+		if names_credential_store "$UNQUOTED"; then
+			BLOCK_REASON="\`$cmd\` copies \`$UNQUOTED\` — a tool's stored login tokens or passwords — to another path, where no rail here can see what reads them next (AMH P17). Leave the file where it is; the tool that wrote it reads it from there, or ask the owner for a narrower evidence contract via the Owner queue."
 			return 1
 		fi
 	done
@@ -1506,6 +2789,139 @@ forge_api_mutation() {
 	forge_operation_class "$endpoint"
 }
 
+# The name bash looks up for a command WORD. Two spellings reach the same program as the bare
+# name and were judged as something else. A leading backslash is a quote bash removes before the
+# lookup — it is how a shell bypasses an alias — so `\rm -rf /` ran with no verdict at all. And a
+# path runs its last component: that was folded for the command itself but not for the
+# transparent prefixes, so `/usr/bin/env` alone printed the environment unjudged while
+# `/usr/bin/printenv` was blocked (AMH ledger row DD041). Only a LEADING backslash is read: one
+# inside the word (`r\m`) is the deliberate evasion this guard's threat model does not chase, and
+# a Windows path such as `C:\Windows\System32\cmd.exe` keeps its backslashes for the arms that read
+# them. Never call this on an operand — `\*` and `\~` keep their meaning there. Two costs, both in
+# the safe direction: quotes are gone by the time a word gets here, so a quoted `'\rm'` — a literal
+# name bash will not find — is judged as `rm`; and the PowerShell arm's re-quoted hand-off reaches
+# this too, where `\x` is a path from the drive root rather than an alias bypass. A Windows
+# suffix is folded too: Git Bash runs `rm.exe` as `rm`, so `rm.exe -rf /` and `git.exe push
+# --force` reached no rail. A Windows filesystem ignores case, so a name carrying the suffix in
+# any case is lowered whole (`RM.EXE`, `Git.exe`); a bare `RM` with no suffix is not, and gets
+# past every rail on such a host. A word that still holds a backslash is a Windows path and is
+# left whole, suffix and case included, for the `cmd` and PowerShell arms that match those
+# spellings (AMH ledger row DD042). Sets COMMAND_WORD.
+command_word() { # command_word <word>
+	local w=${1#\\}
+	w=${w##*/}
+	w=${w#\\}
+	case $w in
+	*\\*) ;;
+	?*.[Ee][Xx][Ee])
+		cmd_lower "${w%.???}"
+		w=$CMD_LOWER
+		;;
+	esac
+	COMMAND_WORD=$w
+}
+COMMAND_WORD=''
+
+# `core.hooksPath` is where git looks for every hook, the pre-push rail's included, so a
+# command that points it elsewhere switches that rail off without touching the hook file.
+# Git folds the case of a section and key name (`CORE.HOOKSPATH` is the same key), and a
+# bare `-c core.hooksPath` with no `=` still names it. True when <name[=value]> names it.
+names_hooks_path_key() { # names_hooks_path_key <word>
+	case ${1%%=*} in
+	[Cc][Oo][Rr][Ee].[Hh][Oo][Oo][Kk][Ss][Pp][Aa][Tt][Hh]) return 0 ;;
+	esac
+	return 1
+}
+
+# The `git config` long option that <name> (dashes stripped) selects, as git's parse-options
+# selects one: the exact name, or else the option it abbreviates, so `--get-reg` is
+# `--get-regexp` and `--typ` is `--type`. Only the options that change what the command
+# writes are listed: the ones that take a value and the modes that read or remove. A prefix
+# of two of them is ambiguous, and git refuses it before writing anything, so whichever one
+# is returned costs nothing. Each name is listed before every longer name it is a prefix of
+# (`get` before `get-all`), so the first match of an exact name is that name. Sets
+# CONFIG_OPTION, empty for any other option.
+config_long_option() { # config_long_option <name>
+	local o
+	CONFIG_OPTION=''
+	[ -n "$1" ] || return 0
+	for o in file blob type default comment value get get-all get-regexp get-urlmatch get-color \
+		get-colorbool list unset unset-all remove-section rename-section edit; do
+		case $o in "$1"*) CONFIG_OPTION=$o && return 0 ;; esac
+	done
+}
+CONFIG_OPTION=''
+
+# True when the words after `git config` SET `core.hooksPath`, read with git's own grammar
+# (measured on git 2.43 against throwaway `--file` targets). The classic form
+# (`git config [--global] [--add] core.hooksPath DIR`) parses options only up to the first
+# word that is not one: after the key EVERY word is a value, so `git config core.hooksPath
+# --get` sets the key to `--get`, and a mode counts only in front of the key. A mode that
+# reads or removes there — `--get` and its family, `--list`, `--unset`, a section removal or
+# rename, `--edit` — sets nothing and passes, and unsetting puts the hooks back where the
+# rail lives; `--no-get` cancels `--get`, so `--get --no-get core.hooksPath DIR` writes. Long
+# options are read by unique prefix too, and short ones in a cluster: `-f` and `-t` take the
+# rest of the cluster or the next word (`-zf FILE`, `-tpath`). `-l` and `-e` take no key,
+# and git refuses one given with a value, so they are passed over with `--`, a glued
+# `--file=X` and every other option.
+# Only the FIRST classic positional is a key: in `git config alias.x
+# core.hooksPath y` it is a value. Behind the `set` subcommand of git 2.46 and later, options
+# are read anywhere before the key and any word may be the key, so `set --comment
+# core.hooksPath alias.x v` sets `alias.x`. After the key, a word of any shape is read as a
+# value in both forms: whether `set` parses an option there could not be measured on git
+# 2.43, and that reading can only deny, never pass. The `get` and `unset` subcommands put no
+# value after the key and pass as they are. `--edit` opens an editor this scanner cannot see
+# into, so a key written there is a miss, named in the header.
+git_config_sets_hooks_path() { # git_config_sets_hooks_path <args after `config`>
+	local a positional=0 subcommand=0 named=0 skip=0 modes=' ' cluster
+	for a in "$@"; do
+		if [ "$skip" -eq 1 ]; then
+			skip=0
+			continue
+		fi
+		[ "$named" -eq 1 ] && return 0
+		if [ "$positional" -eq 0 ] || [ "$subcommand" -eq 1 ]; then
+			case $a in
+			--no-*)
+				config_long_option "${a#--no-}"
+				[ -n "$CONFIG_OPTION" ] && modes=${modes// $CONFIG_OPTION / }
+				continue
+				;;
+			--*)
+				config_long_option "${a#--}"
+				case $CONFIG_OPTION in
+				'') ;;
+				file | blob | type | default | comment | value) skip=1 ;;
+				*) modes="$modes$CONFIG_OPTION " ;;
+				esac
+				continue
+				;;
+			-?*)
+				cluster=${a#-}
+				while [ -n "$cluster" ]; do
+					case $cluster in
+					f | t) skip=1 ;;
+					f* | t*) break ;;
+					esac
+					cluster=${cluster#?}
+				done
+				continue
+				;;
+			esac
+		fi
+		positional=$((positional + 1))
+		if [ "$positional" -eq 1 ] && [ "$a" = set ]; then
+			subcommand=1
+		elif names_hooks_path_key "$a"; then
+			[ "$modes" = ' ' ] || return 1
+			named=1
+		elif [ "$subcommand" -eq 0 ]; then
+			return 1
+		fi
+	done
+	return 1
+}
+
 check_segment() {
 	local raw=$1
 	local words=() i=0 w
@@ -1532,6 +2948,10 @@ check_segment() {
 			BLOCK_REASON="Redirecting from \`$target\` feeds private key material into the command (AMH P17). Check that the file exists, or read the public half (\`$target.pub\`), or ask the owner for a narrower evidence contract via the Owner queue."
 			return 1
 		fi
+		if names_credential_store "$target"; then
+			BLOCK_REASON="Redirecting from \`$target\` feeds a tool's stored login tokens or passwords into the command (AMH P17). Check that the file exists, or ask the tool whether it is logged in, or ask the owner for a narrower evidence contract via the Owner queue."
+			return 1
+		fi
 	done
 
 	# A non-blank command that parses to NO words is a parser failure, not an empty
@@ -1551,9 +2971,14 @@ check_segment() {
 	# `env FOO=1 git push --force` is judged as a git command, not an env dump.
 	while [ "$i" -lt "${#words[@]}" ]; do
 		w=${words[$i]}
-		case $w in
-		*=*) i=$((i + 1)) ;;
-		sudo | nohup | nice | time | command | builtin | exec) i=$((i + 1)) ;;
+		case $w in *=*)
+			i=$((i + 1))
+			continue
+			;;
+		esac
+		command_word "$w"
+		case $COMMAND_WORD in
+		sudo | nohup | nice | time | command | builtin | exec | if | then | else | elif | while | until | do | '!') i=$((i + 1)) ;;
 		env)
 			# `env` handed something to run is a prefix; handed nothing it is the dump.
 			# `env_prefix_width` above is where that distinction is drawn and argued.
@@ -1576,11 +3001,13 @@ check_segment() {
 	done
 	[ "$i" -lt "${#words[@]}" ] || return 0
 
-	local cmd=${words[$i]}
-	cmd=${cmd##*/}
+	command_word "${words[$i]}"
+	local cmd=$COMMAND_WORD
 	local args=("${words[@]:$((i + 1))}")
 
-	if forge_api_mutation "$cmd" ${args[@]+"${args[@]}"}; then
+	# The forge/API rail, the `core.hooksPath` arms and the push rails below encode AMH's
+	# publication process, a project's choice; machine mode skips all three (see MACHINE MODE).
+	if [ "$MACHINE_MODE" -eq 0 ] && forge_api_mutation "$cmd" ${args[@]+"${args[@]}"}; then
 		BLOCK_REASON="Forge/API mutation blocked: client=$FORGE_CLIENT method=$FORGE_METHOD operation-class=$FORGE_CLASS. This local rail never prints payloads or credentials. Use an explicit owner-approved administrative workflow with least-privilege credentials, protected environments and required approvals."
 		return 1
 	fi
@@ -1628,27 +3055,156 @@ check_segment() {
 	git)
 		# `push` must be the SUBCOMMAND, not any word anywhere in the line — otherwise
 		# `git commit -m "never git push --force"` trips the rail on its own message.
-		local j=0 a
+		# `--config-env` takes the next word as `-c` does, and git accepts both spellings
+		# of it; read as a lone flag, its value was taken for the subcommand and every
+		# push behind it went unjudged. Either one naming `core.hooksPath` moves the
+		# hooks directory for this one command, which switches the pre-push rail off.
+		local j=0 a hooks_override=''
 		while [ "$j" -lt "${#args[@]}" ]; do
 			case ${args[$j]} in
-			-C | -c | --exec-path) j=$((j + 2)) ;;
+			-c | --config-env)
+				names_hooks_path_key "${args[$((j + 1))]:-}" && hooks_override="${args[$j]} ${args[$((j + 1))]}"
+				j=$((j + 2))
+				;;
+			--config-env=*)
+				names_hooks_path_key "${args[$j]#--config-env=}" && hooks_override=${args[$j]}
+				j=$((j + 1))
+				;;
+			# Git takes these options' values as the NEXT word too (git.c), and read as lone
+			# flags each value was taken for the subcommand: `git --git-dir /r push --force`
+			# went unjudged while `--git-dir=/r` was denied.
+			-C | --exec-path | --git-dir | --work-tree | --namespace | --super-prefix) j=$((j + 2)) ;;
 			-*) j=$((j + 1)) ;;
 			*) break ;;
 			esac
 		done
-		[ "$j" -lt "${#args[@]}" ] && [ "${args[$j]}" = push ] || return 0
-		local ref_count=0 implicit_ref=0 positional=0 delete_push=0 skip_option_arg=0
+		[ "$j" -lt "${#args[@]}" ] || return 0
+		case ${args[$j]} in
+		config)
+			if [ "$MACHINE_MODE" -eq 0 ] && git_config_sets_hooks_path "${args[@]:$((j + 1))}"; then
+				BLOCK_REASON="Setting \`core.hooksPath\` moves git's hooks directory away from the one holding the AMH pre-push rail, which switches that rail off for every later push, by any agent or none (AMH P13). Moving where a repository's hooks live is an owner decision: ask via the Owner queue. Reading the setting (\`git config --get core.hooksPath\`) and unsetting it are allowed."
+				return 1
+			fi
+			return 0
+			;;
+		# `git credential fill` asks every configured helper for the username and password
+		# of the host on its input and PRINTS them, by design. A helper called directly
+		# (`git credential-store get`, `credential-cache`, `credential-manager`) answers
+		# the same question the same way. `approve`, `reject`, `store` and `erase` print
+		# nothing and pass.
+		credential | credential-?*)
+			local verb='fill' action='' skip=0
+			case ${args[$j]} in credential-?*) verb='get' ;; esac
+			# The action is the first operand. The value of a store or cache helper's own
+			# option is not one: in `credential-store --file get store`, `get` is the file.
+			for a in "${args[@]:$((j + 1))}"; do
+				if [ "$skip" -eq 1 ]; then skip=0; continue; fi
+				case $a in
+				--file | --socket | --timeout) skip=1 ;;
+				-*) ;;
+				*) action=$a; break ;;
+				esac
+			done
+			if [ "$action" = "$verb" ]; then
+				BLOCK_REASON="\`git ${args[$j]} $verb\` prints the username and password git's credential helper holds for that host (AMH P17). To see whether git can authenticate, run the command that needs it (\`git ls-remote origin\`); to see which helper is configured, \`git config --get-all credential.helper\`. Never a value, prefix, suffix, length or hash."
+				return 1
+			fi
+			return 0
+			;;
+		push) [ "$MACHINE_MODE" -eq 0 ] || return 0 ;;
+		*) return 0 ;;
+		esac
+		if [ -n "$hooks_override" ]; then
+			BLOCK_REASON="\`git $hooks_override\` points this push at another hooks directory, which switches off the git-native pre-push rail for it (AMH P13). If that rail refused the push, the refusal is the answer: read what it objected to and fix the push. Retrying a refused operation with its check switched off is the respelling AMH forbids (AMH ledger row DD038). If the hook itself is broken, report that to the owner."
+			return 1
+		fi
+		local ref_count=0 implicit_ref=0 positional=0 delete_push=0 skip_option_arg=0 cluster
+		local operands_only=0
 		for a in "${args[@]:$((j + 1))}"; do
 			if [ "$skip_option_arg" -eq 1 ]; then skip_option_arg=0; continue; fi
+			# Every word after `--` or `--end-of-options` is an operand to git, however it
+			# is spelled: `git push -- origin <branch> -o main` pushes a ref named `-o` and
+			# `main`, and so does `--repo main` there (git 2.43). Read as options, the `-o`
+			# swallowed `main` and the push passed; so after the terminator nothing below
+			# reads an option, and each word goes straight to the refspec arms.
+			if [ "$operands_only" -eq 0 ]; then
 			case $a in
-			--force | -f | --force-with-lease | --force-with-lease=* | --force-if-includes)
+			-- | --end-of-options) operands_only=1; continue ;;
+			esac
+			# A cluster of short flags is read letter by letter, left to right, as git
+			# reads it: `-uf` is `-u -f` and `-qd` is `-q -d`, and both used to fall
+			# through to the `-*` arm unread. `-o` is the one short flag that takes a
+			# value — the rest of the cluster, or the next word when it ends the cluster
+			# — so `-of` is a push option named `f`, never a force. A force found here
+			# is handed to the force arm below by rewriting the word to `-f`.
+			case $a in
+			-[!-]?*)
+				cluster=${a#-}
+				while [ -n "$cluster" ]; do
+					case $cluster in
+					o) skip_option_arg=1; break ;;
+					o*) break ;;
+					f*) a=-f; break ;;
+					d*) delete_push=1 ;;
+					esac
+					cluster=${cluster#?}
+				done
+				;;
+			esac
+			# A long option shortened to a unique prefix IS that option to git's
+			# parse-options: `--del` deletes, `--force-w` and `--force-if` force, `--no-veri`
+			# skips the pre-push rail, and `--mir`, `--al` and `--b` push refs nobody named
+			# (measured on git 2.43). Each passed this rail while it matched whole words. A
+			# long option is matched by prefix against every name the arms below deny and
+			# rewritten to that name, as an `f` in a cluster is rewritten to `-f`. A prefix
+			# git calls ambiguous (`--d`, `--forc`, `--a`) is denied with it, at no cost:
+			# git refuses it too. No harmless push option's name, or its `--no-` form, is a
+			# prefix of a denied one, so no harmless option is read as a denied one:
+			# `--no-force-with-lease` and `--atomic` stay allowed. A denied option that a
+			# later `--no-` form cancels (`--del --no-delete`) is still denied, as its full
+			# spelling always was: the walk does not model negation.
+			# The five long options that take a value are read by prefix too, and their
+			# value skipped unless `=` glues it on. Unread, the value was taken for the
+			# remote and the remote for the one named ref, so `--push-opt x origin`,
+			# `--recurse-submodules check origin` and `--repo origin <branch>` passed as
+			# naming a branch while git pushed with the ref left implicit (git 2.43). Every
+			# prefix shared with another option (`--re`, `--p`) is one git calls ambiguous.
+			case $a in
+			--?*)
+				if is_long_opt "$a" force force-with-lease force-if-includes; then a=--force
+				elif is_long_opt "$a" delete; then a=--delete
+				elif is_long_opt "$a" no-verify; then a=--no-verify
+				elif is_long_opt "$a" mirror; then a=--mirror
+				elif is_long_opt "$a" all; then a=--all
+				elif is_long_opt "$a" branches; then a=--branches
+				elif is_long_opt "$a" push-option receive-pack exec repo recurse-submodules; then
+					case $a in *=*) ;; *) skip_option_arg=1 ;; esac
+					continue
+				fi
+				;;
+			esac
+			case $a in
+			--force | -f)
 				BLOCK_REASON="Force-push is denied (AMH P7): pushed checkpoints are immutable. If the branch diverged, merge the default branch in — never rewrite pushed history. A history rewrite is owner-executed and only for a leaked-credential incident."
 				return 1
 				;;
-			--mirror | --all)
+			# `--branches` is git's newer name for `--all`.
+			--mirror | --all | --branches)
 				BLOCK_REASON="\`git push $a\` pushes refs you did not name — including \`$DEFAULT_BRANCH\` (and, for \`--mirror\`, force-updating and deleting them). Both are denied (AMH P7, P13). Push one branch explicitly: \`git push -u origin $BRANCH_PREFIX/<codename>\`."
 				return 1
 				;;
+			# `--no-verify` is the documented off switch of the pre-push rail, and the
+			# standard way to retry a push that rail refused.
+			--no-verify)
+				BLOCK_REASON="\`git push --no-verify\` skips the git-native pre-push rail, the one check on this push that runs whatever drives the shell (AMH P13). If that rail refused the push, the refusal is the answer: read what it objected to and fix the push. Retrying a refused operation with its check switched off is the respelling AMH forbids (AMH ledger row DD038). If the hook itself is broken, report that to the owner. Drop \`--no-verify\`."
+				return 1
+				;;
+			--delete | -d) delete_push=1; continue ;;
+			-o) skip_option_arg=1; continue ;;
+			-*) continue ;;
+			esac
+			fi
+			case $a in
 			# A leading `+` on a refspec IS a force push — `git push origin +main` needs
 			# no flag to rewrite the default branch, and passed both rail layers.
 			+*)
@@ -1667,10 +3223,6 @@ check_segment() {
 				esac
 				return 1
 				;;
-			--delete | -d) delete_push=1 ;;
-			-o | --push-option | --receive-pack | --exec) skip_option_arg=1 ;;
-			--push-option=* | --receive-pack=* | --exec=*) ;;
-			-*) ;;
 			# Every spelling git resolves to the default branch, not just the two obvious
 			# ones. Git's DWIM for a bare name is `refs/<name>`, `refs/tags/<name>`,
 			# `refs/heads/<name>`, so `main`, `heads/main` and `refs/heads/main` are the
@@ -1728,6 +3280,51 @@ check_segment() {
 		fi
 		if [ "$ref_count" -gt 1 ]; then
 			BLOCK_REASON="This push names $ref_count refs. AMH publishes one branch per push (AMH P13), so the extra ref is one you did not mean to send. Push them one at a time: \`git push -u origin $BRANCH_PREFIX/<codename>\`."
+			return 1
+		fi
+		;;
+	gh)
+		# `gh auth token` prints the stored token by design, and `gh auth status` does when
+		# asked to (`-t`, `--show-token`). Plain `gh auth status` masks the token and is the
+		# check this guard recommends, so it passes. Cobra reads flags anywhere among the
+		# operands — `gh auth -h github.com token` is `gh auth token -h github.com` — so the
+		# walk skips every option, and the value of each one that takes a value, and reads
+		# the first two operands as the command group and the command. `-t` is read in a
+		# cluster of short flags too, where `-h`, `-u` and `-q` take the rest of the cluster
+		# as their value, or the next word when they end it. A `false` value turns either
+		# spelling off.
+		local a skip=0 cluster show=1 ops=()
+		for a in ${args[@]+"${args[@]}"}; do
+			if [ "$skip" -eq 1 ]; then skip=0; continue; fi
+			case $a in
+			--show-token=false | --show-token=0 | --show-token=f | --show-token=F | --show-token=FALSE | --show-token=False) ;;
+			--show-token | --show-token=*) show=0 ;;
+			--hostname | --user | --jq | --json | --template | --repo) skip=1 ;;
+			--*) ;;
+			-?*)
+				cluster=${a#-}
+				while [ -n "$cluster" ]; do
+					case $cluster in
+					t=false | t=0 | t=f | t=F | t=FALSE | t=False) break ;;
+					t=*) show=0; break ;;
+					t*) show=0 ;;
+					[huqR]) skip=1; break ;;
+					[huqR]*) break ;;
+					esac
+					cluster=${cluster#?}
+				done
+				;;
+			*) ops+=("$a") ;;
+			esac
+		done
+		[ "${ops[0]:-}" = auth ] || return 0
+		case ${ops[1]:-} in
+		token) show=0 ;;
+		status) ;;
+		*) return 0 ;;
+		esac
+		if [ "$show" -eq 0 ]; then
+			BLOCK_REASON="\`gh auth ${ops[1]}\` in this form prints the GitHub token gh stored (AMH P17). \`gh auth status\` without \`-t\`/\`--show-token\` says whether you are logged in, as whom and with which scopes, and masks the token. Never a value, prefix, suffix, length or hash."
 			return 1
 		fi
 		;;
@@ -1805,7 +3402,7 @@ check_segment() {
 					to_dir=0
 					skip=0
 					;;
-				--target-directory=*) to_dir=0 ;;
+				--target-directory=* | -t?*) to_dir=0 ;;
 				-*) ;;
 				*) ops+=("$a") ;;
 				esac
@@ -1833,12 +3430,18 @@ leading_command() {
 	words=(${SPLIT_WORDS[@]+"${SPLIT_WORDS[@]}"})
 	while [ "$i" -lt "${#words[@]}" ]; do
 		w=${words[$i]}
-		case $w in
-		*=*) i=$((i + 1)) ;;
-		sudo | nohup | nice | time | command | builtin | exec) i=$((i + 1)) ;;
+		case $w in *=*)
+			i=$((i + 1))
+			continue
+			;;
+		esac
+		command_word "$w"
+		case $COMMAND_WORD in
+		sudo | nohup | nice | time | command | builtin | exec | if | then | else | elif | while | until | do | '!') i=$((i + 1)) ;;
 		env)
-			# Mirror check_segment's transparent-prefix treatment for ordinary
-			# `env NAME=value cmd` forms. An `env` dump is not the advisory's subject.
+			# Mirrors check_segment for `env NAME=value cmd` only: any option stops this walk,
+			# where check_segment's `env_prefix_width` reads past it. An `env` dump is not the
+			# advisory's subject.
 			if [ $((i + 1)) -lt "${#words[@]}" ]; then
 				case ${words[$((i + 1))]} in -*) break ;; *) i=$((i + 1)) ;; esac
 			else
@@ -1849,7 +3452,8 @@ leading_command() {
 		esac
 	done
 	[ "$i" -lt "${#words[@]}" ] || return 1
-	printf '%s' "${words[$i]##*/}"
+	command_word "${words[$i]}"
+	printf '%s' "$COMMAND_WORD"
 }
 
 # Normalise ONE operand for the signature. `$d`, `${d}` and `${d:?}` name the same target,
@@ -1939,12 +3543,118 @@ NORMALIZED=''
 # is right there; `"$R"` with `R=/` is not, and no scanner reading command text before the
 # shell expands it ever will be. That case keeps the unexpanded-variable paragraph it already
 # had, which is the rail asking the agent to print the expansion.
-names_catastrophic_target() { # sets DESTRUCTIVE_CATASTROPHIC_CLASS
-	local w prev c
+#
+# A BRACE EXPANSION is read the way bash reads it, as the list of words it expands to, and the
+# operand is catastrophic when ANY of them is: `~/{.cache,.npm}` is two subdirectories of home
+# and keeps the advisory, while `~/{,.cache}` and `~/{*,.*}` name home itself and every entry in
+# it. Only a `{` holding a top-level comma expands — `{x}` is a literal to bash and stays one
+# here — and a `${...}` is a parameter, never a list. Quotes are gone by the time an operand
+# gets here, so a quoted brace is expanded too; that is the reading this function already gives a
+# quoted glob, and unlike bash, which expands no quoted brace. `cmd.exe` and PowerShell expand no
+# braces, so their callers pass 0 and the operand is read as one path. Two bounds keep the cost
+# bounded on hostile input: an operand longer than BRACE_LENGTH_CAP characters or holding more than
+# BRACE_COUNT_CAP braces is read as one path, unexpanded, and the expansion judges at most
+# BRACE_ALTERNATIVE_CAP words. A word it never
+# produced keeps the ordinary advisory: a permanent denial is never issued on words it did not read.
+BRACE_ALTERNATIVE_CAP=256
+BRACE_COUNT_CAP=64
+BRACE_LENGTH_CAP=1024
+names_catastrophic_target() { # names_catastrophic_target <operand> <expand-braces:0|1>; sets DESTRUCTIVE_CATASTROPHIC_CLASS
 	# An empty operand names nothing, and answering "the filesystem root" for it would be a
 	# verdict invented from a caller's promise rather than read from an argument. The callers
 	# drop empty operands today; a function that is right only while that stays true is the
 	# shape this file keeps finding bugs in.
+	[ -n "$1" ] || return 1
+	local opens=${1//[!\{]/}
+	if [ "${2:-1}" -eq 0 ] || [ "${#opens}" -gt "$BRACE_COUNT_CAP" ] || [ "${#1}" -gt "$BRACE_LENGTH_CAP" ]; then
+		names_catastrophic_path "$1" "${2:-1}"
+		return
+	fi
+	local queue=("$1") w alt seen=1
+	while [ "${#queue[@]}" -gt 0 ]; do
+		w=${queue[0]}
+		queue=("${queue[@]:1}")
+		if brace_alternatives "$w"; then
+			for alt in "${BRACE_ALTS[@]}"; do
+				[ "$seen" -lt "$BRACE_ALTERNATIVE_CAP" ] || break
+				queue+=("$BRACE_PRE$alt$BRACE_POST")
+				seen=$((seen + 1))
+			done
+			continue
+		fi
+		names_catastrophic_path "$w" 1 && return 0
+	done
+	return 1
+}
+
+# The first brace expansion in $1, as bash finds it: a `{` that is not a parameter's, closed at
+# its own depth, with at least one comma at that depth. Sets BRACE_PRE, BRACE_ALTS and
+# BRACE_POST and returns 0; returns 1 when $1 holds none. A backslash keeps the next character
+# literal, as it does to bash. An alternative may itself hold braces; the caller expands again.
+brace_alternatives() { # sets BRACE_PRE BRACE_ALTS BRACE_POST
+	local w=$1
+	local n=${#w} i=0 j c depth from commas
+	BRACE_ALTS=()
+	while [ "$i" -lt "$n" ]; do
+		c=${w:i:1}
+		case $c in
+		\\) i=$((i + 2)); continue ;;
+		'$')
+			if [ "${w:i+1:1}" = '{' ]; then
+				# Skip the parameter, nested ones included.
+				depth=1 j=$((i + 2))
+				while [ "$j" -lt "$n" ] && [ "$depth" -gt 0 ]; do
+					case ${w:j:1} in
+					'{') depth=$((depth + 1)) ;;
+					'}') depth=$((depth - 1)) ;;
+					esac
+					j=$((j + 1))
+				done
+				i=$j
+				continue
+			fi
+			;;
+		'{')
+			depth=1 j=$((i + 1)) from=$((i + 1)) commas=0
+			BRACE_ALTS=()
+			while [ "$j" -lt "$n" ]; do
+				case ${w:j:1} in
+				\\) j=$((j + 1)) ;;
+				'{') depth=$((depth + 1)) ;;
+				'}')
+					depth=$((depth - 1))
+					[ "$depth" -eq 0 ] && break
+					;;
+				,)
+					if [ "$depth" -eq 1 ]; then
+						BRACE_ALTS+=("${w:from:j-from}")
+						from=$((j + 1))
+						commas=$((commas + 1))
+					fi
+					;;
+				esac
+				j=$((j + 1))
+			done
+			if [ "$j" -lt "$n" ] && [ "$commas" -gt 0 ]; then
+				BRACE_ALTS+=("${w:from:j-from}")
+				BRACE_PRE=${w:0:i}
+				BRACE_POST=${w:j+1}
+				return 0
+			fi
+			BRACE_ALTS=()
+			;;
+		esac
+		i=$((i + 1))
+	done
+	return 1
+}
+BRACE_PRE='' BRACE_POST='' BRACE_ALTS=()
+
+# One operand with no brace expansion left in it — see `names_catastrophic_target`. The second
+# argument is 1 for a POSIX shell's operand, whose `[!.]` means "not a dot"; `cmd.exe` reads it as
+# text and PowerShell as a set holding `!` and `.`, so on those arms it is left alone.
+names_catastrophic_path() { # names_catastrophic_path <operand> <posix-globs:0|1>; sets DESTRUCTIVE_CATASTROPHIC_CLASS
+	local w prev c dots
 	[ -n "$1" ] || return 1
 	normalize_operand "$1"
 	w=$NORMALIZED
@@ -2020,12 +3730,25 @@ names_catastrophic_target() { # sets DESTRUCTIVE_CATASTROPHIC_CLASS
 			# and it is how git spells "everything" in a pathspec. It goes first because the
 			# run below would strip its `*` and leave a `?` that matches one-letter names only.
 			# A component of `?` alone matches only names that long, and is left alone.
+			#
+			# The same component behind one leading `.` is every HIDDEN entry, as `.*` is —
+			# `.?*` and `.??*` are the spellings that skip `..`, and `~/.ssh` and `~/.gnupg` are
+			# in all of them. Two bracket expressions are read as the `?` they equal for this
+			# purpose: `[!.]` and `[^.]`, any character but a dot, which is how `*` itself
+			# treats a leading one — `/[!.]*` is `/*`, and `~/.[!.]*` is `~/.?*`. Any other
+			# bracket narrows the names it matches (`[a-m]*`, `[!.a]*`), so it deletes PART of
+			# the directory and keeps the advisory (AMH ledger row DD044).
 			case $w in
 			*/*)
 				c=${w##*/}
-				case $c in
+				if [ "${2:-1}" -eq 1 ]; then
+					c=${c//'[!.]'/?}
+					c=${c//'[^.]'/?}
+				fi
+				dots=${c#.}
+				case $dots in
 				'' | *[!*?]*) ;;
-				*'*'*) w=${w%"$c"} ;;
+				*'*'*) w=${w%/*}/ ;;
 				esac
 				;;
 			esac
@@ -2306,9 +4029,49 @@ JOINED=''
 #
 # All three still set DESTRUCTIVE_UNEXPANDED, so they get the weaker "print the expansion"
 # text. The exclusion narrows which paragraph fires, never whether the advisory fires.
+# Fold `${NAME}` and `${NAME:?…}` to `$NAME` throughout <text>, under `normalize_operand`'s rule
+# for an operand: only when the character after the closing brace cannot continue a name, and
+# never the substituting forms (`${NAME:-…}`, `${NAME:+…}`). It steps from one `${` to the
+# next rather than one character at a time, because the text is a whole command line and can
+# carry a heredoc of many kilobytes. Sets FOLDED_TEXT.
+# shellcheck disable=SC2016 # the `${` patterns are literal command text, not expansions.
+fold_guarded_vars() { # fold_guarded_vars <text>
+	local left=$1 folded='' inner name rest after
+	while :; do
+		case $left in *'${'*) ;; *) break ;; esac
+		folded=$folded${left%%'${'*}
+		left=${left#*'${'}
+		case $left in
+		*'}'*) ;;
+		*)
+			folded=$folded'${'
+			continue
+			;;
+		esac
+		inner=${left%%\}*}
+		after=${left#*\}}
+		name=${inner%%[!A-Za-z0-9_]*}
+		rest=${inner#"$name"}
+		case ${after:0:1} in
+		[A-Za-z0-9_]) folded=$folded\$\{$inner\} ;;
+		*)
+			if [ -n "$name" ] && { [ -z "$rest" ] || [ "${rest#':?'}" != "$rest" ]; }; then
+				folded=$folded\$$name
+			else
+				folded=$folded\$\{$inner\}
+			fi
+			;;
+		esac
+		left=$after
+	done
+	FOLDED_TEXT=$folded$left
+}
+
 record_destructive_targets() { # record_destructive_targets <kind> <operand>...
-	local kind=$1 w bare name entry
+	local kind=$1 w bare name entry braces=1
 	shift
+	# `cmd.exe` and PowerShell expand no braces, so their operands are read as written.
+	case $kind in cmd-* | ps-*) braces=0 ;; esac
 	# Whether this verb's operands are filesystem PATHS or git REVISIONS decides whether the
 	# rootish paragraph is allowed to fire, and it is a correctness question rather than a
 	# stylistic one. That paragraph asserts a specific mechanism — "if that variable is empty
@@ -2381,7 +4144,16 @@ record_destructive_targets() { # record_destructive_targets <kind> <operand>...
 	# because git itself does: `-C` moves the directory a relative pathspec is read from, a
 	# `--work-tree` bounds what a clean with nothing narrower can reach, and a `--git-dir`
 	# names repository metadata that none of these verbs deletes.
-	local places=${DESTRUCTIVE_PLACE_KINDS:-} place='' tree='' pathspecs=0 whole=0
+	#
+	# Only a git verb reads them. The marks are a global the `git` arm sets per bash segment, and
+	# PowerShell's `Remove-Item` and `cmd /c` arms reach this function without passing through
+	# that arm's reset, so in one PowerShell command a `git -C` or `--git-dir` statement — any
+	# verb, `status` included — left its letters for the deletion judged after it. That deletion
+	# then read its first operand as git's directory, never as the target, and
+	# `git -C build clean -fdx; Remove-Item -Recurse -Force C:\` got the one-time advisory instead
+	# of the permanent denial (AMH ledger row DD064).
+	local places='' place='' tree='' pathspecs=0 whole=0
+	case $kind in git-*) places=${DESTRUCTIVE_PLACE_KINDS:-} ;; esac
 	for w in "$@"; do
 		case $w in *'$'*) DESTRUCTIVE_UNEXPANDED=1 ;; esac
 		if [ -n "$places" ]; then
@@ -2410,14 +4182,14 @@ record_destructive_targets() { # record_destructive_targets <kind> <operand>...
 				# Judged where it lands: `-- build` under `-C "$HOME"` is `$HOME/build`, and
 				# `-- .` under the same `-C` is the home directory itself.
 				git_place_join "$place" "$w"
-				names_catastrophic_target "$JOINED" && DESTRUCTIVE_CATASTROPHIC=1
+				names_catastrophic_target "$JOINED" "$braces" && DESTRUCTIVE_CATASTROPHIC=1
 				# Run from outside a `--work-tree`, git reads a pathspec from the TOP of that
 				# tree, and where the command stands is invisible here — so the pathspec is
 				# judged on the tree as well: `--work-tree="$HOME" clean -fd -- .` empties home.
 				if [ -n "$tree" ]; then
 					git_place_join "$place" "$tree"
 					git_place_join "$JOINED" "$w"
-					names_catastrophic_target "$JOINED" && DESTRUCTIVE_CATASTROPHIC=1
+					names_catastrophic_target "$JOINED" "$braces" && DESTRUCTIVE_CATASTROPHIC=1
 				fi
 			fi
 		fi
@@ -2446,10 +4218,10 @@ record_destructive_targets() { # record_destructive_targets <kind> <operand>...
 	# pathspec as "here"; the other deleting git verbs refuse to run without one.
 	if [ "$deletes_here" -eq 1 ] && [ "$revision_operands" -eq 1 ] &&
 		{ [ "$whole" -eq 1 ] || { [ "$kind" = git-clean ] && [ "$pathspecs" -eq 0 ]; }; }; then
-		[ -n "$place" ] && names_catastrophic_target "$place" && DESTRUCTIVE_CATASTROPHIC=1
+		[ -n "$place" ] && names_catastrophic_target "$place" "$braces" && DESTRUCTIVE_CATASTROPHIC=1
 		if [ -n "$tree" ]; then
 			git_place_join "$place" "$tree"
-			names_catastrophic_target "$JOINED" && DESTRUCTIVE_CATASTROPHIC=1
+			names_catastrophic_target "$JOINED" "$braces" && DESTRUCTIVE_CATASTROPHIC=1
 		fi
 	fi
 	# One entry per destructive SEGMENT, and the entry names the command kind as well as
@@ -2469,6 +4241,33 @@ record_destructive_targets() { # record_destructive_targets <kind> <operand>...
 			norm+=("$NORMALIZED")
 		done
 		entry="$kind $(printf '%q\n' "${norm[@]}" | LC_ALL=C sort | tr '\n' ' ')"
+	fi
+	# Behind `xargs` the operands above are not the target set: the targets are whatever its
+	# input produces at run time, so an entry keyed on them alone would be one signature for
+	# every `… | xargs rm -rf` in the session, and the first rerun would clear them all — the
+	# category one-shot this rail's rearm rule exists to refuse (AMH ledger row DB030). The
+	# input's producer is in the COMMAND TEXT, so the entry is keyed on that too, rearming per
+	# command text as the interpreter tier does, and by a digest for that tier's reason: a
+	# command line can carry a literal credential, and the state file is world-readable. The
+	# text digested is the command as the host handed it over, before either comment reading,
+	# and the entry carries the kind and NOT the operands, which the digest already covers: the
+	# two readings can hand this function different operands for one command, and keying on
+	# them made such a command prompt twice. The text is digested with `${VAR:?}` and `${VAR}`
+	# folded to `$VAR`, as `normalize_operand` folds an operand, because the advisory promises
+	# that the guarded rewrite it asks for is the rerun and not a second prompt (AMH ledger row
+	# DC004). No digest tool means no key, and this advisory then re-fires on every attempt
+	# (`DESTRUCTIVE_UNKEYABLE`): loud, the direction an advisory may fail, and what the
+	# interpreter and hook-file tiers do too (`ADVISORY_UNKEYABLE`).
+	if [ "${DESTRUCTIVE_VIA_XARGS:-0}" -eq 1 ]; then
+		DESTRUCTIVE_XARGS=1
+		local digest
+		fold_guarded_vars "${DESTRUCTIVE_COMMAND_TEXT:-}"
+		if digest=$(interpreter_signature "$FOLDED_TEXT") && [ -n "$digest" ]; then
+			entry="xargs:$digest $kind"
+		else
+			DESTRUCTIVE_UNKEYABLE=1
+			entry="xargs:no-digest $kind"
+		fi
 	fi
 	DESTRUCTIVE_TARGETS+=("$entry")
 }
@@ -2502,9 +4301,13 @@ record_destructive_targets() { # record_destructive_targets <kind> <operand>...
 # test and cannot tell a path operand from a revision one, so `git worktree add wt "$REF"`
 # arms on a commit-ish whose destination is literal and safe. Separating them needs a git
 # query, which no rail here may make.
+#
+# A THIRD way, which needs no operand at all: behind `xargs` the operands written here are only
+# the first ones, and the rest arrive from its input at run time (AMH ledger row DD062).
 operands_unknown_target() { # operands_unknown_target <whole-tree-when-empty> <operand>...
 	local empty_is_whole_tree=$1
 	shift
+	[ "${DESTRUCTIVE_VIA_XARGS:-0}" -eq 1 ] && return 0
 	[ "$#" -eq 0 ] && return "$empty_is_whole_tree"
 	local w
 	for w in "$@"; do
@@ -3425,11 +5228,19 @@ ps_destructive_scan() { # ps_destructive_scan <text>; does NOT reset state
 			lead=${ws[0]##*\\}
 			ps_lower "$lead"
 			case $PS_LOWER in
+			# These two arms judge a statement without passing through `is_destructive_segment`,
+			# which is where the per-segment flags are reset, so the flag saying a package runner
+			# resolved a SCRIPT NAME is reset here: an earlier `npm run build;` statement left it
+			# set, and the deletion after it was told it had matched a package script (AMH ledger
+			# row DD064). The git arm's directory marks are scoped by kind in
+			# `record_destructive_targets` instead.
 			remove-item | rm | rmdir | rd | del | erase | ri)
 				PS_UPSTREAM=$upstream
+				DESTRUCTIVE_FROM_SCRIPT_NAME=0
 				ps_remove_item "${ws[@]:1}" && found=0
 				;;
 			cmd | cmd.exe)
+				DESTRUCTIVE_FROM_SCRIPT_NAME=0
 				cmd_wrapper_deletion "$raw" "${ws[@]:1}" && found=0
 				;;
 			*)
@@ -3574,12 +5385,159 @@ powershell_wrapper_deletion() { # powershell_wrapper_deletion <raw segment>
 
 is_ps_destructive_command() {
 	reset_destructive_state
+	DESTRUCTIVE_COMMAND_TEXT=$1
 	ps_destructive_scan "$1"
+}
+
+# The pre-push rail is a FILE, `.git/hooks/pre-push`, and three ordinary commands switch it off
+# without touching git's own options: remove it, move it aside, take its execute bit. That is
+# the hook-tamper class an agent has been reported doing to the hook that guarded it, and
+# deleting a check to get past it is the respelling AMH forbids (AMH ledger row DD051).
+# True when <path> names the hook or a directory holding it: `.git/hooks` itself, or an entry
+# under it that `pre-push` would match as a glob — `pre-push`, `*`, `pre-*`. Case is folded,
+# because the filesystems of two of the three platforms this file supports fold it, and `//` and
+# `/./` are folded as the kernel folds them. A path reaching the hook any other way — a `..`
+# component, `hooks/pre-push` from inside `.git`, a `core.hooksPath` directory,
+# `$(git rev-parse --git-path hooks)` — is not read here; the header says so.
+names_prepush_hook_path() { # names_prepush_hook_path <path>
+	local w rest next
+	cmd_lower "$1"
+	w=$CMD_LOWER
+	# A slash in the pattern is written `\/`, never inside quotes. With `${w//"//"/"/"}` here, the
+	# self-test never returned on stock macOS Bash 3.2 in CI, most likely because 3.2 looks for
+	# the `/` that ends the pattern without honouring quotes; `\/` is the spelling this file's
+	# other folds already ran with there (AMH ledger row DD061). A fold that changes nothing is a
+	# path this function could not read, so it answers yes: the host gets the advisory rather than
+	# a spinning guard, and a silent fixture with `//` and `/./` in it fails.
+	while :; do
+		case $w in
+		*//*) next=${w//\/\//\/} ;;
+		*/./*) next=${w//\/.\//\/} ;;
+		*) break ;;
+		esac
+		[ "$next" != "$w" ] || return 0
+		w=$next
+	done
+	case $w in
+	.git/hooks* | */.git/hooks*) rest=${w#*.git/hooks} ;;
+	*) return 1 ;;
+	esac
+	while :; do case $rest in */) rest=${rest%/} ;; */.) rest=${rest%/.} ;; *) break ;; esac; done
+	[ -z "$rest" ] && return 0
+	case $rest in /*) ;; *) return 1 ;; esac
+	rest=${rest#/}
+	# shellcheck disable=SC2053 # the operand is matched AS a glob on purpose: `rm .git/hooks/*`
+	# removes the hook just as surely as naming it.
+	[[ pre-push == $rest ]]
+}
+
+# A bash operand: each word a brace expansion makes of it, within the caps
+# `names_catastrophic_target` uses, so `.git/hooks/{pre-push,pre-commit}` names the hook.
+names_prepush_hook_file() { # names_prepush_hook_file <word>
+	local opens=${1//[!\{]/}
+	if [ "${#opens}" -gt "$BRACE_COUNT_CAP" ] || [ "${#1}" -gt "$BRACE_LENGTH_CAP" ]; then
+		names_prepush_hook_path "$1"
+		return
+	fi
+	local queue=("$1") w alt seen=1
+	while [ "${#queue[@]}" -gt 0 ]; do
+		w=${queue[0]}
+		queue=("${queue[@]:1}")
+		if brace_alternatives "$w"; then
+			for alt in "${BRACE_ALTS[@]}"; do
+				[ "$seen" -lt "$BRACE_ALTERNATIVE_CAP" ] || break
+				queue+=("$BRACE_PRE$alt$BRACE_POST")
+				seen=$((seen + 1))
+			done
+			continue
+		fi
+		names_prepush_hook_path "$w" && return 0
+	done
+	return 1
+}
+
+# The bash walk: in any segment whose leading command is `rm`, `mv` or `chmod`, every operand
+# that names the hook. `mv x .git/hooks/pre-push` replaces the hook as surely as
+# `mv .git/hooks/pre-push x` removes it, and `mv`'s target directory, glued to `-t` or to
+# `--target-directory=`, is an operand too. Options are not: `chmod --reference=<hook> f` only
+# READS the hook's mode. Every word after `--` is an operand.
+is_hook_file_command() {
+	local cmd=$1 seg lead w i start skip end_of_options
+	local words=()
+	cmd=$(strip_heredocs "$cmd")
+	split_segments "$cmd"
+	for seg in ${SEGMENTS[@]+"${SEGMENTS[@]}"}; do
+		[ -n "${seg// /}" ] || continue
+		lead=$(leading_command "$seg") || continue
+		case $lead in rm | mv | chmod) ;; *) continue ;; esac
+		split_words "$seg"
+		words=(${SPLIT_WORDS[@]+"${SPLIT_WORDS[@]}"})
+		# The leading command's own word: the first one that names it, past the prefixes
+		# `leading_command` skipped.
+		start=${#words[@]}
+		for i in "${!words[@]}"; do
+			command_word "${words[$i]}"
+			[ "$COMMAND_WORD" = "$lead" ] && { start=$((i + 1)); break; }
+		done
+		skip=0 end_of_options=0
+		for w in "${words[@]:start}"; do
+			if [ "$skip" -eq 1 ]; then
+				skip=0
+				continue
+			fi
+			if [ "$end_of_options" -eq 0 ]; then
+				case $lead:$w in
+				*:--) end_of_options=1; continue ;;
+				mv:--target-directory=* | mv:--t*=*) w=${w#*=} ;;
+				mv:-[!-]*t?*) w=${w#*t} ;;
+				# `--ref` is the shortest prefix GNU reads as `--reference`; `--re` is ambiguous
+				# with `--recursive`.
+				chmod:--ref*=*) continue ;;
+				chmod:--ref | chmod:--refe*) skip=1; continue ;;
+				*:-*) continue ;;
+				esac
+			fi
+			names_prepush_hook_file "$w" && return 0
+		done
+	done
+	return 1
+}
+
+# The PowerShell walk: the deletion and move cmdlets and their aliases, with `\` read as the
+# path separator it is there. `chmod` is no cmdlet, but Git for Windows puts one on PATH.
+is_ps_hook_file_command() {
+	local cmd=$1 k c w p
+	local stmts=() parts=()
+	ps_split_statements "$cmd"
+	stmts=(${PS_STATEMENT_WORDS[@]+"${PS_STATEMENT_WORDS[@]}"})
+	for k in ${stmts[@]+"${!stmts[@]}"}; do
+		ps_commands "${stmts[$k]}"
+		for c in ${PS_COMMANDS[@]+"${PS_COMMANDS[@]}"}; do
+			ps_words "$c"
+			case ${#PS_WORDS[0]} in ?? | ? | 1?? | 2[0-4]? | 25[0-5]) ;; *) continue ;; esac
+			ps_lower "${PS_WORDS[0]##*\\}"
+			# Git for Windows' own `rm.exe`, `mv.exe` and `chmod.exe` are on PATH beside the cmdlets.
+			case ${PS_LOWER%.exe} in
+			remove-item | rm | rmdir | rd | del | erase | ri | move-item | mv | move | mi | rename-item | ren | rni | chmod) ;;
+			*) continue ;;
+			esac
+			for w in "${PS_WORDS[@]:1}"; do
+				# `-Path:.git\hooks\pre-push` glues the value to its parameter, and `-Path a,b`
+				# is a list. Braces are no expansion here, so the path is read as it stands.
+				case $w in -*:*) w=${w#*:} ;; esac
+				IFS=, read -r -a parts <<<"$w" || :
+				for p in ${parts[@]+"${parts[@]}"}; do
+					names_prepush_hook_path "${p//\\//}" && return 0
+				done
+			done
+		done
+	done
+	return 1
 }
 
 # The PowerShell entry point. What it judges, in order: the `.env` and key-material advisories,
 # which read command TEXT and so read PowerShell text as well as bash; the destructive tier
-# through `ps_destructive_scan`; then each statement that is not a deletion, re-quoted, through
+# through `ps_destructive_scan`; the hook-file advisory through `is_ps_hook_file_command`; then each statement that is not a deletion, re-quoted, through
 # the interpreter advisory and the bash segment rails — the push rails above all, since
 # `git push --force origin main` is the same command in either shell.
 check_powershell_command() {
@@ -3603,6 +5561,7 @@ check_powershell_command() {
 	# self-test runs every fixture in one process.
 	GUARD_SHELL=powershell
 	needs_one_time_advisory destructive "$cmd" && rc=1
+	[ "$rc" -eq 1 ] || { needs_one_time_advisory hookfile "$cmd" && rc=1; }
 	GUARD_SHELL=bash
 	if [ "$rc" -eq 1 ]; then
 		BLOCK_REASON=$ADVISORY_REASON
@@ -3634,6 +5593,40 @@ check_powershell_command() {
 }
 GUARD_SHELL=bash
 
+# True when <cluster> — a short-option word after `xargs`, its leading `-` removed — ends in an
+# option whose value is the NEXT word. Every letter before the first value-taking one is a flag;
+# that one takes the rest of the cluster as its value, or the next word when nothing follows.
+# GNU's `-e`, `-i` and `-l` take an attached value only, so they never take the next word.
+xargs_short_takes_next() { # xargs_short_takes_next <cluster>
+	local opts=$1 c
+	while [ -n "$opts" ]; do
+		c=${opts:0:1}
+		opts=${opts:1}
+		case $c in
+		[adEIJLnPRSs])
+			[ -z "$opts" ]
+			return
+			;;
+		[eil]) return 1 ;;
+		esac
+	done
+	return 1
+}
+
+# True when <word> is a GNU `xargs` long option, read by unique prefix as getopt reads it, whose
+# value may be the next word. Each pair is the full name and its shortest unique prefix; an
+# ambiguous prefix such as `--max-` is refused by xargs, which then runs nothing.
+xargs_long_takes_value() { # xargs_long_takes_value <word>
+	local w=$1 pair full min
+	for pair in --arg-file:--a --delimiter:--d --max-args:--max-a --max-procs:--max-p \
+		--max-chars:--max-c --process-slot-var:--p; do
+		full=${pair%%:*}
+		min=${pair#*:}
+		case $w in "$min"*) case $full in "$w"*) return 0 ;; esac ;; esac
+	done
+	return 1
+}
+
 is_destructive_segment() {
 	local raw=$1 w cmd recursive=1 force=1 descend=1 i=0
 	local sub kind='' hard=1 staged=1 worktree_target=1
@@ -3645,14 +5638,75 @@ is_destructive_segment() {
 	DESTRUCTIVE_FROM_SCRIPT_NAME=0
 	# Per segment for the same reason: its letters describe THIS segment's leading operands.
 	DESTRUCTIVE_PLACE_KINDS=''
-	split_words "$raw"
+	# Whether THIS segment's command runs behind `xargs` (see the arm below). A `local`, not a
+	# global reset: bash scopes it dynamically, so the functions this segment calls read it,
+	# a nested scan (a `pwsh -c` statement's own segment) gets its own and cannot clear this
+	# one, and nothing outside a segment — the next PowerShell statement, judged by arms that
+	# never enter here — inherits it.
+	local DESTRUCTIVE_VIA_XARGS=0
+	# Judge the words bash would pass, not the redirections around them, as `check_segment`
+	# does: a redirection before the command word (`< list.txt rm -rf ~`), or between `xargs`
+	# and its command, used to hide the deletion from this rail, its permanent denials
+	# included (AMH ledger row DD067). The wrapper arms below still read `raw`, because each
+	# parses its own inner text.
+	strip_redirections "$raw"
+	split_words "$STRIPPED"
 	words=(${SPLIT_WORDS[@]+"${SPLIT_WORDS[@]}"})
 	# Find the same leading command that leading_command reports, without treating
-	# later quoted prose or operands as commands.
+	# later quoted prose or operands as commands — and, for this rail alone, read through
+	# `xargs`, which leading_command does not.
 	while [ "$i" -lt "${#words[@]}" ]; do
 		w=${words[$i]}
-		case $w in
-		*=* | sudo | nohup | nice | time | command | builtin | exec) i=$((i + 1)) ;;
+		case $w in *=*)
+			i=$((i + 1))
+			continue
+			;;
+		esac
+		command_word "$w"
+		case $COMMAND_WORD in
+		sudo | nohup | nice | time | command | builtin | exec | if | then | else | elif | while | until | do | '!') i=$((i + 1)) ;;
+		xargs | gxargs)
+			# `xargs` runs the command after its options with operands it reads from its input
+			# at run time, so the deletion behind it is a deletion whose targets this guard
+			# never sees. It was a named wrapper miss, filed as evasion, until a reported
+			# incident showed it as an honest mistake: an agent piped paths under
+			# `~/Library/Application Support` through `xargs -n1 dirname` into `xargs rm -rf`,
+			# xargs split each path at the space, `dirname` of the first half was `~/Library`,
+			# and that was what got deleted (AMH ledger row DD062). So this rail now reads
+			# through it, and only this rail: the secret and push rails still stop at `xargs`,
+			# because nothing here has measured what widening them would cost.
+			#
+			# Options are skipped with the union of the GNU and BSD grammars, both of which
+			# take an option's value attached or as the next word. Value-taking short
+			# options: GNU `-a -d -E -I -L -n -P -s`, BSD `-E -I -J -L -n -P -R -S -s`; GNU's
+			# `-e -i -l` take a value only when it is attached. No letter is a flag in one
+			# grammar and value-taking in the other. A GNU long option is read by unique
+			# prefix, and those whose value may be the next word are `--arg-file`,
+			# `--delimiter`, `--max-args`, `--max-procs`, `--max-chars` and
+			# `--process-slot-var`. An option outside these lists is read as a flag, so its
+			# value would be judged as the command — the usual failure direction of every list
+			# here. `gxargs` is GNU xargs as Homebrew installs it on macOS, the reported
+			# incident's platform.
+			DESTRUCTIVE_VIA_XARGS=1
+			i=$((i + 1))
+			while [ "$i" -lt "${#words[@]}" ]; do
+				w=${words[$i]}
+				case $w in
+				--)
+					i=$((i + 1))
+					break
+					;;
+				--*=*) i=$((i + 1)) ;;
+				--*)
+					if xargs_long_takes_value "$w"; then i=$((i + 2)); else i=$((i + 1)); fi
+					;;
+				-?*)
+					if xargs_short_takes_next "${w#-}"; then i=$((i + 2)); else i=$((i + 1)); fi
+					;;
+				*) break ;;
+				esac
+			done
+			;;
 		env)
 			if [ $((i + 1)) -lt "${#words[@]}" ]; then
 				case ${words[$((i + 1))]} in -*) break ;; *) i=$((i + 1)) ;; esac
@@ -3663,7 +5717,8 @@ is_destructive_segment() {
 		esac
 	done
 	[ "$i" -lt "${#words[@]}" ] || return 1
-	cmd=${words[$i]##*/}
+	command_word "${words[$i]}"
+	cmd=$COMMAND_WORD
 	i=$((i + 1))
 	# Package runners are how the data-plane tools below are ACTUALLY invoked — nobody types
 	# a bare `prisma`. This strip is deliberately NOT part of the transparent-prefix loop
@@ -3701,7 +5756,8 @@ is_destructive_segment() {
 			esac
 		done
 		[ "$i" -lt "${#words[@]}" ] || return 1
-		cmd=${words[$i]##*/}
+		command_word "${words[$i]}"
+		cmd=$COMMAND_WORD
 		i=$((i + 1))
 		;;
 	npm | pnpm | yarn | bun)
@@ -3738,7 +5794,8 @@ is_destructive_segment() {
 			[ "$i" -lt "${#words[@]}" ] || return 1
 			;;
 		esac
-		cmd=${words[$i]##*/}
+		command_word "${words[$i]}"
+		cmd=$COMMAND_WORD
 		i=$((i + 1))
 		;;
 	esac
@@ -4181,8 +6238,10 @@ is_destructive_segment() {
 		#
 		# `push:pg`, `push:mysql` and `push:sqlite` are the older per-dialect spellings of the
 		# same command. `generate`, `migrate`, `check`, `up` and `studio` are the everyday ones
-		# and are not advised; `drop` is deliberately absent, because no public report shows it
-		# destroying stored data and this tier's list is earned by reports (AMH ledger row DC027).
+		# and are not advised. `drop` is absent: it was kept out while this tier's list was
+		# earned by public reports and none showed it destroying stored data (AMH ledger row
+		# DC027), and under the bar that replaced that one (AMH ledger row DD074) no change has
+		# yet shown what it destroys or measured what it would newly advise.
 		#
 		# The four spellings are ENUMERATED and the kind is built from a literal, never from the
 		# word. A `push:*` glob put command text into the kind, and the kind is the one part of a
@@ -4246,11 +6305,15 @@ reset_destructive_state() {
 	DESTRUCTIVE_CMD_QUOTING=0
 	DESTRUCTIVE_WORKTREE=0
 	DESTRUCTIVE_POWERSHELL=0
+	DESTRUCTIVE_XARGS=0
+	DESTRUCTIVE_UNKEYABLE=0
+	DESTRUCTIVE_COMMAND_TEXT=''
 }
 
 is_destructive_command() {
 	local cmd=$1 seg found=1
 	reset_destructive_state
+	DESTRUCTIVE_COMMAND_TEXT=$cmd
 	cmd=$(strip_heredocs "$cmd")
 	# Every destructive segment is scanned, not just the first. A command that deletes two
 	# path sets is two decisions, and the advisory should be able to name both — stopping
@@ -4319,7 +6382,52 @@ warn_ladder_tail() {
 	done
 }
 
+# Judges a command under both comment readings (see COMMENT_READING): refused if either refuses.
+# The second reading runs only where it can differ from the first — the text holds a `#`, and
+# the two readers it changes hand the rails different text — so a command with no comment in
+# view, a `#` inside a heredoc body included, costs one strip and one join more, not a second
+# run of every rail. A warning from either reading is kept. The one-time tiers run under both:
+# their state is append-only, so each advisory clears on its own rerun and none can loop; a
+# second reading that records a different signature costs one more.
 check_command() {
+	local cmd=$1 warn rc
+	COMMENT_READING=1
+	check_command_reading "$cmd" || return 1
+	case $cmd in *'#'*) ;; *) return 0 ;; esac
+	comment_readings_differ "$cmd" || return 0
+	warn=$WARN_REASON
+	COMMENT_READING=2
+	check_command_reading "$cmd"
+	rc=$?
+	COMMENT_READING=1
+	[ -n "$WARN_REASON" ] || WARN_REASON=$warn
+	return "$rc"
+}
+
+# Whether the two comment readings hand the rails different text. They differ in
+# `strip_heredocs` and `join_continuations` and nowhere else, and every rail reads the command
+# through those two, so equal output here means equal verdicts. Leaves the first reading set.
+comment_readings_differ() { # comment_readings_differ <command>
+	local first second
+	# In this shell, not a `$(…)`, so each reading's answer is kept for the rails after it.
+	COMMENT_READING=1
+	strip_heredocs_into "$1"
+	first=${HEREDOC_STRIPPED%"${HEREDOC_STRIPPED##*[!$'\n']}"}
+	COMMENT_READING=2
+	strip_heredocs_into "$1"
+	second=${HEREDOC_STRIPPED%"${HEREDOC_STRIPPED##*[!$'\n']}"}
+	if [ "$first" = "$second" ]; then
+		join_continuations "$second"
+		second=$JOINED_COMMAND
+		COMMENT_READING=1
+		join_continuations "$first"
+		first=$JOINED_COMMAND
+	fi
+	COMMENT_READING=1
+	[ "$first" != "$second" ]
+}
+
+check_command_reading() { # check_command_reading <command>, under the current COMMENT_READING
 	local cmd=$1
 	local seg
 	BLOCK_REASON=''
@@ -4327,6 +6435,15 @@ check_command() {
 	ADVISORY_REASON=''
 	DOTENV_ADVISORY_REASON=''
 	KEYMATERIAL_ADVISORY_REASON=''
+	# First, before any one-time advisory: every tier below reads the text strip_heredocs hands
+	# back, so a body that never closes has hidden the rest of the command from all of them, and
+	# an advisory cleared by a rerun would only lead to this refusal (AMH ledger row DD058).
+	if heredoc_left_open "$cmd"; then
+		local wanted=${HEREDOC_OPEN_DELIM:0:41}
+		wanted=${wanted/#$'\n'/(unreadable) }
+		BLOCK_REASON="The command guard could not find the end of a heredoc: the body opened for the delimiter \`$wanted\` runs to the end of the command, so no line after the one that opened it was checked, and nothing may be allowed on that basis. Bash would run it, with a warning; this guard will not. End the body with the delimiter alone on its own line — the whole line, with \`<<-\` stripping leading tabs only. If the delimiter shown is marked unreadable, or is not the one you wrote, this guard could not spell it: write it plainly, as \`<<'EOF'\` or \`<<EOF\`, with no escape inside \`\$'…'\` and no backtick or \`\$(\` inside the word. If you wrote no heredoc there, this guard read one in text bash does not — a \`<<\` inside a comment: move that text into a quoted heredoc's body or a file, or reword it. Re-running the same text will not help."
+		return 1
+	fi
 	if needs_one_time_advisory dotenv "$cmd"; then
 		BLOCK_REASON=$ADVISORY_REASON
 		return 1
@@ -4339,11 +6456,18 @@ check_command() {
 		BLOCK_REASON=$ADVISORY_REASON
 		return 1
 	fi
+	# After the destructive tier, so a permanent denial in the same command is the first verdict
+	# and never waits behind a one-time advisory.
+	if needs_one_time_advisory hookfile "$cmd"; then
+		BLOCK_REASON=$ADVISORY_REASON
+		return 1
+	fi
 	if needs_one_time_advisory interpreter "$cmd"; then
 		BLOCK_REASON=$ADVISORY_REASON
 		return 1
 	fi
-	warn_ladder_tail "$cmd"
+	# The ladder is AMH's, and machine mode judges projects that may have none.
+	[ "$MACHINE_MODE" -eq 1 ] || warn_ladder_tail "$cmd"
 	cmd=$(strip_heredocs "$cmd")
 	split_segments "$cmd"
 	# Same fail-closed rule as check_segment's, one level up: a non-blank command that
@@ -4374,8 +6498,17 @@ extract_command() { # fail-open: print nothing if the payload is not what we exp
 	# status decides: its program exits 0 on every payload it reads — declining a non-Bash or
 	# malformed one included — and only an interpreter that did not run exits otherwise, which
 	# sends the payload to the fallback instead (AMH ledger row DD030).
+	#
+	# `-I`, isolated mode, because the hook runs in the SESSION's current directory and `-c` puts
+	# that directory first on `sys.path`. A file named `json.py` there was imported in place of
+	# the standard module: an empty one made `json.load` raise inside the `try`, the parser
+	# printed nothing and exited 0, and every call was allowed unjudged, while one with code in
+	# it ran that code inside the hook. Machine mode carries this reader into every folder on
+	# the machine (AMH ledger row DD065). `-I` also ignores `PYTHON*` variables and the user
+	# site directory. A Python too old to know the flag exits non-zero, which is the fallback's
+	# route above, never a silent pass.
 	if command -v python3 >/dev/null 2>&1 &&
-		parsed=$(printf '%s' "$payload" | python3 -c 'import json,sys
+		parsed=$(printf '%s' "$payload" | python3 -I -c 'import json,sys
 try:
     d = json.load(sys.stdin)
     if d.get("tool_name") in ("Bash", "PowerShell"):
@@ -4493,7 +6626,7 @@ run_hook() {
 	[ "$tool" = PowerShell ] && checker=check_powershell_command
 	[ -n "$cmd" ] || exit 0
 	if ! "$checker" "$cmd"; then
-		printf 'BLOCKED by the AMH command guard.\n\n%s\n' "$BLOCK_REASON" >&2
+		printf '%s\n\n%s\n' "$BLOCK_HEADING" "$BLOCK_REASON" >&2
 		exit 2
 	fi
 	[ -n "$WARN_REASON" ] && printf 'WARNING from the AMH command guard.\n\n%s\n' "$WARN_REASON" >&2
@@ -4602,6 +6735,64 @@ st_allowed() {
 		ST_FAILS=$((ST_FAILS + 1))
 	fi
 }
+# st_machine <blocked|allowed> <bash|powershell> <command> [phrase a refusal must carry]
+# Judges <command> in machine mode and restores the project mode on every path out. A refusal must
+# carry the phrase, so a machine mode that blocked for the wrong reason — an advisory it should
+# never fire — fails a case it would otherwise pass; an allowed case must also carry no warning.
+st_machine() {
+	local want=$1 shell=$2 cmd=$3 phrase=${4:-} checker=check_command rc
+	[ "$shell" = powershell ] && checker=check_powershell_command
+	MACHINE_MODE=1
+	"$checker" "$cmd"
+	rc=$?
+	MACHINE_MODE=0
+	if [ "$want" = blocked ]; then
+		if [ "$rc" -eq 0 ]; then
+			printf 'SELF-TEST FAIL: machine mode should have BLOCKED (%s): %s\n' "$shell" "$cmd" >&2
+			ST_FAILS=$((ST_FAILS + 1))
+		elif [ -n "$phrase" ] && [ "${BLOCK_REASON#*"$phrase"}" = "$BLOCK_REASON" ]; then
+			printf 'SELF-TEST FAIL: machine mode blocked (%s) without naming %s: %s\n   reason given: %s\n' "$shell" "$phrase" "$cmd" "$BLOCK_REASON" >&2
+			ST_FAILS=$((ST_FAILS + 1))
+		fi
+	elif [ "$rc" -ne 0 ]; then
+		printf 'SELF-TEST FAIL: machine mode should have ALLOWED (%s): %s\n   reason given: %s\n' "$shell" "$cmd" "$BLOCK_REASON" >&2
+		ST_FAILS=$((ST_FAILS + 1))
+	elif [ -n "$WARN_REASON" ]; then
+		printf 'SELF-TEST FAIL: machine mode should have ALLOWED WITHOUT WARNING (%s): %s\n   warning given: %s\n' "$shell" "$cmd" "$WARN_REASON" >&2
+		ST_FAILS=$((ST_FAILS + 1))
+	fi
+}
+# Refused because a heredoc body never closes, and for that reason: a fixture that any other rail
+# could refuse would not show the body was ever judged unclosed.
+st_heredoc_open() { # st_heredoc_open <command>
+	if st_check "$1"; then
+		printf 'SELF-TEST FAIL: should have been BLOCKED as an unclosed heredoc: %s\n' "$1" >&2
+		ST_FAILS=$((ST_FAILS + 1))
+		return
+	fi
+	case $BLOCK_REASON in
+	*'could not find the end of a heredoc'*) ;;
+	*)
+		printf 'SELF-TEST FAIL: blocked, but not as an unclosed heredoc: %s\n   reason given: %s\n' "$1" "$BLOCK_REASON" >&2
+		ST_FAILS=$((ST_FAILS + 1))
+		;;
+	esac
+}
+# Refused, and NOT because a heredoc body never closes: the text after the body was judged. Where
+# the unclosed-body rule would refuse the same text, `st_blocked` cannot tell the two apart.
+st_body_judged() { # st_body_judged <command>
+	if st_check "$1"; then
+		printf 'SELF-TEST FAIL: should have been BLOCKED after its heredoc body: %s\n' "$1" >&2
+		ST_FAILS=$((ST_FAILS + 1))
+		return
+	fi
+	case $BLOCK_REASON in
+	*'could not find the end of a heredoc'*)
+		printf 'SELF-TEST FAIL: blocked as an unclosed heredoc, so the text after it went unjudged: %s\n' "$1" >&2
+		ST_FAILS=$((ST_FAILS + 1))
+		;;
+	esac
+}
 st_prepush_blocked() { # <local-ref> <local-sha> <remote-ref> <remote-sha>
 	if prepush_verdict "$1" "$2" "$3" "$4"; then
 		printf 'SELF-TEST FAIL: pre-push should have been BLOCKED: %s %s %s %s\n' "$1" "$2" "$3" "$4" >&2
@@ -4694,7 +6885,7 @@ st_interpreter_advisory_once() { # st_interpreter_advisory_once <cmd> [<call nam
 }
 
 # ONE state file across two different one-liners: the rail must rearm per command text, or the
-# first harmless match in a session silences every deletion after it (AMH ledger row DC004's
+# first harmless match in a session silences every deletion after it (AMH ledger row DB030's
 # lesson, applied to this tier before it can repeat).
 # The rearm key is a DIGEST, and this is the fixture that keeps it one. A `python3 -c` program
 # is where a literal credential turns up, and the state file is world-readable, at a predictable
@@ -4797,6 +6988,38 @@ st_keymaterial_advisory() { # st_keymaterial_advisory <expect: fires|silent> <co
 	fi
 	rm -f -- "$state"
 	if [ -n "$old_set" ]; then KEYMATERIAL_ADVISORY_STATE=$old_state; else unset KEYMATERIAL_ADVISORY_STATE; fi
+}
+
+# The hook-file tier, through whichever reader ST_CHECKER names, with its own unspent state.
+# `fires` asks four things: advised, in this tier's own words, cleared by a rerun of the same
+# command, and armed again for a different one (<other>, also a hook-file command).
+st_hookfile_advisory() { # st_hookfile_advisory <expect: fires|silent> <command> [<other>]
+	local expect=$1 cmd=$2 other=${3:-} state old_set old_state
+	old_set=${HOOKFILE_ADVISORY_STATE+x}
+	old_state=${HOOKFILE_ADVISORY_STATE:-}
+	state=$(mktemp "${TMPDIR:-/tmp}/amh-hookfile-advisory-test.XXXXXX") || exit 1
+	rm -f -- "$state"
+	HOOKFILE_ADVISORY_STATE=$state
+	if [ "$expect" = fires ]; then
+		if st_check "$cmd"; then
+			printf 'SELF-TEST FAIL: should have had the one-time hook-file advisory: %s\n' "$cmd" >&2
+			ST_FAILS=$((ST_FAILS + 1))
+		elif case $BLOCK_REASON in *'git pre-push hook'*) false ;; *) true ;; esac; then
+			printf 'SELF-TEST FAIL: blocked, but not by the hook-file advisory: %s\n   reason given: %s\n' "$cmd" "$BLOCK_REASON" >&2
+			ST_FAILS=$((ST_FAILS + 1))
+		elif ! st_check "$cmd"; then
+			printf 'SELF-TEST FAIL: rerunning the SAME hook-file command should proceed: %s\n   reason given: %s\n' "$cmd" "$BLOCK_REASON" >&2
+			ST_FAILS=$((ST_FAILS + 1))
+		elif [ -n "$other" ] && st_check "$other"; then
+			printf 'SELF-TEST FAIL: a DIFFERENT hook-file command must be advised after an earlier one cleared: %s (after %s)\n' "$other" "$cmd" >&2
+			ST_FAILS=$((ST_FAILS + 1))
+		fi
+	elif ! st_check "$cmd"; then
+		printf 'SELF-TEST FAIL: should NOT have had the hook-file advisory: %s\n   reason given: %s\n' "$cmd" "$BLOCK_REASON" >&2
+		ST_FAILS=$((ST_FAILS + 1))
+	fi
+	rm -f -- "$state"
+	if [ -n "$old_set" ]; then HOOKFILE_ADVISORY_STATE=$old_state; else unset HOOKFILE_ADVISORY_STATE; fi
 }
 
 st_destructive_advisory_once() {
@@ -4954,6 +7177,146 @@ st_destructive_reason_names() { # st_destructive_reason_names <substring> <comma
 		esac
 	fi
 	rm -f -- "$state"
+	if [ -n "$old_set" ]; then DESTRUCTIVE_ADVISORY_STATE=$old_state; else unset DESTRUCTIVE_ADVISORY_STATE; fi
+}
+
+# With no digest the interpreter and hook-file tiers have no key either, and went silent instead of
+# re-firing. <how> is `fail` for no digest tool, `empty` for one whose pipeline printed nothing and
+# exited 0. The same state file serves both tiers because a command only ever reaches one of them.
+st_tier_unkeyable() { # st_tier_unkeyable <fail|empty> <command>
+	local how=$1 cmd=$2 state saved n old_i_set old_i old_h_set old_h st_digest_how=$1
+	saved=$(declare -f interpreter_signature)
+	# Prints nothing either way, and succeeds only for `empty`. Reached through the name, by the code
+	# under test; shellcheck calls that SC2317 before its 0.11 and SC2329 from then on, so both.
+	# shellcheck disable=SC2317,SC2329
+	interpreter_signature() { [ "$st_digest_how" = empty ]; }
+	old_i_set=${INTERPRETER_ADVISORY_STATE+x}
+	old_i=${INTERPRETER_ADVISORY_STATE:-}
+	old_h_set=${HOOKFILE_ADVISORY_STATE+x}
+	old_h=${HOOKFILE_ADVISORY_STATE:-}
+	state=$(mktemp "${TMPDIR:-/tmp}/amh-tier-unkeyable-test.XXXXXX") || exit 1
+	rm -f -- "$state"
+	INTERPRETER_ADVISORY_STATE=$state
+	HOOKFILE_ADVISORY_STATE=$state
+	for n in 1 2; do
+		if st_check "$cmd"; then
+			printf 'SELF-TEST FAIL: with no digest (%s) this advisory must fire on every attempt (attempt %s): %s\n' "$how" "$n" "$cmd" >&2
+			ST_FAILS=$((ST_FAILS + 1))
+		else
+			case $BLOCK_REASON in
+			*'No digest tool'*) ;;
+			*)
+				printf 'SELF-TEST FAIL: an unkeyable advisory did not say why it re-fires: %s\n   reason given: %s\n' "$cmd" "$BLOCK_REASON" >&2
+				ST_FAILS=$((ST_FAILS + 1))
+				;;
+			esac
+		fi
+	done
+	if [ -s "$state" ]; then
+		printf 'SELF-TEST FAIL: with no digest (%s) a signature was recorded anyway: %s\n' "$how" "$cmd" >&2
+		ST_FAILS=$((ST_FAILS + 1))
+	fi
+	rm -f -- "$state"
+	eval "$saved"
+	if [ -n "$old_i_set" ]; then INTERPRETER_ADVISORY_STATE=$old_i; else unset INTERPRETER_ADVISORY_STATE; fi
+	if [ -n "$old_h_set" ]; then HOOKFILE_ADVISORY_STATE=$old_h; else unset HOOKFILE_ADVISORY_STATE; fi
+}
+
+# A marker the guard cannot write must FIRE the advisory on every attempt and say why; it used to
+# pass the command with nothing said (AMH ledger rows DD096, DD097). The marker is pointed into a
+# directory that does not exist, so the write fails for the reason a read-only /tmp gives it.
+# <var> names the tier's state override; `subagent` is driven through `needs_one_time_advisory`,
+# as its own fixtures are, since no command text reaches that tier.
+st_tier_unrecorded() { # st_tier_unrecorded <STATE_VAR> <command>
+	local var=$1 cmd=$2 dir old_set old_state n fired reason
+	dir=$(mktemp -d "${TMPDIR:-/tmp}/amh-unrecorded-test.XXXXXX") || exit 1
+	old_set=$(eval "printf '%s' \"\${$var+x}\"")
+	old_state=$(eval "printf '%s' \"\${$var:-}\"")
+	printf -v "$var" '%s' "$dir/missing/marker"
+	for n in 1 2; do
+		if [ "$var" = SUBAGENT_ADVISORY_STATE ]; then
+			ADVISORY_REASON=''
+			if needs_one_time_advisory subagent ''; then fired=1; else fired=0; fi
+			reason=$ADVISORY_REASON
+		else
+			if st_check "$cmd"; then fired=0; else fired=1; fi
+			reason=$BLOCK_REASON
+		fi
+		if [ "$fired" -eq 0 ]; then
+			printf 'SELF-TEST FAIL: with its marker unwritable (%s) this advisory must fire on every attempt (attempt %s): %s\n' "$var" "$n" "$cmd" >&2
+			ST_FAILS=$((ST_FAILS + 1))
+		else
+			case $reason in
+			*'could not write the marker'*) ;;
+			*)
+				printf 'SELF-TEST FAIL: an advisory with an unwritable marker did not say why it re-fires (%s): %s\n   reason given: %s\n' "$var" "$cmd" "$reason" >&2
+				ST_FAILS=$((ST_FAILS + 1))
+				;;
+			esac
+		fi
+	done
+	rmdir -- "$dir" 2>/dev/null || :
+	if [ -n "$old_set" ]; then printf -v "$var" '%s' "$old_state"; else unset "$var"; fi
+}
+
+# The subagent tier's marker is CLEARED to let a spawn through, so the write that can fail there
+# is the removal: an outstanding marker that will not go must fire, not pass every later spawn
+# (AMH ledger row DD097). A non-empty directory in the marker's place makes `rm -f` fail on
+# every host and for every user, root included, where a read-only directory would not.
+st_subagent_uncleared() {
+	local dir old_set old_state n
+	dir=$(mktemp -d "${TMPDIR:-/tmp}/amh-uncleared-test.XXXXXX") || exit 1
+	mkdir -p -- "$dir/marker/keep" || exit 1
+	old_set=${SUBAGENT_ADVISORY_STATE+x}
+	old_state=${SUBAGENT_ADVISORY_STATE:-}
+	SUBAGENT_ADVISORY_STATE=$dir/marker
+	for n in 1 2; do
+		ADVISORY_REASON=''
+		if ! needs_one_time_advisory subagent ''; then
+			printf 'SELF-TEST FAIL: an outstanding subagent marker that cannot be cleared let the spawn pass (attempt %s)\n' "$n" >&2
+			ST_FAILS=$((ST_FAILS + 1))
+		else
+			case $ADVISORY_REASON in
+			*'could not write the marker'*) ;;
+			*)
+				printf 'SELF-TEST FAIL: an uncleared subagent marker fired without saying why (attempt %s)\n' "$n" >&2
+				ST_FAILS=$((ST_FAILS + 1))
+				;;
+			esac
+		fi
+	done
+	rmdir -- "$dir/marker/keep" "$dir/marker" "$dir" 2>/dev/null || :
+	if [ -n "$old_set" ]; then SUBAGENT_ADVISORY_STATE=$old_state; else unset SUBAGENT_ADVISORY_STATE; fi
+}
+
+# With no digest tool an `xargs` deletion has no key, so it must be advised on EVERY attempt and
+# say why. The digest function is replaced for the duration, not the PATH, because a self-test
+# cannot assume which tools a host's PATH holds or where.
+st_destructive_xargs_unkeyable() { # st_destructive_xargs_unkeyable <command>
+	local cmd=$1 state old_set old_state saved n
+	saved=$(declare -f interpreter_signature)
+	interpreter_signature() { return 1; }
+	old_set=${DESTRUCTIVE_ADVISORY_STATE+x}
+	old_state=${DESTRUCTIVE_ADVISORY_STATE:-}
+	state=$(mktemp "${TMPDIR:-/tmp}/amh-destructive-unkeyable-test.XXXXXX") || exit 1
+	rm -f -- "$state"
+	DESTRUCTIVE_ADVISORY_STATE=$state
+	for n in 1 2; do
+		if st_check "$cmd"; then
+			printf 'SELF-TEST FAIL: an xargs deletion with no digest must be advised on every attempt (attempt %s): %s\n' "$n" "$cmd" >&2
+			ST_FAILS=$((ST_FAILS + 1))
+		else
+			case $ADVISORY_REASON in
+			*'No digest tool'*) ;;
+			*)
+				printf 'SELF-TEST FAIL: an unkeyable xargs advisory did not say why it re-fires: %s\n' "$cmd" >&2
+				ST_FAILS=$((ST_FAILS + 1))
+				;;
+			esac
+		fi
+	done
+	rm -f -- "$state"
+	eval "$saved"
 	if [ -n "$old_set" ]; then DESTRUCTIVE_ADVISORY_STATE=$old_state; else unset DESTRUCTIVE_ADVISORY_STATE; fi
 }
 
@@ -5245,6 +7608,14 @@ self_test() {
 	self_destructive_advisory_state=$(mktemp "${TMPDIR:-/tmp}/amh-destructive-advisory-self-test.XXXXXX") || exit 1
 	rm -f -- "$self_destructive_advisory_state"
 	DESTRUCTIVE_ADVISORY_STATE=$self_destructive_advisory_state
+	# Unspent and private, so no fixture outside `st_hookfile_advisory` reads or writes the
+	# session's real state file: one that strays into the tier fails on the advisory.
+	local old_hookfile_advisory_state_set=${HOOKFILE_ADVISORY_STATE+x}
+	local old_hookfile_advisory_state=${HOOKFILE_ADVISORY_STATE:-}
+	local self_hookfile_advisory_state
+	self_hookfile_advisory_state=$(mktemp "${TMPDIR:-/tmp}/amh-hookfile-advisory-self-test.XXXXXX") || exit 1
+	rm -f -- "$self_hookfile_advisory_state"
+	HOOKFILE_ADVISORY_STATE=$self_hookfile_advisory_state
 
 	# --- the parser's own failure is a BLOCK, never a pass
 	# A rail that hands back an empty word list has not judged the command, and until
@@ -5296,6 +7667,18 @@ self_test() {
 	st_blocked "git push origin refs/heads/$DEFAULT_BRANCH"
 	st_blocked 'env'
 	st_blocked 'env -0'
+	# A path or a leading backslash names the same program as the bare word, for the command
+	# and for every transparent prefix (AMH ledger row DD041).
+	st_blocked '/usr/bin/env'
+	st_blocked '\env'
+	st_blocked '\printenv'
+	st_blocked '\cat .env'
+	st_blocked '/usr/bin/sudo cat .env'
+	st_blocked '\sudo /usr/bin/env'
+	st_blocked '\git push --force origin feature'
+	st_blocked '/usr/bin/env FOO=1 git push --force origin feature'
+	st_allowed '\ls -la'
+	st_allowed '/usr/bin/env FOO=1 make test'
 	# `env` handed no utility prints the environment WHATEVER its options did to it, so
 	# each of these is a dump: `-i` empties it first, `-u` drops one name, an assignment
 	# adds one. The last was allowed until 10.1.2 — the arm read a leading `-` as the
@@ -5376,6 +7759,179 @@ hello
 EOF
 printenv'
 	st_blocked 'echo "write <<EOF into the doc"; cat .env'
+	# Each body ends where bash ends it (AMH ledger row DD057). Every operator on a line counts,
+	# and the bodies follow one another: closing everything at `A` judged B's `'` as a command,
+	# which hid the line after `B`. Both bodies are data, so `printenv` inside one is no command.
+	st_blocked $'cat <<A <<B\nA\n\'\nB\nprintenv'
+	st_blocked $'cat <<A<<B\nA\n\'\nB\nprintenv'
+	st_blocked $'cat <<A; cat <<-B\nA\n\'\n\tB\nprintenv'
+	st_allowed $'cat <<A <<B\nprintenv\nA\nenv\nB'
+	# Inside `((…))` a `<<` is a shift wherever it sits, the spaced style included, before a
+	# real operator or after one; a heredoc inside a subshell still opens its body.
+	st_blocked $'echo $(( 1 << n ))\nprintenv'
+	st_blocked $'echo $((1<<n ))\nprintenv'
+	st_blocked $'cat <<EOF $(( 1 << n ))\nbody\nEOF\nprintenv'
+	st_blocked $'cat <<EOF; echo $(( 1 << n ))\nbody\nEOF\nprintenv'
+	st_blocked $'(cat <<EOF )\nbody\nEOF\nprintenv'
+	st_allowed $'cat <<EOF $(( 1 << n ))\nprintenv\nEOF'
+	st_allowed $'(( x = 1 << n )); cat <<EOF\nprintenv\nEOF'
+	# ...but only where bash reads arithmetic: `((…) )` is two subshells, and a `$(` inside
+	# arithmetic is a command again, so the heredoc in each is real and its body is data.
+	st_blocked $'((true <<EOF ) )\n\'\nEOF\nprintenv'
+	st_blocked $'(( x = $(printf 1 <<EOF\n\'\nEOF\n) ))\nprintenv'
+	st_blocked $'(( x = $(printf 1 <<EOF # note\n\'\nEOF\n) ))\nprintenv'
+	st_blocked $'echo $(( $(cat <<EOF ) + 1 ))\n\'\nEOF\nprintenv'
+	st_allowed $'echo $(( $(cat <<EOF ) + 1 ))\nprintenv\nEOF'
+	# The terminator is the whole line; `<<-` strips TABS only, and from the joined line.
+	st_blocked $'cat <<EOF\n  EOF\n\'\nEOF\nprintenv'
+	st_blocked $'cat <<-EOF\n  EOF\n\'\nEOF\nprintenv'
+	st_blocked $'cat <<-EOF\n\tEOF\nprintenv'
+	st_allowed $'cat <<EOF\nEOF \nprintenv\nEOF'
+	st_allowed $'cat <<-EOF\n\t \tEOF\nprintenv\nEOF'
+	st_allowed $'cat <<-EOF\nE\\\n\tOF\nprintenv\nEOF'
+	# Under an unquoted delimiter an odd run of backslashes joins the next line first: `foo\⏎EOF`
+	# ends nothing, and `EO\⏎F`, `EOF\⏎` and `\⏎EOF` each end the body. A quoted delimiter and an
+	# even run join nothing.
+	st_blocked $'cat <<EOF\nfoo\\\nEOF\n\'\nEOF\nprintenv'
+	st_blocked $'cat <<EOF\nEO\\\nF\nprintenv\nEOF'
+	st_blocked $'cat <<EOF\nEOF\\\n\nprintenv\nEOF'
+	st_blocked $'cat <<-EOF\n\\\n\tEOF\nprintenv\nEOF'
+	st_blocked $'cat <<\'EOF\'\nfoo\\\nEOF\nprintenv'
+	st_blocked $'cat <<EOF\nfoo\\\\\nEOF\nprintenv'
+	st_allowed $'cat <<-EOF\n\tfoo\\\n\tEOF\nprintenv\nEOF'
+	st_allowed $'cat <<EOF\nfoo\\\\\\\nEOF\nprintenv\nEOF'
+	# An operator inside a comment opens nothing under the second reading, while the one before
+	# the comment still does.
+	st_blocked $'cat <<A # x <<B\nA\nprintenv'
+	st_allowed $'cat <<A # note\nprintenv\nA'
+	# A body still open when the text ends is refused for that reason (AMH ledger row DD058).
+	# Bash runs it, with a warning; the guard had judged nothing after the operator's line. Each
+	# fixture's last lines are harmless, so only this rule can refuse it.
+	st_heredoc_open $'cat <<EOF\nhi'
+	st_heredoc_open $'cat <<EOF\nhi\nls'
+	st_heredoc_open $'cat <<EOF\n  EOF\nls'
+	st_heredoc_open $'cat <<EOF\nEOF \nls'
+	st_heredoc_open $'cat <<EOF\nfoo\\\nEOF\nls'
+	st_heredoc_open $'cat <<A <<B\nA\nls'
+	st_heredoc_open $'cat <<A; cat <<B\nA\nB\ncat <<C\nls'
+	# ...so a delimiter the guard cannot spell is refused: an escape inside `$'…'`, which bash
+	# translates (`$'E\x4fF'` ends at `EOF`), and a backtick or `$(` inside the word.
+	st_heredoc_open $'cat <<$\'E\\x4fF\'\nhi\nEOF\nls'
+	st_heredoc_open $'cat <<E`x`F\nhi\nE`x`F\nls'
+	st_heredoc_open $'cat <<E"$(x)"F\nhi\nE$(x)F\nls'
+	# ...and so is a `<<` inside a comment under the first reading, which keeps the comment's text.
+	st_heredoc_open $'echo hi # see <<EOF\nls'
+	# A body STARTS where bash starts it (AMH ledger row DD059). The delimiter word gets bash's
+	# quote removal, wherever the quotes sit, so each body below closes at `EOF` (or `E O F`),
+	# where bash closes it, and the command after it is judged — and `E`, which closed the
+	# `"E O F"` body early and let its `'` hide the line after the terminator, closes nothing.
+	st_body_judged $'cat <<E"O"F\nhi\nEOF\nprintenv'
+	st_body_judged $'cat <<\'E\'OF\nhi\nEOF\nprintenv'
+	st_body_judged $'cat <<"E O F"\nhi\nE O F\nprintenv'
+	st_body_judged $'cat <<"E O F"\nE\n\'\nE O F\nprintenv'
+	st_body_judged $'cat <<$\'EOF\'\nhi\nEOF\nprintenv'
+	st_body_judged $'cat <<$"EOF"\nhi\nEOF\nprintenv'
+	st_body_judged $'cat <<"E\\"F"\n\'\nE"F\nprintenv'
+	st_allowed $'cat <<E"O"F\nhi\nEOF\nls'
+	st_allowed $'cat <<\'E\'OF\nprintenv\nEOF'
+	st_allowed $'cat <<"E O F"\nprintenv\nE O F'
+	st_allowed $'cat <<$\'EOF\'\nprintenv\nEOF'
+	st_allowed $'cat <<\'E\'"O"F\nprintenv\nEOF'
+	# Backslash-newlines go before the operator and its word are read, the operator line's
+	# included, so the command a continuation carries onto the next line is judged before the
+	# body starts, and a word or operator one splits is read whole. An unquoted word stays
+	# unquoted, so its body still joins its own continuations.
+	st_body_judged $'cat <<EOF \\\n&& printenv\nbody\nEOF'
+	st_body_judged $'cat <<EOF \\\n; printenv\nbody\nEOF'
+	st_body_judged $'cat <<EO\\\nF\nbody\nEOF\nprintenv'
+	st_body_judged $'cat <\\\n<EOF\nbody\nEOF\nprintenv'
+	st_body_judged $'cat << \\\nEOF\nbody\nEOF\nprintenv'
+	st_allowed $'cat <\\\n<EOF\nprintenv\nEOF'
+	st_allowed $'cat <<EO\\\nF\nprintenv\nEO\\\nF'
+	st_allowed $'cat <<EOF \\\n> out\nprintenv\nEOF'
+	# A newline inside a quote is text, so the body starts after the line where the quote
+	# closes; and a `<<` inside a string that spans lines opens nothing.
+	st_body_judged $'cat <<EOF "x\ny" ; printenv\nbody\nEOF'
+	st_body_judged $'cat <<EOF "x\ny"\nbody\nEOF\nprintenv'
+	st_body_judged $'echo "subject\nsee <<EOF in docs"\nprintenv'
+	st_allowed $'cat <<EOF "x\ny"\nprintenv\nEOF'
+	st_allowed $'git commit -m "subject\n\nsee <<EOF in docs"\nls'
+	# A comment ends at its newline, and its quote opens nothing, under both readings.
+	st_allowed $'cat <<EOF # it\'s fine\nprintenv\nEOF'
+	st_body_judged $'cat <<EOF # it\'s fine\nbody\nEOF\nprintenv'
+	# A lone `<` does not skip the character after it, so the `"` of `<<<"$v"` opens its string.
+	st_body_judged $'grep -q x <<<"$v" "<<EOF"\nprintenv'
+	st_body_judged $'grep x <<<"$v"; cat <<EOF\n\'\nEOF\nprintenv'
+	st_allowed $'grep x <<<"$v"; cat <<EOF\nprintenv\nEOF'
+	# Inside `$(…)` bash ends the body at the delimiter and the `)` that closes the substitution,
+	# blanks between them or not, and what follows on that line is code; anywhere else, and with
+	# a blank before the delimiter, that line is body text.
+	st_allowed $'x=$(cat <<EOF\nhi\nEOF)\nls'
+	st_allowed $'x=$(cat <<-EOF\n\thi\n\tEOF )'
+	st_body_judged $'x=$(cat <<EOF\nhi\nEOF); printenv'
+	st_body_judged $'x=$(cat <<EOF\n\'\nEOF)\nprintenv\nEOF'
+	st_body_judged $'x=$(cat <<EOF\nhi\nEOF); cat <<A\n\'\nA\nprintenv'
+	st_allowed $'x=$(cat <<EOF\nhi\nEOF); cat <<A\nprintenv\nA'
+	st_allowed $'cat <<EOF\nEOF)\nprintenv\nEOF'
+	st_allowed $'(cat <<EOF\nEOF)\nprintenv\nEOF\n)'
+	st_allowed $'x=$(cat <<EOF\n EOF)\nprintenv\nEOF\n)'
+	# A `)` ends the word and the body is real: bash reads `$(cat <<EOF)` a body after the line.
+	st_body_judged $'echo $(cat <<EOF)\n\'\nEOF\nprintenv'
+	st_allowed $'echo $(cat <<EOF)\nprintenv\nEOF'
+	# The standard commit message: the heredoc inside `"$(…)"` opens the body bash opens, quotes in
+	# the message are body text, and a `<<` in it opens nothing.
+	st_allowed $'git commit -m "$(cat <<\'EOF\'\nsubject\n\nWhy `env` and printenv; it\'s "fine"\nEOF\n)"'
+	st_allowed $'git commit -m "$(cat <<\'EOF\'\nsubject\n\nSee "here <<TOKEN" in docs\nEOF\n)"'
+	st_body_judged $'git commit -m "$(cat <<\'EOF\'\nsubject\nEOF\n)"; printenv'
+	# One stack of open contexts runs across the whole text, so a body starts at the newline that
+	# is a token at its operator's level. A newline inside a substitution opened after the
+	# operator, `${…}`, arithmetic or `$[…]`, a process substitution or a backtick word is none.
+	st_body_judged $'echo <<E"O"F $(printf x\n); printenv\nEOF'
+	st_body_judged $'cat <<EOF `echo\n`; printenv\nEOF'
+	st_body_judged $'cat <<EOF ${x:-$(echo\n)}; printenv\nEOF'
+	st_body_judged $'cat <<EOF $((1 +\n2)); printenv\nEOF'
+	st_body_judged $'cat <<EOF $[1+\n2]; printenv\nEOF'
+	st_body_judged $'cat <<EOF; ((x\n)); printenv\nEOF'
+	st_body_judged $'cat <<EOF <(echo\n); printenv\nEOF'
+	st_allowed $'cat <<EOF; (echo a\nprintenv\nEOF\n)'
+	st_allowed $'x=$(cat <<EOF; echo "a\nb"\nprintenv\nEOF\n)'
+	# A `$(` opened on an earlier line still holds the operator, so `EOF)` ends its body; and only
+	# what follows the delimiter is read again, so a quote inside the delimiter hides nothing.
+	st_body_judged $'x=$(\ncat <<E"O"F\nhi\nEOF); printenv\n: <<EOF\nEOF'
+	st_body_judged $'x=$( (cat <<EOF\nhi\nEOF) ); printenv'
+	st_body_judged $'x=$(cat <<\'E"F\'\nhi\nE"F); printenv'
+	st_body_judged $'x=$(cat <<EOF; cat <<A\nhi\nEOF)\nA\nprintenv'
+	st_body_judged $'x=$(cat <<EOF; cat <<A\nhi\nEOF)\n\'\nA\nprintenv'
+	# A substitution that closes on its operator's line hands its body to the next newline,
+	# whatever context that newline is in, and ahead of the bodies of the level it is read at.
+	st_allowed $'echo $(cat <<EOF) \'a\nprintenv\nEOF\nb\''
+	st_allowed $'echo $(cat <<EOF) \\\nprintenv\nEOF'
+	st_allowed $'cat <<A $(cat <<B)\nb\nB\nprintenv\nA'
+	st_allowed $'x=$(echo $(cat <<EOF)\nprintenv\nEOF\n)'
+	# A backtick substitution is a script of its own: its closing backtick ends a body it left
+	# open, a body line's backtick included, and the lines after it are commands.
+	st_body_judged $'echo `cat <<EOF`\nprintenv\nEOF'
+	st_body_judged $'echo `cat <<EOF; date`\nprintenv\nEOF'
+	st_body_judged $'echo `cat <<EOF\nx` ; printenv\nEOF'
+	st_body_judged $'echo `cat <<EOF; echo \\`date\\``\nprintenv\nEOF'
+	st_allowed $'echo `cat <<EOF\nprintenv\nEOF\n`'
+	# ...a body a `$(…)` inside it handed on, or one read inside such a `$(…)`, included; and a
+	# comment inside backticks ends at the closing backtick, which bash finds before the comment.
+	st_body_judged $'echo `echo $(cat <<EOF)`\nprintenv\nEOF\n:'
+	st_body_judged $'echo `x=$(cat <<EOF\nhi\n`\nprintenv\nEOF'
+	st_body_judged $'echo `cat <<E"O"F # hi`\nprintenv\nEOF\n:'
+	st_body_judged $'echo `cat <<EOF # it\'s`\nprintenv\nEOF'
+	st_allowed $'echo `echo $(cat <<EOF)\nprintenv\nEOF\n`'
+	# A body a `$(…)` handed on before a backtick substitution opened outlives it.
+	st_body_judged $'echo $(cat <<EOF) `date`\n\'\nEOF\nprintenv'
+	# An empty quoted word is a delimiter: its body ends at the first empty line.
+	st_body_judged $'cat <<\'\'""\n\'\n\nprintenv'
+	st_body_judged $'cat <<\'\'\nx\n\nprintenv'
+	st_allowed $'cat <<\'\'\nprintenv\n\nls'
+	# A body that closes on the last line, or before a trailing newline, is not open.
+	st_allowed $'cat <<EOF\nhi\nEOF\n'
+	st_allowed $'cat <<A <<B\nA\nB'
+	st_allowed $'x=$(cat <<EOF\nhi\nEOF\n)'
 	# Redirections the word-split scan never saw.
 	st_blocked 'tr "\0" "\n" 0</proc/self/environ'
 	st_blocked 'cat<.env'
@@ -5422,6 +7978,74 @@ printenv'
 	st_blocked 'cp ~/.ssh/id_rsa /tmp/k'
 	st_blocked 'cp -t /tmp id_rsa'
 	st_blocked 'dd if=id_rsa of=/tmp/k'
+	# Credential stores at their fixed paths, through the reader list, a redirection and a
+	# copy. The first line is the reported incident's own shape: the filter did not help.
+	st_blocked 'cat ~/.netrc 2>/dev/null | grep -E "machine|login" | head -10'
+	st_blocked 'cat ~/.git-credentials'
+	st_blocked 'cat ~/.netrc'
+	st_blocked 'cat ~/.npmrc'
+	st_blocked 'cat ~/.aws/credentials'
+	st_blocked 'cat ~/.config/gh/hosts.yml'
+	st_blocked 'cat ~/.docker/config.json'
+	st_blocked 'cat ~/.kube/config'
+	st_blocked 'cat ~/.config/gcloud/application_default_credentials.json'
+	st_blocked 'cat ~/.cargo/credentials.toml'
+	st_blocked 'cat ~/.cargo/credentials'
+	st_blocked 'cat ~/.config/git/credentials'
+	st_blocked 'cat "$HOME/.git-credentials"'
+	st_blocked 'cat "${HOME}/.npmrc"'
+	st_blocked 'cat /home/dev/.npmrc'
+	st_blocked 'cat /root/.npmrc'
+	st_blocked 'cat ~dev/.npmrc'
+	st_blocked 'head -3 /Users/dev/.aws/credentials'
+	st_blocked 'cat .aws/credentials'
+	ST_CHECKER=check_powershell_command st_blocked 'cat C:\Users\dev\.netrc'
+	ST_CHECKER=check_powershell_command st_blocked 'cat $HOME\.npmrc'
+	ST_CHECKER=check_powershell_command st_blocked 'gh auth token'
+	st_blocked 'cat project/_netrc'
+	st_blocked 'grep -c machine ~/.netrc'
+	st_blocked 'wc -c ~/.kube/config'
+	st_blocked 'jq . < ~/.docker/config.json'
+	st_blocked 'cp ~/.aws/credentials /tmp/c'
+	# The review's replays: a folded path, a quoted redirect target with a space, the `<>`
+	# redirect, a glued copy target, a home `.npmrc` on macOS and Windows.
+	st_blocked 'cat ~/.aws/./credentials'
+	st_blocked 'cat ~/.aws//credentials'
+	st_blocked 'cat /home/dev//.npmrc'
+	st_blocked 'cat < "/home/Example User/.netrc"'
+	st_blocked 'cat <> ~/.netrc'
+	st_blocked 'cat <> .env'
+	st_blocked 'cp -t/tmp ~/.aws/credentials'
+	st_blocked 'cp -t/tmp .env'
+	st_blocked 'cat /Users/dev/.npmrc'
+	ST_CHECKER=check_powershell_command st_blocked 'cat C:\Users\dev\.npmrc'
+	# The two commands that print a stored credential by design, and the respellings that do
+	# the same.
+	st_blocked 'gh auth token'
+	st_blocked 'gh auth token -h github.com'
+	st_blocked 'GH_HOST=github.com gh auth token'
+	st_blocked 'gh auth status --show-token'
+	st_blocked 'gh auth status --show-token=true'
+	st_blocked 'gh auth status -t'
+	st_blocked 'gh auth status -at'
+	st_blocked 'gh auth status -h github.com -t'
+	st_blocked "printf 'host=github.com\\n' | git credential fill"
+	st_blocked 'git -C /some/repo credential fill'
+	st_blocked 'echo host=github.com | git credential-store get'
+	st_blocked 'git credential-store --file /tmp/c get'
+	st_blocked 'git credential-manager get'
+	# Options anywhere among the operands, and option values that are not the command.
+	st_blocked 'gh auth -h github.com token'
+	st_blocked 'gh auth --hostname github.com status -t'
+	st_blocked 'gh --help=false auth token'
+	st_blocked 'gh auth status -t=true'
+	st_blocked 'git --namespace foo credential fill'
+	st_blocked 'git --git-dir /some/repo credential fill'
+	# ...and the same walk on the push rail, which had read each of these values as the
+	# subcommand.
+	st_blocked 'git --git-dir /some/repo push --force origin x'
+	st_blocked 'git --work-tree /some/tree push --force origin x'
+	st_blocked 'git --namespace foo push --force origin x'
 	st_dotenv_advisory_once 'python3 -c "open('"'"'.env'"'"')"'
 	# `.pem`/`.key` get the advisory tier, not the block tier: the extension is a container,
 	# not a secret marker. Both directions, each on its own unspent state file.
@@ -5480,6 +8104,8 @@ printenv'
 	# The interpreter tier: an enumerated interpreter plus an enumerated deletion call, one
 	# advisory, rearmed per command text.
 	st_interpreter_advisory_once 'python3 -c "import shutil; shutil.rmtree(sys.argv[1])"' 'rmtree'
+	st_interpreter_advisory_once '\python3 -c "import shutil; shutil.rmtree(d)"' 'rmtree'
+	st_interpreter_advisory_once '\sudo python3 -c "import shutil; shutil.rmtree(d)"' 'rmtree'
 	st_interpreter_advisory_once 'node -e "fs.rmSync(p, {recursive: true})"' 'rmSync'
 	st_interpreter_advisory_once 'ruby -e "FileUtils.rm_rf(x)"' 'rm_rf'
 	st_interpreter_advisory_once 'perl -e "remove_tree($d)"' 'remove_tree'
@@ -5490,6 +8116,17 @@ printenv'
 	st_interpreter_advisory_once 'python3 -c "shutil.rmtree(d)"' 'It did not read your program'
 	st_interpreter_advisory_once 'python3 -c "shutil.rmtree(d)"' 'os.system'
 	st_interpreter_rearms 'python3 -c "shutil.rmtree(a)"' 'python3 -c "shutil.rmtree(b)"'
+	st_tier_unkeyable fail 'python3 -c "shutil.rmtree(d)"'
+	st_tier_unkeyable empty 'python3 -c "shutil.rmtree(d)"'
+	st_tier_unkeyable fail 'rm .git/hooks/pre-push'
+	st_tier_unkeyable empty 'rm .git/hooks/pre-push'
+	st_tier_unrecorded DOTENV_ADVISORY_STATE 'python3 -c "open('"'"'.env'"'"')"'
+	st_tier_unrecorded KEYMATERIAL_ADVISORY_STATE 'cat server.pem'
+	st_tier_unrecorded DESTRUCTIVE_ADVISORY_STATE 'rm -rf tmp/build'
+	st_tier_unrecorded INTERPRETER_ADVISORY_STATE 'python3 -c "shutil.rmtree(d)"'
+	st_tier_unrecorded HOOKFILE_ADVISORY_STATE 'rm .git/hooks/pre-push'
+	st_tier_unrecorded SUBAGENT_ADVISORY_STATE ''
+	st_subagent_uncleared
 	st_interpreter_signature_is_opaque 'python3 -c "T=\"sk-live-FIXTURE\"; shutil.rmtree(d)"' 'sk-live-FIXTURE'
 	# A multi-line program: one signature line, or the rerun can never clear it — `printf %q`
 	# renders an embedded newline as a backslash-newline on bash before 4.4, which this file
@@ -5532,6 +8169,62 @@ EOF'
 	# permanent denial, because a rail an agent steps around with a trailing slash teaches the
 	# trailing slash.
 	st_destructive_never_clears 'rm -rf /' 'the filesystem root'
+	st_destructive_never_clears '\rm -rf /' 'the filesystem root'
+	st_destructive_never_clears '/bin/\rm -rf /' 'the filesystem root'
+	st_destructive_never_clears 'sudo \rm -rf ~' 'your home directory'
+	# One per site that resolves the command: the destructive walk's prefix fold and both of its
+	# package-runner re-resolutions. Each passed with its own site reverted before these existed.
+	st_destructive_never_clears '\sudo rm -rf /' 'the filesystem root'
+	st_destructive_never_clears '/usr/bin/sudo rm -rf /' 'the filesystem root'
+	st_destructive_never_clears 'npx \rm -rf /' 'the filesystem root'
+	st_destructive_never_clears 'npm exec \rm -rf /' 'the filesystem root'
+	# A reserved word leads a segment and a Windows suffix names the same program; both are
+	# folded at every site that resolves the command (AMH ledger row DD042).
+	st_blocked 'if true; then git push --force origin feature; fi'
+	st_blocked 'if true; then git push origin main; fi'
+	st_blocked 'while true; do printenv; done'
+	st_blocked 'until false; do printenv; done'
+	st_blocked 'if false; then :; elif printenv; then :; fi'
+	st_blocked 'if false; then :; else printenv; fi'
+	st_blocked 'while printenv; do :; done'
+	st_blocked '! printenv'
+	st_blocked 'if ! printenv; then :; fi'
+	st_blocked 'for f in a b; do cat .env; done'
+	st_blocked 'printenv.exe'
+	st_blocked 'env.exe'
+	st_blocked '/usr/bin/env.exe'
+	st_blocked 'PRINTENV.EXE'
+	st_blocked 'git.exe push --force origin feature'
+	st_blocked 'Git.Exe push origin main'
+	st_blocked 'Git.exe push --force origin feature'
+	st_blocked 'sudo.exe cat .env'
+	st_allowed 'if true; then echo hi; fi'
+	st_allowed 'for f in a b; do echo "$f"; done'
+	st_allowed 'echo then printenv'
+	st_allowed 'git commit -m "if true; then printenv; fi"'
+	st_allowed 'do'
+	st_allowed 'git.exe status'
+	st_allowed 'notepad.exe notes.txt'
+	st_interpreter_advisory_once 'if true; then python3 -c "import shutil; shutil.rmtree(d)"; fi' 'rmtree'
+	st_interpreter_advisory_once 'python3.exe -c "import shutil; shutil.rmtree(d)"' 'rmtree'
+	st_destructive_never_clears 'if true; then rm -rf /; fi' 'the filesystem root'
+	st_destructive_never_clears 'while true; do rm -rf ~; done' 'your home directory'
+	st_destructive_never_clears 'rm.exe -rf /' 'the filesystem root'
+	st_destructive_never_clears 'RM.EXE -rf /' 'the filesystem root'
+	st_destructive_never_clears 'npx rm.exe -rf /' 'the filesystem root'
+	st_destructive_never_clears 'npm exec rm.exe -rf /' 'the filesystem root'
+	# A Windows path keeps its suffix for the arms that read it: folding it hid both wrappers.
+	st_destructive_never_clears "'C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe' -Command \"Remove-Item \$env:USERPROFILE -Recurse\"" 'your home directory'
+	st_destructive_never_clears "'C:\\Program Files\\PowerShell\\7\\pwsh.exe' -Command \"Remove-Item \$env:USERPROFILE -Recurse\"" 'your home directory'
+	# Every reserved word in every loop, so the three cannot drift apart unseen.
+	st_blocked 'until printenv; do :; done'
+	for rw in if elif while until '!'; do
+		st_interpreter_advisory_once "$rw python3 -c \"import shutil; shutil.rmtree(d)\"" 'rmtree'
+		st_destructive_never_clears "$rw rm -rf /" 'the filesystem root'
+	done
+	st_interpreter_advisory_once 'if false; then :; else python3 -c "import shutil; shutil.rmtree(d)"; fi' 'rmtree'
+	st_interpreter_advisory_once 'while false; do python3 -c "import shutil; shutil.rmtree(d)"; done' 'rmtree'
+	st_destructive_never_clears 'if false; then :; else rm -rf /; fi' 'the filesystem root'
 	st_destructive_never_clears 'rm -rf //' 'the filesystem root'
 	st_destructive_never_clears 'rm -rf /*' 'the filesystem root'
 	st_destructive_never_clears 'rm -rf -- /' 'the filesystem root'
@@ -5715,6 +8408,20 @@ EOF'
 	ST_CHECKER=check_powershell_command st_destructive_never_clears 'Get-ChildItem | ForEach-Object { Remove-Item C:\ -Recurse }' 'the root of a Windows drive'
 	ST_CHECKER=check_powershell_command st_destructive_never_clears "& cmd.exe /c rd /s /q D:\\" 'the root of a Windows drive'
 	ST_CHECKER=check_powershell_command st_destructive_never_clears 'Remove-Item C:\ -Recurse -ErrorAction SilentlyContinue 2>&1 | Out-Null' 'the root of a Windows drive'
+	# A `git -C` or `--git-dir` statement earlier in the same command, of any verb, leaves the git
+	# arm's directory marks set; the deletion after it must not read them as its own and take its
+	# first operand for git's directory (AMH ledger row DD064).
+	ST_CHECKER=check_powershell_command st_destructive_never_clears "git -C build clean -fdx; Remove-Item -Recurse -Force C:\\" 'the root of a Windows drive'
+	ST_CHECKER=check_powershell_command st_destructive_never_clears "git --git-dir=x --work-tree=y status; Remove-Item -Recurse -Force C:\\" 'the root of a Windows drive'
+	ST_CHECKER=check_powershell_command st_destructive_never_clears "git -C build status; rm -r -fo D:\\" 'the root of a Windows drive'
+	ST_CHECKER=check_powershell_command st_destructive_never_clears "git -C build status; cmd /c rd /s /q C:\\" 'the root of a Windows drive'
+	ST_CHECKER=check_powershell_command st_destructive_never_clears "git -C build status; cmd /c del /s /q C:\\" 'the root of a Windows drive'
+	ST_CHECKER=check_powershell_command st_destructive_never_clears 'git -C build status; Remove-Item -Recurse -Force $HOME' 'your home directory'
+	st_destructive_never_clears 'pwsh -c "git -C build status; Remove-Item -Recurse -Force C:\\"' 'the root of a Windows drive'
+	# The same leak's other flag: an earlier `npm run` statement must not make the deletion after it
+	# claim it matched a package script.
+	ST_CHECKER=check_powershell_command st_destructive_reason_lacks 'matched a package SCRIPT NAME' 'npm run build; Remove-Item -Recurse -Force .\build'
+	ST_CHECKER=check_powershell_command st_destructive_reason_lacks 'matched a package SCRIPT NAME' 'npm run build; cmd /c rd /s /q build'
 	# PowerShell's quoting keeps a quoted path with a space whole, and an ordinary target is the
 	# ordinary advisory — with the PowerShell form of the variable paragraph, never the bash one.
 	ST_CHECKER=check_powershell_command st_destructive_advisory_once "Remove-Item -LiteralPath 'C:\Users\John Smith\proj\build' -Recurse -Force"
@@ -5866,6 +8573,86 @@ EOF'
 	st_destructive_advisory_once 'rm -rf ~/*/..'
 	rm -f -- "$self_destructive_advisory_state"
 	st_destructive_advisory_once 'git -C ~ clean -fd -- "build/*/"'
+	rm -f -- "$self_destructive_advisory_state"
+	# A glob that matches every hidden entry is the directory, as `.*` is: `.?*` and `.??*`
+	# skip only `..` and the shortest names, `[!.]` is the `?` that `*` already is about a
+	# leading dot, and git's pathspec lands under its `-C` (AMH ledger row DD044).
+	st_destructive_never_clears 'rm -rf ~/.?*' 'your home directory'
+	st_destructive_never_clears 'rm -rf ~/.??*' 'your home directory'
+	st_destructive_never_clears 'rm -rf ~/.[!.]*' 'your home directory'
+	st_destructive_never_clears 'rm -rf ~/.[^.]*' 'your home directory'
+	st_destructive_never_clears 'rm -rf /[!.]*' 'the filesystem root'
+	st_destructive_never_clears 'rm -rf "$HOME"/.?*/' 'your home directory'
+	st_destructive_never_clears "git -C ~ clean -fdx -- '.?*'" 'your home directory'
+	# ...and a glob that matches only SOME entries deletes part of the directory, so it keeps
+	# the advisory: a named prefix, any other bracket, a dot and one `?`, and `..` behind a dot.
+	st_destructive_advisory_once 'rm -rf ~/.c*'
+	rm -f -- "$self_destructive_advisory_state"
+	st_destructive_advisory_once 'rm -rf /[a-m]*'
+	rm -f -- "$self_destructive_advisory_state"
+	st_destructive_advisory_once 'rm -rf ~/[!.a]*'
+	rm -f -- "$self_destructive_advisory_state"
+	st_destructive_advisory_once 'rm -rf ~/.?'
+	rm -f -- "$self_destructive_advisory_state"
+	st_destructive_advisory_once 'rm -rf ~/..*'
+	rm -f -- "$self_destructive_advisory_state"
+	# A brace expansion is the words it expands to. Two subdirectories of home are two ordinary
+	# targets; an empty alternative, a glob alternative, a nested one or a listed directory
+	# among them is the denial. The `{` inside a word is not a command group, so the segment
+	# reaches this list whole — split there, the first form read as `rm -rf ~/` and was denied
+	# forever — while a `{` standing as a word still opens a group whose commands are judged.
+	st_destructive_advisory_once 'rm -rf ~/{.cache,.npm}'
+	rm -f -- "$self_destructive_advisory_state"
+	st_destructive_advisory_once 'rm -rf "${HOME}"/{a,b}'
+	rm -f -- "$self_destructive_advisory_state"
+	st_destructive_never_clears 'rm -rf ~/{,.cache}' 'your home directory'
+	st_destructive_never_clears 'rm -rf ~/{*,.*}' 'your home directory'
+	st_destructive_never_clears 'rm -rf ~/{a,{b,}}' 'your home directory'
+	st_destructive_never_clears 'rm -rf /{tmp,home}' 'the directory holding every home directory'
+	st_destructive_never_clears 'rm -rf ~/{.cache,.npm} ~/{,x}' 'your home directory'
+	st_destructive_never_clears '{ rm -rf /; }' 'the filesystem root'
+	st_blocked '{ git push --force origin main;}'
+	st_blocked '{>/dev/null git push --force origin main; }'
+	st_blocked 'true&&{</dev/null printenv;}'
+	st_blocked 'echo {a,b}x && git push --force origin main'
+	st_destructive_advisory_once '{ rm -rf /tmp/x;}'
+	rm -f -- "$self_destructive_advisory_state"
+	# Where bash expands nothing, nothing is expanded: a `{home}` with no comma and an escaped
+	# brace are literal names, and `cmd.exe` reads braces as characters of a path. An escaped
+	# `}` inside a list is a character of one alternative, not its end.
+	st_destructive_advisory_once 'rm -rf /{home}'
+	rm -f -- "$self_destructive_advisory_state"
+	st_destructive_advisory_once 'rm -rf \{,/}'
+	rm -f -- "$self_destructive_advisory_state"
+	st_destructive_never_clears 'rm -rf ~/{a\},}' 'your home directory'
+	st_destructive_advisory_once 'cmd /c "rd /s /q C:/{,x}"'
+	rm -f -- "$self_destructive_advisory_state"
+	# A brace that is not a word of its own is never a reserved word, whether or not it
+	# expands: a `{` ending a name, a `}` ending or starting one, are characters of that name.
+	st_destructive_advisory_once 'rm -rf ~/{ x'
+	rm -f -- "$self_destructive_advisory_state"
+	st_destructive_advisory_once 'rm -rf ~/}x'
+	rm -f -- "$self_destructive_advisory_state"
+	st_destructive_advisory_once 'rm -rf ~/}'
+	rm -f -- "$self_destructive_advisory_state"
+	st_allowed 'echo }rm -rf ~'
+	# A brace is not an operator, so the `}` after a closing one is still part of the word:
+	# `~/{a,}}` is `~/a}` and `~/}`, and neither is home.
+	st_destructive_advisory_once 'rm -rf ~/{a,}}'
+	rm -f -- "$self_destructive_advisory_state"
+	# `[!.]` is "not a dot" to bash alone; to PowerShell it is a set, and to `cmd.exe` text.
+	st_destructive_advisory_once 'cmd /c "del /s /q C:\[!.]*"'
+	rm -f -- "$self_destructive_advisory_state"
+	# The expansion judges at most BRACE_ALTERNATIVE_CAP words, and a word past it keeps the
+	# advisory — a recorded boundary, as is an operand with more braces than BRACE_COUNT_CAP.
+	# The empty alternative that names home is first in one list and past the cap in the other.
+	st_destructive_never_clears "rm -rf ~/{$(printf ',x%.0s' {1..300})}" 'your home directory'
+	st_destructive_advisory_once "rm -rf ~/{$(printf 'x,%.0s' {1..300})}"
+	rm -f -- "$self_destructive_advisory_state"
+	st_destructive_advisory_once "rm -rf ~/{,$(printf '{x}%.0s' {1..65})}"
+	rm -f -- "$self_destructive_advisory_state"
+	st_destructive_advisory_once "rm -rf ~/{,$(printf 'x%.0s' {1..1030})}"
+	rm -f -- "$self_destructive_advisory_state"
 	rm -f -- "$self_destructive_advisory_state"
 	# The catastrophic gate reads THIS segment's verb. An earlier deleting segment must not
 	# lend its property to a later verb that deletes nothing: `git worktree add` overwrites,
@@ -6077,6 +8864,76 @@ EOF'
 	st_destructive_advisory_once 'pnpm exec git clean -fdx'
 	# A runner option that takes a value names a package, not a command.
 	st_destructive_advisory_once 'npx -p prisma@5 prisma migrate reset'
+
+	# --- `xargs`, read through by this rail alone (AMH ledger row DD062). The reported
+	# incident's own pipeline first: its targets came from input xargs split at a space.
+	st_destructive_advisory_once 'find ~/Library/Application\ Support/AgentThreads/channels -name "test-*" -type f | xargs -n1 dirname | sort -u | xargs rm -rf'
+	st_destructive_advisory_once 'xargs -0 rm -rf < list.txt'
+	# The option grammar: a value attached inside a cluster, a value as the next word, a GNU
+	# long option shortened to a unique prefix with its value as the next word, a replacement
+	# string, the end of options, and a prefix on either side of xargs.
+	st_destructive_advisory_once 'find . -print0 | xargs -0n1 rm -rf'
+	st_destructive_advisory_once 'xargs -n 1 -P 4 rm -rf'
+	st_destructive_advisory_once 'xargs --max-a 1 rm -rf'
+	st_destructive_advisory_once 'xargs -I {} rm -rf {}'
+	st_destructive_advisory_once 'xargs --max-args=1 rm -rf'
+	st_destructive_advisory_once 'xargs --delimiter '"'"'\n'"'"' rm -rf'
+	# The two spellings the advisory itself recommends must reach the verb.
+	st_destructive_advisory_once 'xargs -d '"'"'\n'"'"' rm -rf'
+	st_destructive_advisory_once 'find . -print0 | xargs -0 rm -rf'
+	# BSD's value-taking `-J`, and GNU's `-i`, whose value is attached only.
+	st_destructive_advisory_once 'xargs -J % rm -rf % dest'
+	st_destructive_advisory_once 'xargs -i rm -rf {}'
+	st_destructive_advisory_once 'gxargs rm -rf'
+	# `--` and the long-option fallback agree on this spelling; the arm matters only for a
+	# command whose name starts with `-`.
+	st_destructive_advisory_once 'xargs -- rm -rf'
+	st_destructive_advisory_once 'sudo xargs rm -rf'
+	st_destructive_advisory_once 'xargs sudo rm -rf'
+	# The git verbs armed only on an unknown target are armed behind xargs, which adds operands —
+	# including after a literal one, which alone would leave them silent.
+	st_destructive_advisory_once 'xargs -I{} git checkout -f {}'
+	st_destructive_advisory_once 'xargs -0 git rm -r -f'
+	# A literal operand written after the verb is still judged against the target list.
+	st_destructive_never_clears 'xargs rm -rf ~' 'your home directory'
+	# A redirection is not a word bash passes, wherever it sits: before the command word it hid
+	# the deletion from this rail, permanent denials included, and between `xargs` and its
+	# command it hid the verb (AMH ledger row DD067).
+	st_destructive_never_clears '< list.txt rm -rf ~' 'your home directory'
+	st_destructive_never_clears '2>/dev/null rm -rf /' 'the filesystem root'
+	st_destructive_never_clears '0<x xargs rm -rf ~' 'your home directory'
+	st_destructive_advisory_once '< list.txt xargs rm -rf'
+	st_destructive_advisory_once 'xargs 2>/dev/null rm -rf'
+	st_destructive_advisory_once '>log git clean -fdx'
+	st_allowed '< list.txt xargs rm -f'
+	st_allowed '2>/dev/null rm -f build >log'
+	st_destructive_reason_names 'This runs behind `xargs`' 'find a | xargs rm -rf'
+	st_destructive_reason_lacks 'This runs behind `xargs`' 'rm -rf a'
+	# Keyed on the command text: clearing one pipeline does not clear another, which a key
+	# built from the operands alone — none here — would have.
+	st_destructive_rearms_per_target 'find a -type d | xargs rm -rf' 'find b -type d | xargs rm -rf'
+	ST_CHECKER=check_powershell_command st_destructive_rearms_per_target \
+		'Get-ChildItem a | xargs rm -rf' 'Get-ChildItem b | xargs rm -rf'
+	# A nested scan must not clear the outer segment's xargs reading: the `git status` here is
+	# judged as its own segment before the deletion beside it.
+	st_destructive_rearms_per_target 'find a | xargs pwsh -c "git status; Remove-Item -Recurse -Force x"' \
+		'find b | xargs pwsh -c "git status; Remove-Item -Recurse -Force x"'
+	# Nor may one segment's xargs reach a later segment or statement that has none.
+	st_destructive_reason_lacks 'This runs behind `xargs`' 'ls | xargs echo && rm -rf build'
+	ST_CHECKER=check_powershell_command st_destructive_reason_lacks 'This runs behind `xargs`' \
+		'echo a | xargs echo; Remove-Item -Recurse -Force x'
+	# The guarded rewrite the advisory asks for is the rerun, not a second prompt.
+	st_destructive_same_target_set 'find a | xargs rm -rf "$D/x"' 'find a | xargs rm -rf "${D:?}/x"'
+	# The two comment readings hand over different operands for this command; one rerun must
+	# still clear it.
+	st_destructive_advisory_once "find c | xargs rm -rf # don't keep these"
+	st_destructive_xargs_unkeyable 'find a | xargs rm -rf'
+	# Not a deletion: the verb lacks a flag, or xargs runs something else.
+	st_allowed 'xargs rm -f'
+	st_allowed 'xargs -n1 dirname'
+	st_allowed 'xargs echo rm -rf'
+	st_allowed 'find . -name "*.o" | xargs grep foo'
+	st_allowed 'git commit -m "guard: read through xargs rm -rf"'
 	# Global options come before the subcommand, the way the git arm has always read them.
 	st_destructive_advisory_once 'supabase --workdir . db reset'
 	st_destructive_advisory_once 'prisma db push --accept-data-loss=true'
@@ -6126,8 +8983,9 @@ EOF'
 	st_allowed 'drizzle-kit migrate'
 	st_allowed 'drizzle-kit studio'
 	st_allowed 'drizzle-kit check'
-	# Deliberately absent from the arm: no public report shows it destroying stored data, and
-	# this tier's list is earned by reports rather than by resemblance.
+	# Absent from the arm: it was kept out while this tier's list was earned by public reports
+	# (AMH ledger row DC027), and no change has yet measured it under the bar that replaced
+	# that one (AMH ledger row DD074). This pins today's behaviour, not a finding that it is safe.
 	st_allowed 'drizzle-kit drop'
 	# The name is matched WHOLE. A script whose name merely CONTAINS one of the list is a
 	# different script — the D007 class in the arm most exposed to it, since a script name is
@@ -6243,6 +9101,171 @@ EOF'
 	# after it is real. A walker that treated the backslash as an escape there would swallow
 	# the closing quote and the push with it — the same hole, one quote character over.
 	st_blocked "echo 'a \\' && git push --force origin main"
+	# LINE CONTINUATIONS. Bash removes an unquoted backslash-newline before it splits words, and
+	# the walkers kept it, which cost both directions at once: the permanent denial became an
+	# advisory or nothing, and a legal push was denied as naming two refs. Shapes from
+	# cc-safe-setup's line-continuation suite (AMH ledger row DD046).
+	st_destructive_never_clears $'rm -rf \\\n/' 'the filesystem root'
+	st_destructive_never_clears $'rm \\\n-rf /' 'the filesystem root'
+	st_destructive_never_clears $'rm \\\n-rf ~' 'your home directory'
+	st_destructive_never_clears $'rm -rf \\\n  ~' 'your home directory'
+	st_destructive_never_clears $'echo $(rm \\\n-rf /)' 'the filesystem root'
+	st_blocked $'git \\\n-C /repo push --force'
+	st_blocked $'git push -u origin \\\nmain'
+	st_blocked $'git push --for\\\nce origin feature'
+	st_destructive_advisory_once $'git \\\nreset --hard "$X"'
+	st_allowed $'git push \\\n-u origin '"$BRANCH_PREFIX/x"
+	st_allowed $'git status \\\n--short'
+	# Each of these dies with one rule of `join_continuations`. An escaped backslash before a
+	# newline is no continuation, so the newline still separates; a backslash inside SINGLE
+	# quotes escapes nothing, so the pair after the string is still outside it; a `\"` inside
+	# DOUBLE quotes is no closing quote, so the `'` after it opens nothing; a `#` comment ends at
+	# its newline however many backslashes precede it, so the line after it runs; a comment
+	# starts after a space, tab, newline or operator, and not inside a word, after a carriage
+	# return or inside `${…}`; and a removed pair leaves the character before it as the one the
+	# next follows, so `a\⏎#b` is the word `a#b`, no comment, and the `rm` is echo's argument.
+	st_destructive_never_clears $'echo x\\\\\nrm -rf /' 'the filesystem root'
+	st_allowed $'echo \'a \\\' && git push \\\n-u origin '"$BRANCH_PREFIX/x"
+	st_allowed $'echo "a \\"\'" && git push \\\n-u origin '"$BRANCH_PREFIX/x"
+	st_destructive_never_clears $'echo a # note \\\nrm -rf /' 'the filesystem root'
+	st_destructive_never_clears $'echo a #x \\\\\nrm -rf /' 'the filesystem root'
+	st_blocked $'echo a # C:\\\\temp\\\\\ngit push --force origin main'
+	st_destructive_never_clears $'echo a;# x \\\nrm -rf /' 'the filesystem root'
+	st_destructive_never_clears $'echo a\t# x \\\nrm -rf /' 'the filesystem root'
+	st_destructive_never_clears $'echo a\n# x \\\nrm -rf /' 'the filesystem root'
+	st_destructive_never_clears $'rm -rf a#b \\\n/' 'the filesystem root'
+	st_blocked $'git push origin \r#x \\\n--force main'
+	st_blocked $'git push ${x:- #} \\\n--force origin main'
+	st_allowed $'echo a\\\n#b \\\nrm -rf /'
+	# The pairs go AFTER the heredoc bodies: a quoted-delimiter body keeps its backslash, and
+	# joining its last line onto the delimiter would hide the delimiter and the push after it.
+	st_blocked $'cat <<\'EOF\'\nx \\\nEOF\ngit push --force origin main'
+	# COMMENTS ARE MADE INERT, under the second reading: a quote inside one opens nothing, so each
+	# of these hid its second line from every rail. A `#` starts a comment after a blank, a
+	# newline, an operator, a backtick, a `(` or a `)`; a `<<` inside one opens no heredoc body
+	# (AMH ledger row DD056).
+	st_blocked $'echo a # don\'t\nprintenv'
+	st_blocked $'echo a # don\'t\ngit push --force origin main'
+	st_blocked $'echo a # say "hi\nprintenv'
+	st_destructive_never_clears $'echo a # it\'s\nrm -rf /' 'the filesystem root'
+	st_blocked $'echo hi # see <<EOF\nprintenv'
+	st_blocked $'cat <(# see <<EOF\nprintenv)'
+	st_blocked $'echo a\t# don\'t\nprintenv'
+	st_blocked $'echo a;# don\'t\nprintenv'
+	st_blocked $'echo a&# don\'t\nprintenv'
+	st_blocked $'echo a|# don\'t\nprintenv'
+	st_blocked $'echo `# don\'t`\nprintenv'
+	# A region ends at the newline, inside backticks too: ended at a backtick the walker may have
+	# misplaced, it would put the `'` after it back into play.
+	st_blocked $'echo a # `don\'t\nprintenv'
+	st_blocked $'(echo a)# don\'t\nprintenv'
+	st_blocked $'( (echo a)# don\'t\nprintenv )'
+	st_blocked $'((1))# don\'t\nprintenv'
+	st_blocked $'case a in (a)# don\'t\nprintenv;; esac'
+	st_blocked $'case a in a)# don\'t\nprintenv;; esac'
+	st_blocked $'case a in a) case b in b)# don\'t\nprintenv;; esac;; esac'
+	st_blocked $'{\\\n( echo a # don\'t\n ); }; printenv'
+	st_blocked $'echo $(# don\'t\nprintenv)'
+	st_blocked $'cat <(# don\'t\nprintenv)'
+	st_blocked $'until\\\n(echo a # don\'t\n)\ndo break; done; printenv'
+	st_blocked $'if (echo a)# don\'t\nthen printenv; fi'
+	st_blocked $'x=case; case $x in case ) case a in (a)# don\'t\nprintenv;; esac;; esac'
+	st_blocked $'case a in b) :;; a) (echo a)# don\'t\nprintenv;; esac'
+	st_blocked $'case b in a) :;; b)# don\'t\nprintenv;; esac'
+	st_blocked $'echo ${x:-(} # don\'t\nprintenv'
+	st_blocked $'( (( 1 #x )) # don\'t\n ); printenv'
+	st_blocked $'a=(1 # don\'t\n2); printenv'
+	# The backslashes before a deleted quote go with it, so the newline after the comment still
+	# ends it and no walker reads the next line as joined on.
+	st_blocked $'echo a # say "a\\\'\nprintenv'
+	# The FIRST reading holds these: the walkers misplace the comment, since none nests the
+	# quotes inside `"$(…)"`, and the inert second reading alone would let each one through —
+	# the `"` that closes the string becomes an opener, or a heredoc whose `<<` the second reading
+	# took for a comment has its body judged, and the body's `'` hides the line after it.
+	st_blocked $'echo "$(printf "fix #1")\n"; printenv'
+	st_blocked $'echo "$(printf "fix #1")"; cat <<EOF\n\'\nEOF\nprintenv'
+	st_blocked $'x=$(\necho a\n)#y <<EOF\n\'\nEOF\nprintenv'
+	st_blocked $'x=`\necho a\n`#y <<EOF\n\'\nEOF\nprintenv'
+	# ...and these, which removing comments outright let through (AMH ledger row DD056), stay
+	# refused by both: a misplaced comment made inert keeps its commands in view.
+	st_blocked 'git commit -m "$(printf "fix #1")" && git push --force origin main'
+	st_blocked 'echo "$(printf "fix #1")"; "printenv"'
+	st_blocked 'echo "$(printf "fix #1")"; print"env"'
+	st_blocked '[[ x =~ a|(#x) ]]; printenv'
+	st_blocked $'shopt -s extglob\necho !(#x); printenv'
+	st_blocked '(( 1<(2 #x) )); printenv'
+	st_blocked 'echo $[1 #x]; printenv'
+	# Where bash starts NO comment the text stays judged, as it always was.
+	st_blocked 'echo <(echo a)#b; printenv'
+	st_blocked 'echo >(cat)#b; printenv'
+	st_blocked 'echo $((1+2))#b; printenv'
+	st_blocked 'echo $(echo a)#b; printenv'
+	st_blocked 'echo `echo a`#b; printenv'
+	st_blocked 'echo `#x`; printenv'
+	st_blocked $'echo $(echo a)#\'x\n\'; printenv'
+	st_blocked 'a=(1)#b; printenv'
+	st_blocked 'a=#x; printenv'
+	st_blocked 'echo ${x}#y; printenv'
+	st_blocked 'echo ${x:- #}; printenv'
+	st_blocked 'echo a\#b; printenv'
+	st_blocked '((1 #x)); printenv'
+	st_blocked 'echo a >#x; printenv'
+	st_blocked 'cat <<<#x; printenv'
+	st_blocked $'shopt -s extglob\necho @(a #b); printenv'
+	st_destructive_never_clears $'case a in a)# x \\\nrm -rf /;; esac' 'the filesystem root'
+	st_blocked $'((echo a)# x \\\nprintenv)'
+	# Comment text is still judged under the first reading, so a command it only mentions after
+	# an operator is refused, as it always was; its quotes, deleted, open nothing.
+	st_blocked 'echo a # ; printenv'
+	st_blocked 'echo a # see `env`'
+	st_blocked 'echo $x #$(printenv)'
+	# An accepted refusal, pinned so the choice stays visible: bash only echoes this, but the
+	# walkers misplace the comment, and with its quotes deleted the `;` is an operator.
+	st_blocked 'echo "$(printf "fix #1")" "; printenv "'
+	# ...and comment text is judged as it always was once no quote hides it, a redirection included.
+	st_blocked 'echo a # " < id_rsa'
+	# Ordinary text with a `#` in it stays allowed under both readings.
+	st_allowed 'echo a # rm -rf /'
+	st_allowed 'echo a # \; printenv'
+	st_allowed "# a note that says don't"
+	st_allowed $'echo a # note\ncat <<EOF\nprintenv\nEOF'
+	# A `#` that starts no comment leaves a heredoc's body data under both readings: inside
+	# `${…}`, inside quotes, and inside a word.
+	st_allowed $'cat ${x:- #} <<EOF\nprintenv\nEOF'
+	st_allowed $'cat "a #b" <<EOF\nprintenv\nEOF'
+	st_allowed $'cat a#b <<EOF\nprintenv\nEOF'
+	st_allowed "git commit -m \"it's # fine\""
+	st_allowed 'git commit -m "fix #12"'
+	st_allowed "echo a # it's fine"
+	st_allowed 'echo a # "quoted"'
+	st_allowed 'echo a#b'
+	st_allowed 'echo ${x:-#}'
+	st_allowed 'echo $#'
+	st_allowed 'echo ${#a}'
+	st_allowed 'echo $((16#ff))'
+	st_allowed 'echo ${x#*/} ${x##*.} "${x%#*}"'
+	st_allowed 'x=1 # set x'
+	st_allowed 'ls # list'
+	st_allowed 'echo "# heading" '"'# heading'"
+	st_allowed "grep -n '^#' f.md"
+	st_allowed 'grep -c "#include" a.c'
+	st_allowed "sed -n '/^#/p' f"
+	st_allowed "printf '%s\\n' '#!/bin/bash'"
+	st_allowed '#!/bin/bash'
+	st_allowed $'cat <<\'EOF\'\n# Title\n## Sub, don\'t\nEOF'
+	st_allowed $'git commit -m "$(cat <<\'EOF\'\nFix #12\n\nDon\'t # stop\nEOF\n)"'
+	st_allowed $'gh pr create --body "$(cat <<\'EOF\'\n## Summary\n- it\'s #1\nEOF\n)"'
+	st_allowed 'a=(1 2) # array'
+	st_allowed 'for i in 1 2; do echo $i; done # loop'
+	st_allowed 'echo a | grep b # pipe'
+	st_allowed 'curl https://example.com/#frag'
+	st_allowed "git log --format='%h #%s'"
+	st_allowed 'echo a\#b'
+	st_allowed 'echo `date` # when'
+	st_allowed 'echo $(date) # when'
+	st_allowed 'case $x in a) echo a;; esac # case'
+	st_allowed $'echo a # x\necho b # y'
+	st_allowed $'# one\n# two\necho ok'
 	# ONE FIXTURE PER WALKER, because six sites are six ways to break this and the first draft
 	# of this block demonstrated exactly one of them — every mutation but `split_segments`
 	# survived a green suite. Each command below dies with the walker it names; two of them die
@@ -6250,15 +9273,15 @@ EOF'
 	# that fails without it" and NOT the tidier "each covers exactly one" — that sentence was
 	# in an earlier draft and was false for the two `>` cases (AMH ledger row DC025).
 	#
-	# `heredoc_delim` is the sixth and it took three tries to demonstrate, which is the part
-	# worth carrying away. Draft one claimed six kills from a mutation run whose suite was
+	# The heredoc reader (`heredoc_walk`, `heredoc_delim` then) is the sixth and it took three
+	# tries to demonstrate, which is the part worth carrying away. Draft one claimed six kills from a mutation run whose suite was
 	# ALREADY red, so every mutant died for the wrong reason. Draft two put the `<<` AFTER the
 	# quoted word (`echo "a \" <<EOF`), left the string unterminated, and concluded from that
 	# one construction that the walker was unreachable on input bash accepts — a claim the
 	# review pass falsified by moving the operator INSIDE the word, where the string closes and
 	# both lines really run. The lesson is not "write fixtures": it is that "unreachable" is a
 	# claim about every input, and one failed construction is not a proof of it.
-	#   heredoc_delim: a `<<` inside a quoted WORD — the string still closes, so bash runs both
+	#   heredoc_walk: a `<<` inside a quoted WORD — the string still closes, so bash runs both
 	#   lines — opens body mode that discards every later line, which is the severity class AMH
 	#   ledger row D016 item 1 records: the rails do not fire because they never see the input.
 	st_blocked 'echo "a \" << EOF b"
@@ -6411,6 +9434,228 @@ cat .env'
 	st_allowed 'git commit -m "use > to redirect, and read the 2> form"'
 	st_allowed "git push -o ci.skip origin $BRANCH_PREFIX/x"
 	st_allowed "git push --receive-pack git-receive-pack origin $BRANCH_PREFIX/x"
+	# A short-flag cluster is read letter by letter; each of these passed while the rail
+	# knew `-f` and `-d` only as whole words.
+	st_blocked "git push -uf origin $BRANCH_PREFIX/x"
+	st_blocked "git push -fu origin $BRANCH_PREFIX/x"
+	st_blocked "git push -qf origin $BRANCH_PREFIX/x"
+	st_blocked "git push -vuf origin $BRANCH_PREFIX/x"
+	st_blocked "git push -ud origin $BRANCH_PREFIX/x"
+	st_blocked "git push -qd origin $BRANCH_PREFIX/x"
+	st_blocked "git push origin -qd $BRANCH_PREFIX/x"
+	st_blocked "git -C /repo push -uf origin $BRANCH_PREFIX/x"
+	ST_CHECKER=check_powershell_command st_blocked "git push -uf origin $BRANCH_PREFIX/x"
+	ST_CHECKER=check_powershell_command st_blocked "git push -ud origin $BRANCH_PREFIX/x"
+	# `-o` takes the rest of its cluster as its value, or the next word when it ends the
+	# cluster, so the `f` and `d` here are push options. The `-uo f` spelling was DENIED
+	# as naming two refs, because its value was read as the remote.
+	st_allowed "git push -of origin $BRANCH_PREFIX/x"
+	st_allowed "git push -uof origin $BRANCH_PREFIX/x"
+	st_allowed "git push -uod origin $BRANCH_PREFIX/x"
+	st_allowed "git push -uo f origin $BRANCH_PREFIX/x"
+	st_allowed "git push -uq origin $BRANCH_PREFIX/x"
+	st_blocked "git push -uo ci.skip -f origin $BRANCH_PREFIX/x"
+	# A long option is not a cluster: walking `--dry-run` or `--signed=no` letter by letter
+	# finds a `d` and denies the push as a deletion.
+	st_allowed "git push --dry-run origin $BRANCH_PREFIX/x"
+	st_allowed "git push --signed=no origin $BRANCH_PREFIX/x"
+	ST_CHECKER=check_powershell_command st_allowed "git push --dry-run origin $BRANCH_PREFIX/x"
+	# A long option shortened to a unique prefix is that option to git. Measured on git 2.43
+	# with `--dry-run --porcelain`: `--del` and `--delet` deleted the branch; `--force-w`,
+	# `--force-with=<ref>`, `--force-if` and `--no-veri` were accepted; `--mir`, `--al`,
+	# `--branc` and `--branches` were refused only for naming a refspec, which they make
+	# unnecessary. Each passed this rail. Every one names the branch, so what denies it is
+	# the option and not the implicit-ref rule. `--forc` is a prefix git calls ambiguous.
+	st_blocked "git push --del origin $BRANCH_PREFIX/x"
+	st_blocked "git push --delet origin $BRANCH_PREFIX/x"
+	st_blocked "git push -u origin $BRANCH_PREFIX/x --del"
+	st_blocked "git push --force-w origin $BRANCH_PREFIX/x"
+	st_blocked "git push --force-with=$BRANCH_PREFIX/x origin $BRANCH_PREFIX/x"
+	st_blocked "git push --force-if origin $BRANCH_PREFIX/x"
+	st_blocked "git push --forc origin $BRANCH_PREFIX/x"
+	st_blocked "git push --no-veri origin $BRANCH_PREFIX/x"
+	st_blocked "git push --mir origin $BRANCH_PREFIX/x"
+	st_blocked "git push --al origin $BRANCH_PREFIX/x"
+	st_blocked "git push --branc origin $BRANCH_PREFIX/x"
+	st_blocked "git push --branches origin $BRANCH_PREFIX/x"
+	# The full names, each with the branch named, so the arm and not the implicit-ref rule
+	# is what denies them.
+	st_blocked "git push --delete origin $BRANCH_PREFIX/x"
+	st_blocked "git push --force-with-lease origin $BRANCH_PREFIX/x"
+	st_blocked "git push --force-with-lease=$BRANCH_PREFIX/x origin $BRANCH_PREFIX/x"
+	st_blocked "git push --force-if-includes origin $BRANCH_PREFIX/x"
+	st_blocked "git push --mirror origin $BRANCH_PREFIX/x"
+	st_blocked "git push --all origin $BRANCH_PREFIX/x"
+	ST_CHECKER=check_powershell_command st_blocked "git push --del origin $BRANCH_PREFIX/x"
+	ST_CHECKER=check_powershell_command st_blocked "git push --force-w origin $BRANCH_PREFIX/x"
+	ST_CHECKER=check_powershell_command st_blocked "git push --no-veri origin $BRANCH_PREFIX/x"
+	ST_CHECKER=check_powershell_command st_blocked "git push --mir origin $BRANCH_PREFIX/x"
+	# A value-taking long option, whole or shortened, takes the next word. Read as the
+	# remote, it made `origin` the one named ref, and each of these passed while git pushed
+	# with the ref left implicit (git 2.43); `--repo`'s value leaves the branch to be read
+	# as the repository.
+	st_blocked 'git push --push-opt x origin'
+	st_blocked 'git push --push-option x origin'
+	st_blocked 'git push --ex git-receive-pack origin'
+	st_blocked 'git push --recurse-submodules check origin'
+	st_blocked "git push --repo origin $BRANCH_PREFIX/x"
+	st_blocked "git push --rep origin $BRANCH_PREFIX/x"
+	ST_CHECKER=check_powershell_command st_blocked 'git push --push-opt x origin'
+	# Harmless long options, whole and shortened, pass, and so does a value-taking option
+	# that names the branch after its value. `--push-opt x` was denied as naming two refs.
+	st_allowed "git push --no-force-with-lease origin $BRANCH_PREFIX/x"
+	st_allowed "git push --set-up origin $BRANCH_PREFIX/x"
+	st_allowed "git push --verify origin $BRANCH_PREFIX/x"
+	st_allowed "git push --at origin $BRANCH_PREFIX/x"
+	st_allowed "git push --follow-tags origin $BRANCH_PREFIX/x"
+	st_allowed "git push --push-opt x origin $BRANCH_PREFIX/x"
+	st_allowed "git push --push-option=x origin $BRANCH_PREFIX/x"
+	st_allowed "git push --recurse-submodules check origin $BRANCH_PREFIX/x"
+	st_allowed "git push --recurse-submodules=check origin $BRANCH_PREFIX/x"
+	st_allowed "git push --recurse=check origin $BRANCH_PREFIX/x"
+	st_allowed "git push --repo=origin origin $BRANCH_PREFIX/x"
+	st_allowed 'git commit -m "--del"'
+	ST_CHECKER=check_powershell_command st_allowed "git push --push-opt x origin $BRANCH_PREFIX/x"
+	# After `--` or `--end-of-options` every word is a refspec to git (git 2.43: `-o`,
+	# `--repo` and `--force` there were each refused as a src refspec). Read as options,
+	# `-o` and `--repo` swallowed the default branch behind them and the push passed.
+	st_blocked "git push -- origin $BRANCH_PREFIX/x -o $DEFAULT_BRANCH"
+	st_blocked "git push -- origin $BRANCH_PREFIX/x --repo $DEFAULT_BRANCH"
+	st_blocked "git push --end-of-options origin $BRANCH_PREFIX/x --repo $DEFAULT_BRANCH"
+	st_blocked "git push origin -- $BRANCH_PREFIX/x --push-option $DEFAULT_BRANCH"
+	st_blocked "git push -- origin $BRANCH_PREFIX/x --x:$DEFAULT_BRANCH"
+	ST_CHECKER=check_powershell_command st_blocked "git push -- origin $BRANCH_PREFIX/x -o $DEFAULT_BRANCH"
+	# A word after the terminator is one ref, not an option: this names one branch.
+	st_allowed "git push -u -- origin $BRANCH_PREFIX/x"
+	st_allowed "git push -u --end-of-options origin $BRANCH_PREFIX/x"
+	# The pre-push rail's off switches. Each of these passed every rail.
+	st_blocked "git push --no-verify -u origin $BRANCH_PREFIX/x"
+	st_blocked "git push -u origin $BRANCH_PREFIX/x --no-verify"
+	st_blocked "git -C /repo push --no-verify -u origin $BRANCH_PREFIX/x"
+	st_blocked "git -c core.hooksPath=/dev/null push -u origin $BRANCH_PREFIX/x"
+	st_blocked "git -c CORE.HOOKSPATH=/dev/null push -u origin $BRANCH_PREFIX/x"
+	st_blocked "git -c \"core.hooksPath=/dev/null\" push -u origin $BRANCH_PREFIX/x"
+	st_blocked "git -c core.hooksPath push -u origin $BRANCH_PREFIX/x"
+	st_blocked "git --config-env=core.hooksPath=HP push -u origin $BRANCH_PREFIX/x"
+	st_blocked "git --config-env core.hooksPath=HP push -u origin $BRANCH_PREFIX/x"
+	st_blocked 'git config core.hooksPath /tmp/none'
+	st_blocked 'git config --global core.hooksPath /dev/null'
+	st_blocked 'git config --add core.hookspath /dev/null'
+	st_blocked 'git config set core.hooksPath /dev/null'
+	st_blocked 'git config --file .git/config core.hooksPath /dev/null'
+	st_blocked 'git -C /repo config core.hooksPath .githooks'
+	st_blocked 'git config set --global core.hooksPath /dev/null'
+	# The classic form stops reading options at the key, so each of these SETS the key to
+	# the word after it (`--type`, `--get`), measured on git 2.43.
+	st_blocked 'git config core.hooksPath --type path'
+	st_blocked 'git config core.hooksPath --get'
+	# Options read as git's parse-options reads them, each measured on git 2.43 writing the
+	# key: a short value option alone, in a cluster and glued; a negated mode; and a long
+	# option shortened to a prefix git accepts.
+	st_blocked 'git config -t path core.hooksPath /tmp/none'
+	st_blocked 'git config -zf /tmp/other.cfg core.hooksPath /tmp/none'
+	st_blocked 'git config -tpath core.hooksPath /tmp/none'
+	st_blocked 'git config --get --no-get core.hooksPath /tmp/none'
+	st_blocked 'git config --unset --no-unset core.hooksPath /tmp/none'
+	st_blocked 'git config --typ path core.hooksPath /tmp/none'
+	st_blocked 'git config --fil other.cfg core.hooksPath /tmp/none'
+	st_blocked 'git config --file=other.cfg core.hooksPath /tmp/none'
+	st_blocked 'git config -- core.hooksPath /tmp/none'
+	ST_CHECKER=check_powershell_command st_blocked "git push --no-verify -u origin $BRANCH_PREFIX/x"
+	ST_CHECKER=check_powershell_command st_blocked 'git config core.hooksPath /tmp/none'
+	# `--config-env` takes the next word as its value, as `-c` does. Read as a lone flag,
+	# `user.name=X` was taken for the subcommand and the force push behind it passed.
+	st_blocked "git --config-env user.name=X push --force origin $BRANCH_PREFIX/x"
+	# Reading or unsetting the key, another key, a message that names the flag, and a
+	# commit, which no AMH hook guards.
+	st_allowed 'git config --get core.hooksPath'
+	st_allowed 'git config core.hooksPath'
+	st_allowed 'git config get core.hooksPath'
+	st_allowed 'git config --unset core.hooksPath'
+	st_allowed 'git config --unset core.hooksPath /dev/null'
+	st_allowed 'git config --get core.hooksPath /dev/null'
+	st_allowed 'git config --get-reg core.hooksPath /dev/null'
+	st_allowed 'git config --get --no-unset core.hooksPath /dev/null'
+	# Behind `set` (git 2.46), `--comment` takes the next word: this sets `alias.example`.
+	st_allowed 'git config set --comment core.hooksPath alias.example value'
+	st_allowed 'git config unset core.hooksPath'
+	st_allowed 'git config --show-origin --get core.hooksPath'
+	st_allowed 'git config --type path core.hooksPath'
+	st_allowed 'git config user.name x'
+	st_allowed 'git config alias.x core.hooksPath y'
+	st_allowed "git -c user.name=x push -u origin $BRANCH_PREFIX/x"
+	st_allowed "git --config-env user.name=X push -u origin $BRANCH_PREFIX/x"
+	st_allowed 'git -c core.hooksPath=/dev/null commit -m x'
+	st_allowed 'git commit -m "never use --no-verify"'
+	st_allowed 'git commit --no-verify -m x'
+	ST_CHECKER=check_powershell_command st_allowed 'git config --get core.hooksPath'
+	# The hook FILE: removed, moved aside, its execute bit taken, or replaced. Each passed every
+	# rail. A one-time advisory per command text, never a denial.
+	st_hookfile_advisory fires 'rm -f .git/hooks/pre-push' 'mv .git/hooks/pre-push /tmp/'
+	st_hookfile_advisory fires 'mv .git/hooks/pre-push /tmp/' 'chmod -x .git/hooks/pre-push'
+	st_hookfile_advisory fires 'chmod -x .git/hooks/pre-push' 'rm -f .git/hooks/pre-push'
+	st_hookfile_advisory fires 'rm .git/hooks/pre-push'
+	st_hookfile_advisory fires 'chmod 644 .git/hooks/pre-push'
+	st_hookfile_advisory fires 'mv my-hook .git/hooks/pre-push'
+	st_hookfile_advisory fires 'mv .git/hooks .git/hooks.off'
+	st_hookfile_advisory fires 'chmod -R a-x .git/hooks/'
+	st_hookfile_advisory fires 'rm -f .git/hooks/*'
+	st_hookfile_advisory fires 'rm -f .git/hooks/pre-*'
+	st_hookfile_advisory fires 'rm -f ./.git/hooks/pre-push'
+	st_hookfile_advisory fires 'rm -f /repo/.git/hooks/pre-push'
+	st_hookfile_advisory fires 'rm -f ".git/hooks/pre-push"'
+	st_hookfile_advisory fires 'rm -f .GIT/Hooks/Pre-Push'
+	st_hookfile_advisory fires 'sudo rm -f .git/hooks/pre-push'
+	st_hookfile_advisory fires 'cd /repo && rm -f .git/hooks/pre-push'
+	st_hookfile_advisory fires '/bin/rm -f .git/hooks/pre-push'
+	st_hookfile_advisory fires 'rm \
+-f .git/hooks/pre-push'
+	ST_CHECKER=check_powershell_command st_hookfile_advisory fires 'Remove-Item .git\hooks\pre-push' 'Move-Item .git\hooks\pre-push C:\tmp'
+	ST_CHECKER=check_powershell_command st_hookfile_advisory fires 'rm -Force .git/hooks/pre-push'
+	ST_CHECKER=check_powershell_command st_hookfile_advisory fires 'Rename-Item -Path:.git\hooks\pre-push -NewName pre-push.off'
+	ST_CHECKER=check_powershell_command st_hookfile_advisory fires 'Remove-Item C:\repo\.git\hooks\pre-push'
+	ST_CHECKER=check_powershell_command st_hookfile_advisory fires 'chmod -x .git/hooks/pre-push'
+	ST_CHECKER=check_powershell_command st_hookfile_advisory fires "mv '.git\\hooks\\pre-push' 'C:\\tmp\\'"
+	# Literal spellings of the same path, and operands an option carries. Each passed the first
+	# version of this rail, found by its review.
+	st_hookfile_advisory fires 'rm -f .git/hooks/./pre-push'
+	st_hookfile_advisory fires 'rm -f .git//hooks/pre-push'
+	st_hookfile_advisory fires 'chmod -x .git/./hooks/pre-push'
+	# The same folding on a path that names no hook. On a bash that misreads the fold, the
+	# function answers yes for any such path, and this is the fixture that says so.
+	st_hookfile_advisory silent 'rm -f src//build/./x'
+	st_hookfile_advisory fires 'mv .git/hooks/. /tmp/hooks'
+	st_hookfile_advisory fires 'rm -f .git/hooks/{pre-push,pre-commit}'
+	st_hookfile_advisory fires 'mv --target-directory=.git/hooks pre-push'
+	st_hookfile_advisory fires 'mv -t.git/hooks pre-push'
+	st_hookfile_advisory fires 'mv -ft.git/hooks pre-push'
+	st_hookfile_advisory fires 'mv -t .git/hooks pre-push'
+	st_hookfile_advisory fires 'rm -f -- .git/hooks/pre-push'
+	ST_CHECKER=check_powershell_command st_hookfile_advisory fires 'Remove-Item .git/hooks/./pre-push'
+	ST_CHECKER=check_powershell_command st_hookfile_advisory fires 'Remove-Item -Path .git/hooks/pre-commit,.git/hooks/pre-push'
+	ST_CHECKER=check_powershell_command st_hookfile_advisory fires 'rm.exe -f .git/hooks/pre-push'
+	ST_CHECKER=check_powershell_command st_hookfile_advisory fires 'mv.exe .git/hooks/pre-push C:/tmp'
+	# `--reference` only READS the hook's mode; the file it changes is the other one.
+	st_hookfile_advisory silent 'chmod --reference=/repo/.git/hooks/pre-push scripts/tool.sh'
+	st_hookfile_advisory silent 'chmod --reference /repo/.git/hooks/pre-push scripts/tool.sh'
+	st_hookfile_advisory silent 'chmod --ref /repo/.git/hooks/pre-push scripts/tool.sh'
+	# A glued `--reference=` takes no next word, so the hook after it is still the operand.
+	st_hookfile_advisory fires 'chmod --reference=scripts/tool.sh .git/hooks/pre-push'
+	# An option's own value is not an operand; after `--`, a word that looks like one is.
+	st_hookfile_advisory silent 'mv --suffix=/x/.git/hooks/pre-push a b'
+	st_hookfile_advisory fires 'rm -f -- -/.git/hooks/pre-push'
+	# A permanent denial in the same command is the first verdict, not this advisory.
+	st_destructive_never_clears 'rm -rf / .git/hooks/pre-push' 'the filesystem root'
+	# Other hooks, the sample, reading or listing the hook, and prose naming it.
+	st_hookfile_advisory silent 'rm -f .git/hooks/pre-commit'
+	st_hookfile_advisory silent 'rm -f .git/hooks/pre-push.sample'
+	st_hookfile_advisory silent 'chmod +x scripts/pre-push'
+	st_hookfile_advisory silent 'mv .git/hooksbak/pre-push /tmp/'
+	st_hookfile_advisory silent 'cat .git/hooks/pre-push'
+	st_hookfile_advisory silent 'ls -l .git/hooks/pre-push'
+	st_hookfile_advisory silent 'git commit -m "rm -f .git/hooks/pre-push is advised"'
+	st_hookfile_advisory silent 'echo rm .git/hooks/pre-push'
+	ST_CHECKER=check_powershell_command st_hookfile_advisory silent 'Get-Content .git\hooks\pre-push'
 	st_allowed 'env FOO=1 make test'
 	# The rail's own false positive, and the reason this arm was rewritten: unsetting a
 	# name prints nothing, and this repository's shipped fixture suite runs that exact
@@ -6471,6 +9716,39 @@ cat .env'
 	# A file whose name merely contains the stem is not the key, and prose about one is prose.
 	st_allowed 'cat id_rsa_fixture_notes.md'
 	st_allowed 'git commit -m "block cat id_rsa at the rail"'
+	# A project's `.npmrc` is commonly committed and commonly tokenless: only the home one is
+	# a store. The same holds for a file merely BESIDE a store, and for checks that print no
+	# value.
+	st_allowed 'cat .npmrc'
+	st_allowed 'cat ./.npmrc'
+	st_allowed 'cat packages/web/.npmrc'
+	st_allowed 'cat /home/dev/project/.npmrc'
+	st_allowed 'cat ~/.aws/config'
+	st_allowed 'cat ~/.cargo/config.toml'
+	st_allowed 'cat ~/.docker/daemon.json'
+	st_allowed 'cat ~/.config/gh/config.yml'
+	st_allowed '[ -f ~/.netrc ] && echo present'
+	st_allowed 'ls -la ~/.aws'
+	st_allowed 'git commit -m "never cat ~/.netrc"'
+	st_allowed 'gh auth status'
+	st_allowed 'gh auth status -h github.com'
+	# `-h` takes the rest of its cluster as the host, so the `t` in it is no flag.
+	st_allowed 'gh auth status -hgithub.com'
+	st_allowed 'gh auth status --show-token=false'
+	st_allowed 'gh auth status -t=false'
+	st_allowed 'gh auth status --json hosts --template "-t"'
+	st_allowed 'git credential-store --file get store'
+	st_allowed 'git --git-dir /some/repo status'
+	st_allowed 'cat < "notes with space.txt"'
+	st_allowed 'cat <&3'
+	st_allowed 'gh auth login'
+	st_allowed 'gh pr view 1'
+	st_allowed 'git credential approve'
+	st_allowed 'git config --get-all credential.helper'
+	st_allowed 'echo "gh auth token prints it"'
+	# The same inherited false positive as `id_rsa` above, a decision rather than a surprise:
+	# the one-word pattern reads as the path.
+	st_blocked 'grep -rn ".netrc" docs/'
 	# Inherited false positive, fixtured so it is a decision rather than a surprise: a
 	# one-word search PATTERN is indistinguishable from a path after quote stripping, so
 	# grepping the tree for the literal stem is blocked — exactly as `grep -rn ".env" docs/`
@@ -6591,6 +9869,86 @@ git push --force origin main
 	# A BRANCH whose name merely contains `tags` is not a tag.
 	st_prepush_allowed "refs/heads/$BRANCH_PREFIX/tags-cleanup" "$pp_a" "refs/heads/$BRANCH_PREFIX/tags-cleanup" "$pp_zero"
 
+	# --- machine mode (`--machine`; see MACHINE MODE in the header) ---
+	# Every ALLOWED case below is a command the project guard refuses, permanently or once, so each
+	# fails against a script whose machine mode changes nothing. Every BLOCKED case must keep its
+	# own reason, so a machine mode that skipped too much fails them. The one-time tiers get FRESH,
+	# unspent state files here, so a machine mode that still fired an advisory would refuse the
+	# `.env`, `.pem`, deletion, interpreter and hook-file cases — and the check after them fails
+	# if machine mode wrote any state file at all (AMH ledger row DD063).
+	local mm_dir mm_f
+	local mm_old_dotenv_set=${DOTENV_ADVISORY_STATE+x} mm_old_dotenv=${DOTENV_ADVISORY_STATE:-}
+	local mm_old_keymaterial_set=${KEYMATERIAL_ADVISORY_STATE+x} mm_old_keymaterial=${KEYMATERIAL_ADVISORY_STATE:-}
+	local mm_old_destructive_set=${DESTRUCTIVE_ADVISORY_STATE+x} mm_old_destructive=${DESTRUCTIVE_ADVISORY_STATE:-}
+	local mm_old_interpreter_set=${INTERPRETER_ADVISORY_STATE+x} mm_old_interpreter=${INTERPRETER_ADVISORY_STATE:-}
+	local mm_old_hookfile_set=${HOOKFILE_ADVISORY_STATE+x} mm_old_hookfile=${HOOKFILE_ADVISORY_STATE:-}
+	mm_dir=$(mktemp -d "${TMPDIR:-/tmp}/amh-machine-self-test.XXXXXX") || exit 1
+	DOTENV_ADVISORY_STATE=$mm_dir/dotenv
+	KEYMATERIAL_ADVISORY_STATE=$mm_dir/keymaterial
+	DESTRUCTIVE_ADVISORY_STATE=$mm_dir/destructive
+	INTERPRETER_ADVISORY_STATE=$mm_dir/interpreter
+	HOOKFILE_ADVISORY_STATE=$mm_dir/hookfile
+	# The permanent deletion verdicts, the reported incident's own command first.
+	st_machine blocked bash 'cmd /c "rmdir /s /q \"D:\My Documents\Projects\_scratch_sitevideo\profile\""' 'nested quotes'
+	st_machine blocked bash "cmd /c rmdir /s /q \\" 'the filesystem root'
+	st_machine blocked bash 'rm -rf /' 'the filesystem root'
+	st_machine blocked bash 'rm -rf ~' 'your home directory'
+	st_machine blocked bash 'xargs rm -rf ~' 'your home directory'
+	st_machine blocked bash '< list.txt rm -rf ~' 'your home directory'
+	st_machine blocked bash 'git --git-dir="$HOME/.cfg" --work-tree="$HOME" clean -fd' 'your home directory'
+	st_machine blocked powershell 'cmd /c "rmdir /s /q \"D:\My Documents\Projects\_scratch_sitevideo\profile\""' 'nested quotes'
+	st_machine blocked powershell "Remove-Item -Recurse -Force C:\\" 'the root of a Windows drive'
+	st_machine blocked powershell "rm -r -fo D:\\" 'the root of a Windows drive'
+	# The credential tier, whole.
+	st_machine blocked bash 'cat .env' 'credential values'
+	st_machine blocked bash 'cat id_ed25519' 'private key material'
+	st_machine blocked bash 'cat ~/.aws/credentials' 'login tokens'
+	st_machine blocked bash "tr '\\0' '\\n' < /proc/self/environ" 'Redirecting from'
+	st_machine blocked bash 'printenv' 'prints credential values'
+	st_machine blocked bash 'env' 'prints the environment'
+	st_machine blocked bash 'echo "$GITHUB_TOKEN"' 'credential-shaped variable'
+	st_machine blocked bash 'source .env' 'loads every credential'
+	st_machine blocked bash 'gh auth token' 'GitHub token'
+	st_machine blocked bash 'git credential fill' 'credential helper'
+	st_machine blocked powershell 'gh auth token' 'GitHub token'
+	st_machine blocked powershell 'cat C:\Users\dev\.netrc' 'login tokens'
+	# The refusal to pass what the guard could not read.
+	st_machine blocked bash $'cat <<EOF\nrm -rf /' 'could not find the end of a heredoc'
+	# AMH's own process: the push rails, the pre-push rail's off switches, the forge/API rail.
+	st_machine allowed bash 'git push --force origin main'
+	st_machine allowed bash 'git push origin main'
+	st_machine allowed bash 'git push'
+	st_machine allowed bash 'git push origin refs/tags/v1.0.0'
+	st_machine allowed bash 'git push --no-verify origin feature'
+	st_machine allowed bash 'git -c core.hooksPath=/dev/null push origin feature'
+	st_machine allowed bash 'git config core.hooksPath .githooks'
+	st_machine allowed bash 'gh api -X DELETE repos/o/r/git/refs/heads/x'
+	st_machine allowed powershell 'git push --force origin main'
+	# Every one-time tier, and the ladder warning (`st_machine allowed` refuses a warning too).
+	st_machine allowed bash 'rm -rf build'
+	st_machine allowed bash 'git reset --hard "$BASE"'
+	st_machine allowed bash 'ls | xargs rm -rf'
+	st_machine allowed bash 'supabase db reset'
+	st_machine allowed bash 'ls -la .env'
+	st_machine allowed bash 'openssl x509 -in cert.pem -noout -text'
+	st_machine allowed bash "python3 -c \"import shutil; shutil.rmtree('build')\""
+	st_machine allowed bash 'rm .git/hooks/pre-push'
+	st_machine allowed bash 'scripts/ladder.sh 2>&1 | tail -n 20'
+	st_machine allowed powershell 'Remove-Item -Recurse -Force .\build'
+	st_machine allowed powershell 'cmd /c "rd /s /q build"'
+	for mm_f in "$mm_dir"/*; do
+		[ -e "$mm_f" ] || continue
+		printf 'SELF-TEST FAIL: machine mode wrote advisory state: %s\n' "${mm_f##*/}" >&2
+		ST_FAILS=$((ST_FAILS + 1))
+	done
+	rm -f -- "$mm_dir"/*
+	rmdir -- "$mm_dir" 2>/dev/null || :
+	if [ -n "$mm_old_dotenv_set" ]; then DOTENV_ADVISORY_STATE=$mm_old_dotenv; else unset DOTENV_ADVISORY_STATE; fi
+	if [ -n "$mm_old_keymaterial_set" ]; then KEYMATERIAL_ADVISORY_STATE=$mm_old_keymaterial; else unset KEYMATERIAL_ADVISORY_STATE; fi
+	if [ -n "$mm_old_destructive_set" ]; then DESTRUCTIVE_ADVISORY_STATE=$mm_old_destructive; else unset DESTRUCTIVE_ADVISORY_STATE; fi
+	if [ -n "$mm_old_interpreter_set" ]; then INTERPRETER_ADVISORY_STATE=$mm_old_interpreter; else unset INTERPRETER_ADVISORY_STATE; fi
+	if [ -n "$mm_old_hookfile_set" ]; then HOOKFILE_ADVISORY_STATE=$mm_old_hookfile; else unset HOOKFILE_ADVISORY_STATE; fi
+
 	rm -f -- "$self_keymaterial_advisory_state"
 	if [ -n "$old_keymaterial_advisory_state_set" ]; then
 		KEYMATERIAL_ADVISORY_STATE=$old_keymaterial_advisory_state
@@ -6609,6 +9967,12 @@ git push --force origin main
 	else
 		unset DESTRUCTIVE_ADVISORY_STATE
 	fi
+	rm -f -- "$self_hookfile_advisory_state"
+	if [ -n "$old_hookfile_advisory_state_set" ]; then
+		HOOKFILE_ADVISORY_STATE=$old_hookfile_advisory_state
+	else
+		unset HOOKFILE_ADVISORY_STATE
+	fi
 	if [ "$ST_FAILS" -ne 0 ]; then
 		printf 'command-guard.sh self-test: %d failure(s)\n' "$ST_FAILS" >&2
 		return 1
@@ -6625,18 +9989,31 @@ git push --force origin main
 #
 # Exit is always 0, including when the state files are absent, which is the ordinary case in
 # a session that deleted nothing.
+#
+# The two state directories are one record split in two (see advisory_state_dir), so the report
+# is the union of advised signatures minus the union of resumed ones: a deletion advised where
+# both were written and resumed where only one was is not abandoned. Each line is tagged with
+# the file it came from, `A` advised or `R` resumed, and the set difference is awk's.
 advisory_report() {
-	local state advised
-	state=$(advisory_state_file destructive) || return 0
-	[ -n "$state" ] || return 0
-	[ -e "$state" ] || return 0
-	while IFS= read -r advised; do
-		[ -n "$advised" ] || continue
-		if [ -e "$state.resumed" ] && LC_ALL=C grep -qxF -- "$advised" "$state.resumed" 2>/dev/null; then
-			continue
+	local state line
+	local -a ADVISORY_STATES=()
+	advisory_state_files destructive 2>/dev/null || return 0
+	for state in "${ADVISORY_STATES[@]}"; do
+		# Opened silently: a failed open would print the state file's path, which carries this
+		# repository's location (AMH ledger row DD097).
+		if [ -f "$state" ] && [ -r "$state" ]; then
+			while IFS= read -r line || [ -n "$line" ]; do printf 'A %s\n' "$line"; done 2>/dev/null <"$state"
 		fi
-		printf '%s\n' "$advised"
-	done <"$state"
+		if [ -f "$state.resumed" ] && [ -r "$state.resumed" ]; then
+			while IFS= read -r line || [ -n "$line" ]; do printf 'R %s\n' "$line"; done 2>/dev/null <"$state.resumed"
+		fi
+	done |
+		LC_ALL=C awk '
+			{ sig = substr($0, 3) }
+			sig == "" { next }
+			/^R / { resumed[sig] = 1; next }
+			!(sig in seen) { seen[sig] = 1; order[++n] = sig }
+			END { for (i = 1; i <= n; i++) if (!(order[i] in resumed)) print order[i] }'
 	return 0
 }
 
@@ -6670,15 +10047,33 @@ run_pretask() {
 # gate, CI step or decision procedure may read it as evidence of a check (P3, AMH ledger row
 # D014).
 spawn_report() {
-	local state count
-	state=$(advisory_state_file subagent) || return 0
-	[ -n "$state" ] || return 0
-	[ -e "$state.resumed" ] || return 0
-	count=$(LC_ALL=C grep -c '' "$state.resumed" 2>/dev/null) || return 0
+	local state count=0 n
+	local -a ADVISORY_STATES=()
+	advisory_state_files subagent 2>/dev/null || return 0
+	for state in "${ADVISORY_STATES[@]}"; do
+		[ -e "$state.resumed" ] || continue
+		n=$(LC_ALL=C grep -c '' "$state.resumed" 2>/dev/null) || continue
+		count=$((count + n))
+	done
 	[ "$count" -gt 0 ] || return 0
 	printf '%s\n' "$count"
 	return 0
 }
+
+# Machine mode has three entry points: the hook and the two inspections. The others belong to
+# a repository — git's pre-push stdin, the spawn speed bump, this file's fixture matrix and the
+# advisory reports — so with `--machine` they are a usage error, and a usage error exits 2, which
+# a host reads as a refusal: a misspelled user-level hook refuses every call rather than letting
+# every call through unjudged.
+if [ "$MACHINE_MODE" -eq 1 ]; then
+	case "${1:-}" in
+	"" | --command | --powershell) ;;
+	*)
+		printf 'usage: %s --machine [--command CMD|--powershell CMD]\n' "$0" >&2
+		exit 2
+		;;
+	esac
+fi
 
 case "${1:-}" in
 "") run_hook ;;
@@ -6687,7 +10082,7 @@ case "${1:-}" in
 		[ -n "$WARN_REASON" ] && printf 'WARNING from the AMH command guard.\n\n%s\n' "$WARN_REASON" >&2
 		exit 0
 	fi
-	printf 'BLOCKED by the AMH command guard.\n\n%s\n' "$BLOCK_REASON" >&2
+	printf '%s\n\n%s\n' "$BLOCK_HEADING" "$BLOCK_REASON" >&2
 	exit 2
 	;;
 --powershell)
@@ -6695,7 +10090,7 @@ case "${1:-}" in
 		[ -n "$WARN_REASON" ] && printf 'WARNING from the AMH command guard.\n\n%s\n' "$WARN_REASON" >&2
 		exit 0
 	fi
-	printf 'BLOCKED by the AMH command guard.\n\n%s\n' "$BLOCK_REASON" >&2
+	printf '%s\n\n%s\n' "$BLOCK_HEADING" "$BLOCK_REASON" >&2
 	exit 2
 	;;
 --pre-push) run_prepush ;;
@@ -6704,7 +10099,7 @@ case "${1:-}" in
 --advisory-report) advisory_report ;;
 --spawn-report) spawn_report ;;
 *)
-	printf 'usage: %s [--command CMD|--powershell CMD|--pre-push|--pre-task|--self-test|--advisory-report|--spawn-report]\n' "$0" >&2
+	printf 'usage: %s [--command CMD|--powershell CMD|--pre-push|--pre-task|--self-test|--advisory-report|--spawn-report]\n       %s --machine [--command CMD|--powershell CMD]\n' "$0" "$0" >&2
 	exit 2
 	;;
 esac

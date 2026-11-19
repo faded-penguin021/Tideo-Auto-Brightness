@@ -13,7 +13,12 @@
 set -uo pipefail
 
 ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
-WORK=$(mktemp -d)
+# Checked: an empty WORK puts every fixture at the filesystem root, and the suite would go on
+# to report on trees it never built.
+if ! WORK=$(mktemp -d) || [ -z "$WORK" ] || [ ! -d "$WORK" ]; then
+	printf '%s: no scratch directory could be created — no fixture ran\n' "${0##*/}" >&2
+	exit 1
+fi
 trap 'rm -rf "$WORK"' EXIT
 
 export GIT_AUTHOR_NAME=amh-test GIT_AUTHOR_EMAIL=amh@test.invalid
@@ -21,6 +26,7 @@ export GIT_COMMITTER_NAME=amh-test GIT_COMMITTER_EMAIL=amh@test.invalid
 
 PASSED=0
 FAILED=0
+SKIPPED=0
 SUITE_STARTED=$SECONDS
 REPORT_STARTED=$SECONDS
 SLOW_FIXTURE_SECONDS=${SLOW_FIXTURE_SECONDS:-10}
@@ -259,12 +265,17 @@ run_full() { (cd "$1" && CI=1 scripts/ladder.sh 2>&1); }
 run_local() { (cd "$1" && env -u CI scripts/ladder.sh --guards-only 2>&1); }
 
 # --- assertions -------------------------------------------------------------
-report() { # <ok|no> <name> <detail...>
+# `skip` is for a fixture this host cannot run. It is counted apart, so the pass total counts
+# only assertions that ran: a skip reported as `ok` reads, in the summary, exactly like a pass.
+report() { # <ok|no|skip> <name> <detail...>
 	local elapsed=${FIXTURE_ELAPSED_SECONDS:-$((SECONDS - REPORT_STARTED))}
 	record_timing "$2" "$elapsed"
 	if [ "$1" = ok ]; then
 		PASSED=$((PASSED + 1))
 		printf 'ok %03d - %ss - %s\n' "$((PASSED + FAILED))" "$elapsed" "$2" >&2
+	elif [ "$1" = skip ]; then
+		SKIPPED=$((SKIPPED + 1))
+		printf 'skip - %s\n' "$2" >&2
 	else
 		FAILED=$((FAILED + 1))
 		shift
@@ -305,6 +316,24 @@ timing_diagnostics_self_test() {
 			"an out-of-range threshold was accepted"
 	else
 		report ok "timing diagnostics filter and summarize fixtures"
+	fi
+}
+
+# The skip verdict, exercised in a subshell so its counts stay out of the real ones: a skip
+# must raise the skip count, leave the pass and fail counts alone, and say `skip`.
+skip_verdict_probe() {
+	local PASSED=0 FAILED=0 SKIPPED=0
+	report skip "a fixture this host cannot run" 2>&1
+	printf '%s %s %s\n' "$PASSED" "$FAILED" "$SKIPPED"
+}
+skip_verdict_self_test() {
+	local out
+	out=$(skip_verdict_probe)
+	if [ "$(printf '%s\n' "$out" | tail -1)" = '0 0 1' ] &&
+		grep -qxF 'skip - a fixture this host cannot run' <<<"$out"; then
+		report ok "a skipped fixture is counted as skipped, not passed"
+	else
+		report no "a skipped fixture is counted as skipped, not passed" "$out"
 	fi
 }
 
@@ -468,13 +497,14 @@ akia_token() {
 # =============================================================================
 printf 'ladder guard fixtures\n'
 timing_diagnostics_self_test
+skip_verdict_self_test
 
 # --- command-guard.sh: Codex PreToolUse payload -----------------------------
 d=$(mk codex_hook_payload)
 out=$(cd "$d" && printf '%s' '{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"cat .env"}}' |
 	scripts/command-guard.sh 2>&1)
 rc=$?
-if [ "$rc" -eq 2 ] && printf '%s' "$out" | grep -qF 'prefer presence-only checks'; then
+if [ "$rc" -eq 2 ] && grep -qF 'prefer presence-only checks' <<<"$out"; then
 	report ok "a forbidden Codex Bash payload is blocked with the instructive reason"
 else
 	report no "a forbidden Codex Bash payload is blocked with the instructive reason" "rc=$rc" "$out"
@@ -501,7 +531,7 @@ if [ "$rc" -eq 0 ]; then report ok "a non-Bash Codex payload fails open"; else r
 out=$(cd "$d" && printf '%s' '{"hook_event_name":"PreToolUse","tool_name":"PowerShell","tool_input":{"command":"Remove-Item -Recurse -Force C:\\"}}' |
 	scripts/command-guard.sh 2>&1)
 rc=$?
-if [ "$rc" -eq 2 ] && printf '%s' "$out" | grep -qF 'the root of a Windows drive'; then
+if [ "$rc" -eq 2 ] && grep -qF 'the root of a Windows drive' <<<"$out"; then
 	report ok "a PowerShell payload deleting a drive root is blocked by the PowerShell reader"
 else
 	report no "a PowerShell payload deleting a drive root is blocked by the PowerShell reader" "rc=$rc" "$out"
@@ -527,7 +557,7 @@ if [ "$rc" -eq 2 ]; then report ok "a Codex Bash payload is guarded without Pyth
 out=$(cd "$d" && printf '%s' '{"hook_event_name":"PreToolUse","tool_name":"PowerShell","tool_input":{"command":"Remove-Item -Recurse -Force C:\\"}}' |
 	env PATH="$fallback_path" scripts/command-guard.sh 2>&1)
 rc=$?
-if [ "$rc" -eq 2 ] && printf '%s' "$out" | grep -qF 'the root of a Windows drive'; then
+if [ "$rc" -eq 2 ] && grep -qF 'the root of a Windows drive' <<<"$out"; then
 	report ok "a PowerShell payload is guarded without Python"
 else
 	report no "a PowerShell payload is guarded without Python" "rc=$rc" "$out"
@@ -539,17 +569,95 @@ fi
 incident_payload='{"hook_event_name":"PreToolUse","tool_name":"PowerShell","tool_input":{"command":"cmd /c \"rmdir /s /q \\\"\\\\?\\C:\\x\\\"\"","description":"clean up worktrees"}}'
 out=$(cd "$d" && printf '%s' "$incident_payload" | env PATH="$fallback_path" scripts/command-guard.sh 2>&1)
 rc=$?
-if [ "$rc" -eq 2 ] && printf '%s' "$out" | grep -qF 'nested quotes'; then
+if [ "$rc" -eq 2 ] && grep -qF 'nested quotes' <<<"$out"; then
 	report ok "the incident command is denied without Python, decoded from its JSON escapes"
 else
 	report no "the incident command is denied without Python, decoded from its JSON escapes" "rc=$rc" "$out"
 fi
 out=$(cd "$d" && printf '%s' "$incident_payload" | scripts/command-guard.sh 2>&1)
 rc=$?
-if [ "$rc" -eq 2 ] && printf '%s' "$out" | grep -qF 'nested quotes'; then
+if [ "$rc" -eq 2 ] && grep -qF 'nested quotes' <<<"$out"; then
 	report ok "the incident command is denied through the Python reader"
 else
 	report no "the incident command is denied through the Python reader" "rc=$rc" "$out"
+fi
+
+# --- command-guard.sh: machine mode (`--machine`) -----------------------------
+# The user-level install: the guard copied OUTSIDE any repository, to the path the Claude machine
+# template names, beside an `amh.conf` machine mode must never read — sourcing it prints a marker.
+# Every call runs from a directory that is no git repository, as a session in an arbitrary folder
+# does. Each assertion fails against a guard with no machine mode, which answers `--machine` with
+# its usage line and exit 2 whatever the payload.
+mh="$WORK/machine-home"
+mkdir -p "$mh/.claude/hooks" "$mh/elsewhere"
+cp "$ROOT/scripts/command-guard.sh" "$mh/.claude/hooks/amh-command-guard.sh"
+mguard="$mh/.claude/hooks/amh-command-guard.sh"
+printf '%s\n' "printf 'AMH-CONF-WAS-SOURCED\\n' >&2" 'DEFAULT_BRANCH=feature' >"$mh/.claude/amh.conf"
+# The control: the SAME copy in project mode reads that file, so the marker is live and its
+# absence below is evidence, not a trap that could never fire.
+out=$(cd "$mh/elsewhere" && bash "$mguard" --command 'printf ok' 2>&1)
+if grep -qF 'AMH-CONF-WAS-SOURCED' <<<"$out"; then
+	report ok "machine-mode fixture: the amh.conf beside the copy is read in project mode (the marker is live)"
+else
+	report no "machine-mode fixture: the amh.conf beside the copy is read in project mode (the marker is live)" "$out"
+fi
+out=$(cd "$mh/elsewhere" && printf '%s' "$incident_payload" | bash "$mguard" --machine 2>&1)
+rc=$?
+if [ "$rc" -eq 2 ] && grep -qF 'nested quotes' <<<"$out" &&
+	grep -qF 'in machine mode' <<<"$out" && ! grep -qF 'AMH-CONF-WAS-SOURCED' <<<"$out"; then
+	report ok "machine mode denies the incident payload, names itself, and reads no amh.conf"
+else
+	report no "machine mode denies the incident payload, names itself, and reads no amh.conf" "rc=$rc" "$out"
+fi
+out=$(cd "$mh/elsewhere" && printf '%s' "$incident_payload" | env PATH="$fallback_path" bash "$mguard" --machine 2>&1)
+rc=$?
+if [ "$rc" -eq 2 ] && grep -qF 'nested quotes' <<<"$out"; then
+	report ok "machine mode denies the incident payload without Python"
+else
+	report no "machine mode denies the incident payload without Python" "rc=$rc" "$out"
+fi
+out=$(cd "$mh/elsewhere" && printf '%s' '{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"printenv"}}' |
+	bash "$mguard" --machine 2>&1)
+rc=$?
+if [ "$rc" -eq 2 ] && grep -qF 'prints credential values' <<<"$out"; then
+	report ok "machine mode keeps the credential rails"
+else
+	report no "machine mode keeps the credential rails" "rc=$rc" "$out"
+fi
+out=$(cd "$mh/elsewhere" && printf '%s' '{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"git push --force origin main && rm -rf build"}}' |
+	bash "$mguard" --machine 2>&1)
+rc=$?
+if [ "$rc" -eq 0 ] && [ -z "$out" ]; then
+	report ok "machine mode passes AMH's push rails and the one-time deletion advisory without a word"
+else
+	report no "machine mode passes AMH's push rails and the one-time deletion advisory without a word" "rc=$rc" "$out"
+fi
+# A `json.py` in the session's directory — where the host runs the hook — must not stand in for
+# the standard module. Empty, it made the payload parser raise, print nothing and exit 0, so the
+# call was allowed unjudged; both modes are checked, since the reader is shared.
+mkdir -p "$mh/shadowed"
+: >"$mh/shadowed/json.py"
+home_payload='{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"rm -rf ~"}}'
+out=$(cd "$mh/shadowed" && printf '%s' "$home_payload" | bash "$mguard" --machine 2>&1)
+rc=$?
+if [ "$rc" -eq 2 ] && grep -qF 'your home directory' <<<"$out"; then
+	report ok "a json.py in the session's directory does not switch machine mode off"
+else
+	report no "a json.py in the session's directory does not switch machine mode off" "rc=$rc" "$out"
+fi
+out=$(cd "$mh/shadowed" && printf '%s' "$home_payload" | bash "$ROOT/scripts/command-guard.sh" 2>&1)
+rc=$?
+if [ "$rc" -eq 2 ] && grep -qF 'your home directory' <<<"$out"; then
+	report ok "a json.py in the session's directory does not switch the project guard off"
+else
+	report no "a json.py in the session's directory does not switch the project guard off" "rc=$rc" "$out"
+fi
+out=$(cd "$mh/elsewhere" && printf '' | bash "$mguard" --machine --pre-push 2>&1)
+rc=$?
+if [ "$rc" -eq 2 ] && grep -qF -- '--machine [--command CMD|--powershell CMD]' <<<"$out"; then
+	report ok "machine mode refuses a repository entry point with its usage line"
+else
+	report no "machine mode refuses a repository entry point with its usage line" "rc=$rc" "$out"
 fi
 
 # A command of nothing but a line end holds no command, and is not judged as one.
@@ -638,7 +746,7 @@ pp_block() { # <name> <stdin line> — must exit 2 AND name the pre-push rail
 	local out rc
 	out=$(cd "$d" && printf '%s\n' "$2" | scripts/command-guard.sh --pre-push 2>&1)
 	rc=$?
-	if [ "$rc" -eq 2 ] && printf '%s' "$out" | grep -qF 'AMH pre-push rail'; then
+	if [ "$rc" -eq 2 ] && grep -qF 'AMH pre-push rail' <<<"$out"; then
 		report ok "$1"
 	else
 		report no "$1" "rc=$rc" "$out"
@@ -1426,6 +1534,40 @@ else
 	report no "secret scan is value-free" "(not reached)"
 fi
 
+# The ladder's own scratch directory could not be created. Every rung that writes there then
+# writes to a path built from the empty string, its reads find nothing, and the citation and
+# secret rungs printed `ok` over the defects planted below and the ladder exited 0 (AMH ledger
+# row DD072). The shim fails ONLY the first `mktemp` of the run, which is the ladder's own: with
+# every call failing, unrelated rungs go red and a fixture built that way passes against the
+# broken ladder. The plants are what make exit 0 a false pass rather than a clean tree.
+d=$(mk scratch_mktemp_fails)
+printf 'key = %s\n' "$(akia_token)" >"$d/scripts/deploy.sh"
+printf '# see D-099\n' >"$d/scripts/thing.sh"
+shim=$WORK/mktemp_first_fails
+mkdir -p "$shim"
+real_mktemp=$(command -v mktemp)
+{
+	printf '#!/usr/bin/env bash\n'
+	printf 'if [ ! -e %q ]; then : >%q; printf "mktemp: simulated failure\\n" >&2; exit 1; fi\n' \
+		"$shim/tripped" "$shim/tripped"
+	printf 'exec %q "$@"\n' "$real_mktemp"
+} >"$shim/mktemp"
+chmod +x "$shim/mktemp"
+out=$(cd "$d" && PATH="$shim:$PATH" CI=1 scripts/ladder.sh --guards-only 2>&1)
+rc=$?
+if [ ! -e "$shim/tripped" ]; then
+	report no "a ladder with no scratch directory checked NOTHING and says so" \
+		"the shim never ran, so nothing failed" "$out"
+elif [ "$rc" -ne 1 ]; then
+	report no "a ladder with no scratch directory checked NOTHING and says so" \
+		"expected exit 1, got $rc" "$out"
+elif ! grep -qF "checked NOTHING" <<<"$out"; then
+	report no "a ladder with no scratch directory checked NOTHING and says so" \
+		"exit 1, but the output never says the run checked nothing" "$out"
+else
+	report ok "a ladder with no scratch directory checked NOTHING and says so"
+fi
+
 # A CRLF worktree under a `sed` that is not byte-transparent — which is a stock Windows
 # checkout, not an exotic one: Git for Windows sets `core.autocrlf=true` in its system config
 # at install time, and the MSYS2 sed it ships rewrites CRLF to LF even for a script that
@@ -1522,12 +1664,157 @@ sed_in_place 's/^--baseline)/--baseline-removed)/' "$d/scripts/redact.sh"
 expect_fail "a redact.sh with no --baseline mode makes the scan refuse rather than pass" "$d" \
 	"has no working --baseline mode"
 
+# A broken filter that passes the canary through and then prints a long tail. The control
+# piped it into `grep -qF` under `pipefail`: grep matched the first line and exited, the filter
+# took EPIPE, and the failed pipeline read as "redacted" — every run, the tail being far past a
+# pipe buffer (AMH ledger row DD110). The message pins WHICH control refused.
+d=$(mk secret_canary_long_tail)
+printf '#!/usr/bin/env bash\ncat\nyes "a broken filter appends this line" | head -n 30000\n' >"$d/scripts/redact.sh"
+expect_fail "a pass-through filter with a long tail fails the redaction control" "$d" \
+	"did not redact a generated test token"
+
 # A file name with a space: the file list must be NUL-separated, or the scan
 # silently skips it — a hole that looks exactly like a pass.
 d=$(mk secret_spacey)
 tok=$(akia_token)
 printf 'key = %s\n' "$tok" >"$d/scripts/deploy notes.sh"
 expect_fail "a secret in a file name with a space is still caught" "$d" "credential-shaped"
+
+# --- Claude adapter: AMH hooks pin their shell
+# The fixture adapter is written here, in the shipped layout, rather than copied: an adopter
+# running this suite has no harness checkout to copy from. It carries one hook of the adopter's
+# OWN, unpinned, which the rung must not judge.
+write_claude_settings() { # <fixture-dir>
+	mkdir -p "$1/.claude"
+	cat >"$1/.claude/settings.json" <<-'JSON'
+		{
+		  "$comment": "fixture adapter; scripts/command-guard.sh is named here and is not a hook",
+		  "permissions": { "allow": ["Bash(scripts/command-guard.sh:*)"] },
+		  "hooks": {
+		    "PostToolUse": [
+		      { "matcher": "*", "hooks": [
+		        {
+		          "type": "command",
+		          "shell": "bash",
+		          "command": "bash \"${CLAUDE_PROJECT_DIR}\"/scripts/redact-tool-output.sh"
+		        }
+		      ] }
+		    ],
+		    "SessionStart": [
+		      { "hooks": [
+		        {
+		          "type": "command",
+		          "shell": "bash",
+		          "command": "bash \"${CLAUDE_PROJECT_DIR}\"/scripts/session-start.sh"
+		        },
+		        {
+		          "type": "command",
+		          "command": "echo my own hook"
+		        }
+		      ] }
+		    ],
+		    "PreToolUse": [
+		      { "matcher": "Bash|PowerShell", "hooks": [
+		        {
+		          "type": "command",
+		          "shell": "bash",
+		          "command": "bash \"${CLAUDE_PROJECT_DIR}\"/scripts/command-guard.sh",
+		          "onFailure": "block"
+		        }
+		      ] },
+		      { "matcher": "Task", "hooks": [
+		        {
+		          "type": "command",
+		          "shell": "bash",
+		          "command": "bash \"${CLAUDE_PROJECT_DIR}\"/scripts/command-guard.sh --pre-task",
+		          "onFailure": "block"
+		        }
+		      ] }
+		    ]
+		  }
+		}
+	JSON
+}
+
+# No adapter file is the common case for a repository on another agent, and it costs nothing.
+d=$(mk claude_absent)
+expect_pass_saying "no Claude settings file skips the hook-shell rung" "$d" \
+	"   skip  .claude/settings.json is absent"
+
+# The pinned baseline: four AMH hooks counted, the adopter's own unpinned hook not judged, and
+# a script named in a comment and a permission rule not mistaken for a hook.
+d=$(mk claude_pinned)
+write_claude_settings "$d"
+expect_pass_saying "four pinned AMH hooks pass and the adopter's own hook is not judged" "$d" \
+	'   ok    4 AMH hook(s) in .claude/settings.json carry "shell": "bash"'
+
+# The hand step undone on one entry — the state an upgrade that skipped it leaves behind.
+d=$(mk claude_unpinned)
+write_claude_settings "$d"
+awk '/"shell": "bash"/ && !done { done = 1; next } { print }' "$d/.claude/settings.json" >"$d/s" &&
+	mv "$d/s" "$d/.claude/settings.json"
+expect_fail "an AMH hook without the shell pin fails" "$d" "1 of 4 AMH hook(s) do not carry"
+# ...and a failing rung prints no `ok` beside its failure.
+out=$(run "$d")
+if grep -qF '   ok    4 AMH hook(s)' <<<"$out"; then
+	report no "a failing hook-shell rung prints no ok line" "the ok line printed beside the failure" "$out"
+else
+	report ok "a failing hook-shell rung prints no ok line"
+fi
+
+# The script is found by its file name, so a path spelled another way is still an AMH hook.
+d=$(mk claude_respelled)
+write_claude_settings "$d"
+awk '/"shell": "bash"/ && !done { done = 1; next } { print }' "$d/.claude/settings.json" |
+	sed 's#/scripts/redact-tool-output#/scripts//redact-tool-output#' >"$d/s" &&
+	mv "$d/s" "$d/.claude/settings.json"
+expect_fail "an unpinned AMH hook with a respelled path still fails" "$d" "1 of 4 AMH hook(s) do not carry"
+
+# A value that is not exactly `bash` is not the pin; to the host it drops the entry outright.
+d=$(mk claude_near_value)
+write_claude_settings "$d"
+sed_in_place 's/"shell": "bash",/"shell": "bash ",/' "$d/.claude/settings.json"
+expect_fail "a shell value that is only nearly bash fails" "$d" "4 of 4 AMH hook(s) do not carry"
+
+# A key is a key only after `{` or `,`: a string ending in an escaped `"shell` is not one.
+d=$(mk claude_spoofed_key)
+write_claude_settings "$d"
+sed_in_place 's/"shell": "bash",/"x \\"shell": "bash",/' "$d/.claude/settings.json"
+expect_fail "a key spelled inside another key's string is not the pin" "$d" "4 of 4 AMH hook(s) do not carry"
+
+# A misspelled key leaves the entry unpinned, which is what Claude Code does with it too.
+d=$(mk claude_misspelled)
+write_claude_settings "$d"
+sed_in_place 's/"shell": "bash"/"shel": "bash"/' "$d/.claude/settings.json"
+expect_fail "a misspelled shell key is read as no pin" "$d" "4 of 4 AMH hook(s) do not carry"
+
+# JSON keeps the LAST of two equal keys, so a later non-bash value is the one in force.
+d=$(mk claude_duplicate)
+write_claude_settings "$d"
+sed_in_place 's/"shell": "bash",/"shell": "bash", "shell": "powershell",/' "$d/.claude/settings.json"
+expect_fail "a later duplicate shell key overrides the pin" "$d" "4 of 4 AMH hook(s) do not carry"
+
+# The same file minified: layout is not what the rung reads.
+d=$(mk claude_minified)
+write_claude_settings "$d"
+tr -d '\n\t' <"$d/.claude/settings.json" | sed 's/  */ /g; s/": /":/g; s/, /,/g; s/{ /{/g' >"$d/s" &&
+	mv "$d/s" "$d/.claude/settings.json"
+expect_pass_saying "a minified adapter is read the same as the shipped layout" "$d" \
+	'   ok    4 AMH hook(s) in .claude/settings.json carry "shell": "bash"'
+
+# An AMH command the entry reader cannot reach is UNVERIFIED, never passed.
+d=$(mk claude_unreadable)
+write_claude_settings "$d"
+sed_in_place 's/"onFailure": "block"/"onFailure": "block", "extra": {}/' "$d/.claude/settings.json"
+expect_warn "an AMH hook in an entry the rung cannot read flat is reported unverified" "$d" \
+	"2 of 4 AMH hook command(s) are not in a flat"
+
+# A settings file that holds no AMH hook at all checked nothing, and says so.
+d=$(mk claude_no_hooks)
+mkdir -p "$d/.claude"
+printf '{ "permissions": { "allow": [] } }\n' >"$d/.claude/settings.json"
+expect_warn "a settings file with no AMH hook warns that it checked nothing" "$d" \
+	"names no AMH hook script"
 
 # --- repo-local guard extension point
 d=$(mk guard_ok)
@@ -1759,6 +2046,102 @@ else
 	report no "session-start rearms the one-time destructive advisory" "rc=$rc" "$out"
 fi
 
+# The markers live under TMPDIR when it is set, and the bootstrap clears them there. A host
+# sandbox can leave /tmp read-only while TMPDIR stays writable, and a marker that cannot be written
+# makes the advisory fire on every attempt, a rerun never clearing it (AMH ledger rows DD093,
+# DD097).
+d=$(mk ss_advisory_marker_under_tmpdir)
+td="$WORK/ss_tmpdir_markers"
+mkdir -p "$td"
+out=$(cd "$d" && TMPDIR="$td" scripts/command-guard.sh --command 'rm -rf tmp/build' 2>&1)
+rc=$?
+n=$(find "$td" -maxdepth 1 -name 'amh-command-guard-*-advisory-*' | wc -l | tr -d ' ')
+slug=$(cd "$d" && pwd)
+slug=${slug//\//_}
+slug=${slug// /_}
+marker_name="amh-command-guard-destructive-advisory-${UID:-unknown}-$slug"
+if [ "$rc" -eq 2 ] && [ "$n" -ge 1 ] && [ ! -e "/tmp/$marker_name" ]; then
+	report ok "the advisory marker is written under TMPDIR, and not under /tmp"
+else
+	report no "the advisory marker is written under TMPDIR, and not under /tmp" "rc=$rc, markers under TMPDIR: $n, under /tmp: $([ -e "/tmp/$marker_name" ] && echo 1 || echo 0)" "$out"
+fi
+# The clearing half plants its own marker, named as the guard names one, so it cannot pass on a
+# directory that was empty all along.
+planted="$td/$marker_name"
+: >"$planted"
+(cd "$d" && TMPDIR="$td" env -u AMH_REMOTE bash scripts/session-start.sh >/dev/null 2>&1)
+if [ ! -e "$planted" ]; then
+	report ok "session-start clears the markers under TMPDIR"
+else
+	report no "session-start clears the markers under TMPDIR" "the planted marker is still there"
+fi
+# A marker the bootstrap cannot remove is a spent advisory the next session inherits, so it is
+# reported, naming the directory by its role and printing neither the marker, whose name embeds
+# the repository's path (AMH ledger row DD097), nor TMPDIR's value; the boot still exits 0. A directory planted under the marker's name
+# is what `rm -f` cannot remove whoever runs it, root included, where an unwritable directory
+# would not stop root.
+mkdir -p "$planted"
+out=$(cd "$d" && TMPDIR="$td" env -u AMH_REMOTE bash scripts/session-start.sh 2>&1)
+rc=$?
+if [ "$rc" -eq 0 ] && [ -e "$planted" ] &&
+	grep -qF "could not clear the command guard's one-time advisory state under TMPDIR" <<<"$out" &&
+	! grep -qF "state under /tmp" <<<"$out" &&
+	! grep -qF "$marker_name" <<<"$out" && ! grep -qF "$slug" <<<"$out" && ! grep -qF "$td" <<<"$out"; then
+	report ok "session-start reports a marker it cannot clear, by its directory's role, and still exits 0"
+else
+	report no "session-start reports a marker it cannot clear, by its directory's role, and still exits 0" "rc=$rc" "$out"
+fi
+rmdir -- "$planted"
+
+# The two fixtures below need a writable /tmp, the fallback they test; under a sandbox that
+# leaves /tmp read-only they are reported as skipped, by name, rather than passed.
+if [ -w /tmp ]; then
+	# A TMPDIR that is missing or unwritable falls back to /tmp, so the advisory stays one-time: a
+	# marker the guard cannot write would make it fire on every attempt.
+	d=$(mk ss_advisory_tmpdir_missing)
+	# The first attempt alone cannot tell the fallback from its failure, since an unwritable marker
+	# fires too (AMH ledger row DD097): the rerun must pass, and nothing may say the write failed.
+	out=$(cd "$d" && TMPDIR="$WORK/no/such/dir" scripts/command-guard.sh --command 'rm -rf tmp/build' 2>&1)
+	rc=$?
+	out2=$(cd "$d" && TMPDIR="$WORK/no/such/dir" scripts/command-guard.sh --command 'rm -rf tmp/build' 2>&1)
+	rc2=$?
+	if [ "$rc" -eq 2 ] && grep -qF "This destructive filesystem command" <<<"$out" &&
+		[ "$rc2" -eq 0 ] && ! grep -qF "could not write the marker" <<<"$out$out2"; then
+		report ok "a missing TMPDIR still gets the advisory, once"
+	else
+		report no "a missing TMPDIR still gets the advisory, once" "rc=$rc rerun rc=$rc2" "$out" "$out2"
+	fi
+	(cd "$d" && env -u TMPDIR -u AMH_REMOTE bash scripts/session-start.sh >/dev/null 2>&1)
+
+	# A hook outside a host sandbox may see no TMPDIR while the bootstrap or the ladder inside it sees
+	# one, so the readers look in /tmp as well as in TMPDIR: a marker the hook wrote under /tmp is
+	# reported and cleared from a process that has TMPDIR set.
+	d=$(mk ss_advisory_tmp_seen_from_tmpdir)
+	(cd "$d" && env -u TMPDIR scripts/command-guard.sh --command 'rm -rf tmp/build' >/dev/null 2>&1)
+	out=$(cd "$d" && TMPDIR="$td" scripts/command-guard.sh --advisory-report 2>&1)
+	if grep -qF 'tmp/build' <<<"$out"; then
+		report ok "a marker under /tmp is reported from a process with TMPDIR set"
+	else
+		report no "a marker under /tmp is reported from a process with TMPDIR set" "report was: [$out]"
+	fi
+	slug=$(cd "$d" && pwd)
+	slug=${slug//\//_}
+	slug=${slug// /_}
+	(cd "$d" && TMPDIR="$td" env -u AMH_REMOTE bash scripts/session-start.sh >/dev/null 2>&1)
+	if [ ! -e "/tmp/amh-command-guard-destructive-advisory-${UID:-unknown}-$slug" ]; then
+		report ok "session-start with TMPDIR set clears a marker under /tmp"
+	else
+		report no "session-start with TMPDIR set clears a marker under /tmp" "the /tmp marker is still there"
+		(cd "$d" && env -u TMPDIR -u AMH_REMOTE bash scripts/session-start.sh >/dev/null 2>&1)
+	fi
+else
+	for f in "a missing TMPDIR still gets the advisory, once" \
+		"a marker under /tmp is reported from a process with TMPDIR set" \
+		"session-start with TMPDIR set clears a marker under /tmp"; do
+		report skip "$f (/tmp is not writable here)"
+	done
+fi
+
 # The `.resumed` sibling rearms too. The bootstrap's pattern stopped at the slug, so it deleted
 # the advisory state and left the ledger of what a session went ahead with — and both reports
 # built on that file then spanned every session sharing the container. Hook mode is required:
@@ -1807,6 +2190,329 @@ if [ "$rc" -eq 2 ] && grep -qF "This destructive filesystem command" <<<"$out"; 
 	report ok "the rearm survives a noglob amh.conf"
 else
 	report no "the rearm survives a noglob amh.conf" "rc=$rc" "$out"
+fi
+
+# --- the advisory state's edges: four defects, each silent in its own direction
+# (a) Only a regular file is a spent marker. A directory at the `.env` or key-material marker's
+# path counted as one, so those advisories never fired again; it is state the guard cannot use,
+# and it fires as an unwritable marker does (AMH ledger row DD097). So does a dangling symlink,
+# which the write would otherwise follow to create a marker somewhere else. Needs no /tmp. The
+# directories must exist first: a marker that cannot be written prints the same sentence.
+d=$(mk cg_advisory_marker_not_a_file)
+mkdir -p "$d/state.dotenv" "$d/state.keymaterial"
+ln -s "$d/no-such-target" "$d/state.dangling"
+out=$(cd "$d" && DOTENV_ADVISORY_STATE="$d/state.dotenv" scripts/command-guard.sh --command 'cat .env.example' 2>&1)
+rc=$?
+out2=$(cd "$d" && KEYMATERIAL_ADVISORY_STATE="$d/state.keymaterial" scripts/command-guard.sh --command 'cat cert.pem' 2>&1)
+rc2=$?
+out3=$(cd "$d" && DOTENV_ADVISORY_STATE="$d/state.dangling" scripts/command-guard.sh --command 'cat .env.example' 2>&1)
+rc3=$?
+if [ -d "$d/state.dotenv" ] && [ -d "$d/state.keymaterial" ] && [ -L "$d/state.dangling" ] &&
+	[ "$rc" -eq 2 ] && [ "$rc2" -eq 2 ] && [ "$rc3" -eq 2 ] && [ ! -e "$d/no-such-target" ] &&
+	grep -qF 'something other than a regular file at its path' <<<"$out" &&
+	grep -qF 'something other than a regular file at its path' <<<"$out2" &&
+	grep -qF 'something other than a regular file at its path' <<<"$out3"; then
+	report ok "a directory or dangling symlink at the .env or key-material marker's path fires the advisory as unusable state"
+else
+	report no "a directory or dangling symlink at the .env or key-material marker's path fires the advisory as unusable state" "rc=$rc rc2=$rc2 rc3=$rc3" "$out" "$out2" "$out3"
+fi
+
+# The three below read /tmp, the second state directory, and are skipped by name without it.
+if [ -w /tmp ]; then
+	# (b) An explicit override is the only file read, even directly under TMPDIR, where it used
+	# to be taken for the default file and a same-named stranger under /tmp was reported too.
+	# The stranger is made by `mktemp`, so no entry already under /tmp is touched. An override
+	# holding a newline is one path, not two: read as lines, its second line named a file whose
+	# contents the report printed.
+	d=$(mk cg_advisory_override_under_tmpdir)
+	ovr="$WORK/cg_override_tmpdir"
+	mkdir -p "$ovr"
+	decoy=0
+	stranger=$(mktemp /tmp/amh-fixture-override.XXXXXX 2>/dev/null) && [ -f "$stranger" ] &&
+		printf 'tmp/stranger\n' >"$stranger" && decoy=1
+	base=${stranger##*/}
+	printf 'tmp/own\n' >"$ovr/$base"
+	printf 'tmp/second-line\n' >"$ovr/second"
+	out=$(cd "$d" && TMPDIR="$ovr" DESTRUCTIVE_ADVISORY_STATE="$ovr/$base" scripts/command-guard.sh --advisory-report 2>&1)
+	out2=$(cd "$d" && DESTRUCTIVE_ADVISORY_STATE="$ovr/none
+$ovr/second" scripts/command-guard.sh --advisory-report 2>&1)
+	[ -n "$stranger" ] && rm -f -- "$stranger"
+	if [ "$decoy" -eq 1 ] && grep -qxF 'tmp/own' <<<"$out" && ! grep -qF 'tmp/stranger' <<<"$out" &&
+		! grep -qF 'tmp/second-line' <<<"$out2"; then
+		report ok "an override under TMPDIR is the only file the report reads"
+	else
+		report no "an override under TMPDIR is the only file the report reads" "decoy=$decoy" "report was: [$out]" "newline override report: [$out2]"
+	fi
+
+	# (c) The report is the union of advised minus the union of resumed. `tmp/build` is advised
+	# by a hook that saw no TMPDIR and again, then resumed, by one that saw it: it came back, and
+	# was reported abandoned. `tmp/other`, advised under /tmp alone, keeps the report honest.
+	d=$(mk cg_advisory_union_across_dirs)
+	un="$WORK/cg_union_tmpdir"
+	mkdir -p "$un"
+	(cd "$d" && hook_cmd 'rm -rf tmp/build' | env -u TMPDIR scripts/command-guard.sh >/dev/null 2>&1)
+	(cd "$d" && hook_cmd 'rm -rf tmp/other' | env -u TMPDIR scripts/command-guard.sh >/dev/null 2>&1)
+	(cd "$d" && hook_cmd 'rm -rf tmp/build' | TMPDIR="$un" scripts/command-guard.sh >/dev/null 2>&1)
+	(cd "$d" && hook_cmd 'rm -rf tmp/build' | TMPDIR="$un" scripts/command-guard.sh >/dev/null 2>&1) # resumed
+	out=$(cd "$d" && TMPDIR="$un" scripts/command-guard.sh --advisory-report 2>&1)
+	slug=$(cd "$d" && pwd)
+	slug=${slug//\//_}
+	slug=${slug// /_}
+	m="amh-command-guard-destructive-advisory-${UID:-unknown}-$slug"
+	# The setup, checked: advised in both directories, resumed under TMPDIR alone.
+	setup=0
+	grep -qF 'tmp/build' "/tmp/$m" 2>/dev/null && grep -qF 'tmp/build' "$un/$m" 2>/dev/null &&
+		grep -qF 'tmp/build' "$un/$m.resumed" 2>/dev/null && [ ! -e "/tmp/$m.resumed" ] && setup=1
+	rm -f -- "/tmp/$m" "/tmp/$m.resumed"
+	if [ "$setup" -eq 1 ] && grep -qF 'tmp/other' <<<"$out" && ! grep -qF 'tmp/build' <<<"$out"; then
+		report ok "a deletion resumed in one state directory is not reported abandoned from the other"
+	else
+		report no "a deletion resumed in one state directory is not reported abandoned from the other" "setup=$setup" "report was: [$out]"
+	fi
+
+	# (d) A TMPDIR that is /tmp by another spelling is one directory, read once: the spawn report
+	# counted every spawn twice through a symlink to /tmp.
+	d=$(mk cg_spawn_count_one_dir_two_spellings)
+	ln -s /tmp "$WORK/cg_tmp_link"
+	(cd "$d" && printf '{}' | TMPDIR="$WORK/cg_tmp_link" scripts/command-guard.sh --pre-task >/dev/null 2>&1)
+	(cd "$d" && printf '{}' | TMPDIR="$WORK/cg_tmp_link" scripts/command-guard.sh --pre-task >/dev/null 2>&1) # proceeds
+	out=$(cd "$d" && TMPDIR="$WORK/cg_tmp_link" scripts/command-guard.sh --spawn-report 2>&1)
+	slug=$(cd "$d" && pwd)
+	slug=${slug//\//_}
+	slug=${slug// /_}
+	# The setup, checked: the link is /tmp, and the spawn was recorded there through it, once.
+	via=0
+	[ -L "$WORK/cg_tmp_link" ] && [ "$WORK/cg_tmp_link" -ef /tmp ] &&
+		[ "$(LC_ALL=C grep -c '' "/tmp/amh-command-guard-subagent-advisory-${UID:-unknown}-$slug.resumed" 2>/dev/null)" = 1 ] && via=1
+	rm -f -- "/tmp/amh-command-guard-subagent-advisory-${UID:-unknown}-$slug" \
+		"/tmp/amh-command-guard-subagent-advisory-${UID:-unknown}-$slug.resumed"
+	if [ "$via" -eq 1 ] && [ "$out" = 1 ]; then
+		report ok "one spawn through a TMPDIR symlinked to /tmp is counted once"
+	else
+		report no "one spawn through a TMPDIR symlinked to /tmp is counted once" "via=$via" "spawn report was: [$out]"
+	fi
+else
+	for f in "an override under TMPDIR is the only file the report reads" \
+		"a deletion resumed in one state directory is not reported abandoned from the other" \
+		"one spawn through a TMPDIR symlinked to /tmp is counted once"; do
+		report skip "$f (/tmp is not writable here)"
+	done
+fi
+
+# --- the working-memory line: newer state on top of this checkout, judged by no branch name
+# The incident (AMH ledger row DD049): a unit finished in a second worktree was pushed with a
+# `<local>:<remote>` refspec, so the remote branch moved and the main checkout's branch did not,
+# and the next session read the old state file and reported the finished unit as not started.
+#
+# Each direction is separately silent, so each has its own case. With commits of its own, HEAD
+# is judged against everything built on it: (a) that shape is reported — the remote ref the push
+# moved WITHOUT a fetch, one line per commit with every name for it, origin/HEAD not listed as a
+# second name, no detached worktree that does not build on HEAD or whose directory is gone, and
+# no path; (b) a branch on top that changes no state file is not, which pins the state file
+# against an ancestry-only test. With none, siblings cannot be told from a continuation: (c)
+# sibling unit branches are not reported and the line says they were not judged; (d) a default
+# branch with a newer state file is, and a bot branch on top of it is not. (e) A shallow clone's
+# "nothing" is hedged. (f) Every way git can fail to answer is "NOT checked", never "nothing".
+# (g) A repository with no commit yet prints no line and still boots.
+ss_git() { git -C "$1" -c user.email=f@example.invalid -c user.name=fixture "${@:2}"; }
+ss_state_commit() { # <dir> <line>
+	printf '%s\n' "$2" >>"$1/docs/STATE.md"
+	ss_git "$1" commit -qam "$2" 2>/dev/null
+}
+ss_code_commit() { # <dir> <line>
+	mkdir -p "$1/e2e" && printf '%s\n' "$2" >>"$1/e2e/requirements.txt" &&
+		ss_git "$1" add e2e/requirements.txt 2>/dev/null && ss_git "$1" commit -qm "$2" 2>/dev/null
+}
+ss_banner() { (cd "$1" && env -u AMH_REMOTE bash scripts/session-start.sh 2>&1); }
+# A git that fails exactly the calls matching a `case` pattern over its arguments and runs the
+# real git for everything else, so the rest of the banner still boots.
+ss_shim() { # <dir to create> <case pattern>
+	mkdir -p "$1" || return 1
+	# The shim's `$*`/`$@` are literal text for the shim, so they must NOT expand here.
+	# shellcheck disable=SC2016
+	printf '#!/usr/bin/env bash\ncase "$*" in %s) exit 128 ;; esac\nexec %q "$@"\n' \
+		"$2" "$(type -P git)" >"$1/git" && chmod +x "$1/git"
+}
+
+d=$(mk ss_newer_state_worktree)
+bare="$WORK/ss_newer_state_origin.git"
+wt="$WORK/ss_newer_state_wt"
+det="$WORK/ss_newer_state_detached"
+off="$WORK/ss_newer_state_offpath"
+gone="$WORK/ss_newer_state_gone"
+if ! git clone -q --bare "$d" "$bare" 2>/dev/null ||
+	! ss_git "$d" remote add origin "$bare" 2>/dev/null ||
+	! ss_git "$d" checkout -q -b session/x 2>/dev/null ||
+	! ss_state_commit "$d" "- unit 1" ||
+	! ss_git "$d" push -q origin session/x 2>/dev/null ||
+	! ss_git "$d" symbolic-ref refs/remotes/origin/HEAD refs/remotes/origin/session/x 2>/dev/null ||
+	! ss_git "$d" worktree add -q -b wt-unit2 "$wt" session/x 2>/dev/null ||
+	! ss_state_commit "$wt" "- unit 2" ||
+	! ss_git "$wt" push -q origin wt-unit2:session/x 2>/dev/null ||
+	! ss_git "$d" worktree add -q --detach "$det" wt-unit2 2>/dev/null ||
+	! ss_state_commit "$det" "- unit 3" ||
+	! ss_git "$d" worktree add -q --detach "$off" "origin/$DEFAULT_BRANCH_FIXTURE" 2>/dev/null ||
+	! ss_state_commit "$off" "- a sibling" ||
+	! ss_git "$d" worktree add -q --detach "$gone" wt-unit2 2>/dev/null ||
+	! ss_state_commit "$gone" "- unit 3b" || ! mv "$gone" "$gone.moved"; then
+	printf '  SKIP 2 working-memory cases: could not build the worktree fixture (clone, worktree or push failed)\n' >&2
+else
+	out=$(ss_banner "$d")
+	rc=$?
+	if [ "$rc" -eq 0 ] &&
+		grep -qF "· ⚠ working memory: docs/STATE.md here is OLDER than on work that builds on this checkout:" <<<"$out" &&
+		grep -qE ' \(origin/session/x, wt-unit2\): 1 newer commit\(s\) change it$' <<<"$out" &&
+		[ "$(grep -c 'a detached worktree' <<<"$out")" -eq 1 ] &&
+		grep -qE ' \(a detached worktree\): 2 newer commit\(s\) change it$' <<<"$out"; then
+		report ok "a stale checkout under a worktree's refspec push is reported, with no fetch"
+	else
+		report no "a stale checkout under a worktree's refspec push is reported, with no fetch" "rc=$rc" "$out"
+	fi
+	# Only the worktree paths: the pre-push rail's install line names the repository itself.
+	if grep -qF -e "$wt" -e "$det" -e "$off" -e "$gone" <<<"$out"; then
+		report no "the working-memory line names no worktree path" "a path was printed" "$out"
+	else
+		report ok "the working-memory line names no worktree path"
+	fi
+fi
+
+d=$(mk ss_newer_state_code_only)
+if ! ss_git "$d" checkout -q -b session/x 2>/dev/null || ! ss_state_commit "$d" "- unit 1" ||
+	! ss_git "$d" checkout -q -b wip 2>/dev/null || ! ss_code_commit "$d" "pillow==13.0.0" ||
+	! ss_git "$d" checkout -q session/x 2>/dev/null; then
+	printf '  SKIP 1 working-memory case: could not build the code-only fixture\n' >&2
+else
+	out=$(ss_banner "$d")
+	if grep -qF "· working memory: nothing that builds on this checkout changes docs/STATE.md (refs as last fetched)." <<<"$out" &&
+		! grep -qF "OLDER" <<<"$out"; then
+		report ok "a branch on top that changes no state file is not reported"
+	else
+		report no "a branch on top that changes no state file is not reported" "it was, or no verdict" "$out"
+	fi
+fi
+
+d=$(mk ss_newer_state_siblings)
+ss_ok=1
+for w in alice bob; do
+	ss_git "$d" checkout -q -b "session/$w" 2>/dev/null && ss_state_commit "$d" "- $w" &&
+		ss_git "$d" update-ref "refs/remotes/origin/session/$w" HEAD 2>/dev/null &&
+		ss_git "$d" checkout -q - 2>/dev/null && ss_git "$d" branch -q -D "session/$w" 2>/dev/null || ss_ok=0
+done
+if [ "$ss_ok" = 0 ]; then
+	printf '  SKIP 1 working-memory case: could not build the sibling fixture\n' >&2
+else
+	out=$(ss_banner "$d")
+	if grep -qF "· working memory: origin/main has no newer docs/STATE.md (refs as last fetched). This checkout" <<<"$out" &&
+		grep -qF "a sibling unit" <<<"$out" && ! grep -qF "OLDER" <<<"$out"; then
+		report ok "sibling unit branches off a HEAD with no commits of its own are not reported, and the line says so"
+	else
+		report no "sibling unit branches off a HEAD with no commits of its own are not reported, and the line says so" "they were, or no verdict" "$out"
+	fi
+fi
+
+d=$(mk ss_newer_state_behind_default)
+if ! ss_git "$d" checkout -q -b tmp 2>/dev/null || ! ss_state_commit "$d" "- merged unit" ||
+	! ss_git "$d" update-ref "refs/remotes/origin/$DEFAULT_BRANCH_FIXTURE" HEAD 2>/dev/null ||
+	! ss_code_commit "$d" "pillow==13.0.0" ||
+	! ss_git "$d" update-ref refs/remotes/origin/dependabot/pip/bump HEAD 2>/dev/null ||
+	! ss_git "$d" checkout -q - 2>/dev/null || ! ss_git "$d" branch -q -D tmp 2>/dev/null; then
+	printf '  SKIP 1 working-memory case: could not build the behind-the-default-branch fixture\n' >&2
+else
+	out=$(ss_banner "$d")
+	if grep -qF "· ⚠ working memory: docs/STATE.md here is OLDER than on origin/main, and this checkout has no" <<<"$out" &&
+		grep -qF "1 newer commit(s) there change it" <<<"$out" && ! grep -qF "dependabot" <<<"$out"; then
+		report ok "a newer state file on the default branch is reported, and a bot branch on top of it is not"
+	else
+		report no "a newer state file on the default branch is reported, and a bot branch on top of it is not" "it was not" "$out"
+	fi
+fi
+
+src=$(mk ss_newer_state_shallow_src)
+sh="$WORK/ss_newer_state_shallow"
+if ! ss_git "$src" checkout -q -b session/x 2>/dev/null || ! ss_state_commit "$src" "- unit 1" ||
+	! ss_git "$src" checkout -q -b session/y 2>/dev/null || ! ss_state_commit "$src" "- unit 2" ||
+	! ss_state_commit "$src" "- unit 3" || ! ss_state_commit "$src" "- unit 4" ||
+	! ss_git "$src" checkout -q session/x 2>/dev/null ||
+	! git clone -q --depth 2 --no-single-branch --branch session/x "file://$src" "$sh" 2>/dev/null; then
+	printf '  SKIP 1 working-memory case: could not build the shallow-clone fixture\n' >&2
+else
+	out=$(ss_banner "$sh")
+	if grep -qF "· working memory: nothing found, but this clone is shallow and cannot see a branch whose history was cut off — NOT checked" <<<"$out" &&
+		! grep -qF "nothing that builds on this checkout" <<<"$out"; then
+		report ok "a shallow clone's empty answer is hedged, never an affirmative nothing"
+	else
+		report no "a shallow clone's empty answer is hedged, never an affirmative nothing" "it was not" "$out"
+	fi
+fi
+
+# (f) One shim per call the step depends on. The listing and counting calls need a HEAD with
+# commits of its own, or the step never makes them; the count needs something built on it.
+ss_unanswered() { # <name> <case pattern> <expected fixed text> <setup: own|built-on|none>
+	local d shim out
+	d=$(mk "ss_newer_state_$1")
+	shim="$WORK/ss_newer_state_$1_shim"
+	if { [ "$4" = none ] || { ss_git "$d" checkout -q -b session/x 2>/dev/null && ss_state_commit "$d" "- unit 1"; }; } &&
+		{ [ "$4" != built-on ] || { ss_git "$d" branch -q next 2>/dev/null && ss_git "$d" checkout -q next 2>/dev/null &&
+			ss_state_commit "$d" "- unit 2" && ss_git "$d" checkout -q session/x 2>/dev/null; }; } &&
+		ss_shim "$shim" "$2"; then
+		out=$(cd "$d" && PATH="$shim:$PATH" env -u AMH_REMOTE bash scripts/session-start.sh 2>&1)
+		if grep -qF "$3" <<<"$out" && ! grep -qE 'nothing that builds|has no newer|OLDER' <<<"$out"; then
+			report ok "$1: reported as NOT checked, never as an answer"
+		else
+			report no "$1: reported as NOT checked, never as an answer" "it was not" "$out"
+		fi
+	else
+		printf '  SKIP 1 working-memory case: could not build the %s fixture\n' "$1" >&2
+	fi
+}
+ss_unanswered unreadable_repo 'rev-parse --git-dir' \
+	"· working memory: git could not read this repository — NOT checked" none
+ss_unanswered refs_unlistable 'for-each-ref*' \
+	"· working memory: could not list what builds on this checkout — NOT checked" own
+ss_unanswered worktrees_unlistable 'worktree*' \
+	"· working memory: could not list what builds on this checkout — NOT checked" own
+ss_unanswered continuation_uncountable 'rev-list*' \
+	"· working memory: could not count the commits that build on this checkout — NOT checked" built-on
+ss_unanswered default_uncountable 'rev-list*' \
+	"· working memory: could not count what origin/main adds to docs/STATE.md — NOT checked" none
+
+# A count that failed, ahead of 200 KiB of others. The check asked `printf | grep -q '^x '` under
+# `pipefail`: grep matched the first line and exited, the writer took EPIPE, and the banner
+# printed `x newer commit(s)` as an answer instead of NOT checked — on every run, past two pipe
+# buffers (AMH ledger row DD110). A thousand branches, each on its own commit built on this
+# checkout, made in one fast-import; the shim fails every count, so every line is a failed one.
+d=$(mk ss_newer_state_uncountable_many)
+shim="$WORK/ss_newer_state_uncountable_many_shim"
+pad=$(printf '%0180d' 0)
+if ss_git "$d" checkout -q -b session/x 2>/dev/null && ss_state_commit "$d" "- unit 1" &&
+	head=$(ss_git "$d" rev-parse HEAD) &&
+	for ((i = 1; i <= 1000; i++)); do
+		printf 'commit refs/heads/many/%s-%04d\ncommitter f <f@example.invalid> 0 +0000\ndata 5\nc%04d\nfrom %s\n\n' \
+			"$pad" "$i" "$i" "$head"
+	done | ss_git "$d" fast-import --quiet 2>/dev/null &&
+	[ "$(ss_git "$d" for-each-ref --contains HEAD refs/heads/many | wc -l)" -eq 1000 ] &&
+	ss_shim "$shim" 'rev-list*'; then
+	out=$(cd "$d" && PATH="$shim:$PATH" env -u AMH_REMOTE bash scripts/session-start.sh 2>&1)
+	if grep -qF "· working memory: could not count the commits that build on this checkout — NOT checked" <<<"$out" &&
+		! grep -qE 'nothing that builds|has no newer|OLDER' <<<"$out"; then
+		report ok "a failed count ahead of 200 KiB of others is reported as NOT checked"
+	else
+		report no "a failed count ahead of 200 KiB of others is reported as NOT checked" \
+			"it was read as an answer — an early-exiting reader under pipefail" "$out"
+	fi
+else
+	report no "a failed count ahead of 200 KiB of others is reported as NOT checked" \
+		"setup: could not build a thousand branches on the checkout"
+fi
+
+d=$(mk ss_newer_state_unborn)
+ss_git "$d" checkout -q --orphan unborn 2>/dev/null
+out=$(ss_banner "$d")
+rc=$?
+if [ "$rc" -eq 0 ] && ! grep -qF "working memory:" <<<"$out"; then
+	report ok "a repository with no commit yet prints no working-memory line and still boots"
+else
+	report no "a repository with no commit yet prints no working-memory line and still boots" "rc=$rc" "$out"
 fi
 
 # --- the protocol pointer names only documents that exist
@@ -2333,7 +3039,7 @@ else
 	if [ -e "$SHIM/sha256sum" ] || [ -e "$SHIM/shasum" ]; then
 		report no "the no-hasher fixture really has no hasher" "the shim PATH contains one"
 	else
-		out=$(cd "$d" && env -i PATH="$SHIM" CI=1 HOME="$WORK" bash scripts/ladder.sh --guards-only 2>&1)
+		out=$(cd "$d" && env -i PATH="$SHIM" CI=1 HOME="$WORK" TMPDIR="${TMPDIR:-/tmp}" bash scripts/ladder.sh --guards-only 2>&1)
 		rc=$?
 		if [ "$rc" -ne 0 ]; then
 			report no "no hashing tool is not fatal" "expected exit 0, got $rc" "$out"
@@ -2899,6 +3605,43 @@ else
 	report ok "advisories stay out of CI"
 fi
 
+# A state file listed FIRST among more changed paths than two pipe buffers hold. The advisory
+# asked `printf | grep -qF` under `pipefail`: grep matched the first line and exited, the writer
+# took EPIPE, and the pipeline's failure read as "the state file is not among them" — on every
+# run, because 64 KiB is all the pipe can hold before grep has read anything (AMH ledger row
+# DD110). The paths are DELETED on the branch, so the scan rungs have no files to read and the
+# case stays fast. "Local advisories" is checked first, so the absence below is not over nothing.
+d=$(mk advisory_state_file_long_list)
+(
+	cd "$d" || exit 1
+	mkdir zz || exit 1
+	pad=$(printf '%0200d' 0)
+	for ((i = 1; i <= 1000; i++)); do : >"zz/$pad-$i" || exit 1; done
+	git add -A && git commit -qm "a thousand long paths" &&
+		git update-ref "refs/remotes/origin/$DEFAULT_BRANCH_FIXTURE" HEAD &&
+		git rm -rq zz &&
+		printf -- '- 2026-01-02 — the long paths removed.\n' >>docs/STATE.md &&
+		git commit -qam "the long paths removed, with a changelog line"
+) >/dev/null 2>&1
+# The setup is checked, not trusted: a branch with no diff prints the advisory section too, and
+# this case would then pass over a predicate it never reached.
+listing=$(git -C "$d" diff --name-only "origin/$DEFAULT_BRANCH_FIXTURE...HEAD" 2>/dev/null)
+started=$SECONDS
+out=$(run_local "$d")
+elapsed=$((SECONDS - started))
+FIXTURE_ELAPSED_SECONDS=$elapsed
+if [ "${listing%%$'\n'*}" != docs/STATE.md ] || [ "${#listing}" -le 131072 ]; then
+	report no "a state file listed first among 200 KiB of changed paths is seen" \
+		"setup: the branch does not list docs/STATE.md first among more than 128 KiB of paths (${#listing} bytes)"
+elif ! grep -qF "Local advisories" <<<"$out"; then
+	report no "a state file listed first among 200 KiB of changed paths is seen" "the advisory section did not run" "$out"
+elif grep -qF "changelog line is probably missing" <<<"$out"; then
+	report no "a state file listed first among 200 KiB of changed paths is seen" \
+		"the advisory read the listed state file as missing — an early-exiting reader under pipefail" "$out"
+else
+	report ok "a state file listed first among 200 KiB of changed paths is seen"
+fi
+
 # --- the verdict's subject: which commit, and whether the tree IS that commit
 # The ladder printed "green" for three releases without ever saying green OF WHAT
 # (AMH ledger row DA025). Every case below is asserted on the VERDICT LINE, because that
@@ -3021,6 +3764,6 @@ expect_verdict "the full green verdict names its subject" run_full "$d" 0 \
 	"✓ ladder green"
 
 # =============================================================================
-printf '\n%d passed, %d failed\n' "$PASSED" "$FAILED"
+printf '\n%d passed, %d failed, %d skipped\n' "$PASSED" "$FAILED" "$SKIPPED"
 print_timing_summary
 [ "$FAILED" -eq 0 ]

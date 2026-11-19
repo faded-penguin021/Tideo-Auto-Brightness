@@ -27,6 +27,14 @@ prefix_rule(pattern = [["cat", "head", "tail", "less", "more", "strings", "grep"
 # Private keys by conventional filename; public `.pub` halves are deliberately allowed.
 prefix_rule(pattern = [["cat", "head", "tail", "less", "more", "strings", "grep", "wc", "base64", "sha256sum", "md5sum"], ["id_rsa", "./id_rsa", "id_dsa", "./id_dsa", "id_ecdsa", "./id_ecdsa", "id_ecdsa_sk", "./id_ecdsa_sk", "id_ed25519", "./id_ed25519", "id_ed25519_sk", "./id_ed25519_sk"]], decision = "forbidden", justification = "AMH forbids reading private key material; check the file's presence or read the .pub half.")
 
+# Two commands print a stored credential by design, and their leading words are fixed, so a prefix
+# rule can name them. The stores themselves (`~/.netrc`, `~/.aws/credentials` and the rest of the
+# list in scripts/command-guard.sh) sit under a home directory, a path this policy has no glob
+# operand for (below); the command guard judges them. A respelling the guard
+# also reads (`gh auth status -t`, a helper's own `get`) is not a prefix of these and passes here.
+prefix_rule(pattern = ["gh", "auth", "token"], decision = "forbidden", justification = "AMH forbids printing a stored credential; `gh auth status` says whether gh is logged in.")
+prefix_rule(pattern = ["git", "credential", "fill"], decision = "forbidden", justification = "AMH forbids printing a stored credential; run the command that needs it to see whether git can authenticate.")
+
 # Codex prefix policy has no path-glob operand, so nested .env paths and arbitrary
 # /proc/<pid>/environ paths cannot be expressed here. scripts/command-guard.sh covers
 # its enumerated reader forms; AGENTS.md remains binding beyond both mechanical rails.

@@ -19,7 +19,7 @@
 > **Paths in rows (AMH 14.0.0).** A row's immutability covers its text, not the lifetime or location
 > of a file it names. A new path reference must resolve in the tree where the row is authored; a
 > committed row's target may later move or disappear, and that drift leaves the historical text
-> alone. A new path that does not resolve, and any citation of a plan's path (RUNBOOK **Session
+> alone. A new path that does not resolve, and any citation of a plan's path (PROTOCOLS **Session
 > discipline** 5), are both forbidden — and both are **prose-only here**: this repository ships no
 > path-reference guard and nothing scans rows for plan paths, so the rule-review pass is the whole
 > enforcement.
@@ -503,3 +503,11 @@
   `flash_context_loaded`, and `HardcodedStringCheckTest` scans `AabFlash.show("`. Until the store's
   first value arrives, `AabFlash` behaves as Off (outside Tideo), so neither off state can leak a
   cold-start toast over another app. `docs/plans/FLASH_VISIBILITY_TOGGLE.md` Units 2 and 3 carry it.
+- DE-042: **AMH 15.1.0 -> 17.0.0 (2026-11-19): the six binding sections moved VERBATIM from our
+  runbook into `docs/PROTOCOLS.md`, not from the seed, so every local edit arrived by
+  construction; the seed's new items 10–12 and review sentences were then added with "adversarial
+  pass" read as our glue-review pass.** The owner declined Claude Code's sandbox here, as sessions
+  already run in a Docker container (no `sandbox` block, no `bwrap socat` in `REQUIRED_TOOLS`). Every `amh-init.sh` run writes `ci.yml` again, and
+  it was deleted again, as `docs/HARNESS_LOCAL.md` records. The machine-mode guard installed on
+  2026-11-09 matched no release tag (measured: `sha256sum` against amh-v16.1.0, 16.1.1 and 17.0.0;
+  `diff` 13 lines from 16.1.1), so a copy's version cannot be read from its install date.

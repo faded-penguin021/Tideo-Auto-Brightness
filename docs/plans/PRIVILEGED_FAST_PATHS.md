@@ -413,7 +413,7 @@ becomes a new DD row in the unit that acts on it:
   - this plan's design;
   - the order of its units, its gates and its risks;
   - its test and evidence strategy;
-  - its fit with AGENTS.md and the RUNBOOK (playbooks 5, 6 and 9; glue and rule review);
+  - its fit with AGENTS.md, the RUNBOOK (playbooks 5, 6 and 9) and PROTOCOLS (glue and rule review);
   - the facts it cites, using the sources at the end.
 - Out of scope: code (none is written), the excluded items (check only their reasons), the Tasker
   XML, the release and PR process, and targetSdk 37.

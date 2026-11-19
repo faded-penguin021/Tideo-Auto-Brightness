@@ -101,7 +101,16 @@ skip() { printf '   skip  %s\n' "$1"; }
 # do not read one from the other.)
 note() { printf '   note  %s\n' "$1"; }
 
-TMP=$(mktemp -d)
+# Checked, and the run stops here rather than going on without it. Every rung below that writes
+# a scratch file builds its path from `$TMP`; with it empty they wrote to `/rows`, `/chain` and
+# the like, read back nothing, and the citation and secret rungs printed `ok` over defects they
+# never read — the ladder exited 0 over a planted credential (AMH ledger row DD072). No rung is
+# worth running on a path nobody made, so none is.
+if ! TMP=$(mktemp -d) || [ -z "$TMP" ] || [ ! -d "$TMP" ]; then
+	printf '   FAIL  no scratch directory could be created (mktemp -d) — this run checked NOTHING\n'
+	printf '\n✗ ladder red — no scratch directory, so no rung ran\n'
+	exit 1
+fi
 trap 'rm -rf "$TMP"' EXIT
 
 in_ci() { [ -n "${CI:-}" ]; }
@@ -793,7 +802,15 @@ guard_secret_shapes() {
 		canary=$canary$(head -c 512 /dev/urandom | LC_ALL=C tr -dc 'A-Z0-9')
 	done
 	canary="AKIA${canary:0:16}"
-	if printf 'x %s x\n' "$canary" | bash scripts/redact.sh 2>/dev/null | grep -qF "$canary"; then
+	# Both controls capture the filter's output and match it with `case`, never `| grep -q`: the
+	# filter is the thing under test, so its output is not bounded by construction, and a broken
+	# one that printed the canary ahead of a long tail made an early-exiting reader under
+	# `pipefail` read a survivor as redacted. `case` needs no pipe and no temporary file, which a
+	# here-string past the pipe buffer does (AMH ledger row DD110). The capture keeps a failing
+	# filter a failed check, as the pipeline did.
+	local filtered
+	if filtered=$(printf 'x %s x\n' "$canary" | bash scripts/redact.sh 2>/dev/null) &&
+		case $filtered in *"$canary"*) true ;; *) false ;; esac; then
 		fail "scripts/redact.sh did not redact a generated test token — the filter is empty, broken or pass-through, and this scan would report green on everything"
 		return
 	fi
@@ -811,7 +828,8 @@ guard_secret_shapes() {
 	# the per-file comparison below, which runs on that file's own bytes. Refusing to scan
 	# is the honest verdict for both: this rung is the repo's whole secret defence, and
 	# "I did not manage to look" must never render as clean (AMH ledger row DC002).
-	if ! printf 'x %s x\n' "$canary" | bash scripts/redact.sh --baseline 2>/dev/null | grep -qF "$canary"; then
+	if ! { filtered=$(printf 'x %s x\n' "$canary" | bash scripts/redact.sh --baseline 2>/dev/null) &&
+		case $filtered in *"$canary"*) true ;; *) false ;; esac; }; then
 		fail "scripts/redact.sh has no working --baseline mode, so this scan cannot tell a redaction from the platform's own newline handling and did NOT scan this tree. The copy of redact.sh beside this ladder is older than it or broken — re-run the harness's init script to restore the matching pair."
 		return
 	fi
@@ -1347,6 +1365,104 @@ guard_shipped_integrity() {
 	[ "$bad" = 0 ] && ok "$checked shipped script(s) match the published hashes ($tool) — a lower count than your version ships means the manifest was edited"
 }
 
+# The Claude adapter's hooks run under the shell they name, and AMH's hooks name bash.
+#
+# This rung reads ONE vendor's file, and only when it exists: a repository with no
+# `.claude/settings.json` gets a `skip` line and nothing else, so an adopter using another agent,
+# or none, is unaffected. Where the file exists, every entry whose command names one of AMH's three
+# hook scripts must carry `"shell": "bash"`. An unpinned hook still exists and still matches, and on
+# Windows, where the host's search for Git's bash fails, it hands a bare `.sh` to the file
+# association, which runs it DETACHED and reports success with no output — so a guard that
+# denies with a non-zero exit allows instead, and nothing says so. Both typos are as quiet: a
+# misspelled KEY is stripped and leaves the entry unpinned, and an invalid VALUE drops the whole
+# entry (AMH ledger rows DD008, DD011, DD013). The pin is an upgrade step done by hand, in the
+# one file an agent's permission classifier may refuse to let it edit, so its ABSENCE needs a
+# check the ladder runs.
+#
+# Hooks of your own are not judged: what shell they need is yours to say. An AMH hook is an entry
+# whose `"command"` NAMES `command-guard.sh`, `session-start.sh` or `redact-tool-output.sh`, by
+# file name, so `scripts//command-guard.sh` and a quote inside the path are still AMH hooks. The
+# cost runs the safe way: an entry of yours that merely mentions one of those names is judged too.
+#
+# No JSON parser is in the dependency floor, so this reads the file as text, and reads it
+# without regard to layout: a hook entry is a flat object, so each innermost `{...}` outside a
+# string is one candidate, minified or not. JSON keeps the LAST of two equal keys, so the last
+# `"shell"` in an entry is the one judged, and only one that follows a `{` or a `,` is a key — a
+# string ending in `\"shell` is not. A value must be exactly `bash`, which is also what the host
+# accepts: any other value drops the whole entry. A key written with `\u` escapes is not read. The POPULATION is counted separately, as every
+# `"command"` value naming one of those scripts anywhere in the file, and reconciled: an AMH
+# command the entry reader did not reach — nested in an object it cannot read as flat — is
+# reported as UNVERIFIED, never passed.
+guard_claude_hook_shell() {
+	section "Claude adapter: AMH hooks pin their shell"
+	local settings=.claude/settings.json verdict total entries unpinned
+	if [ ! -f "$settings" ]; then
+		skip "$settings is absent — this repository has no Claude adapter to check"
+		return
+	fi
+	verdict=$(awk '
+		{ text = text $0 "\n" }
+		END {
+			amh = "(command-guard|session-start|redact-tool-output)\\.sh"
+			# The population: every "command" value naming an AMH script, escaped quotes and all.
+			rest = text
+			total = 0
+			while (match(rest, "\"command\"[ \t\r\n]*:[ \t\r\n]*\"([^\"\\\\]|\\\\.)*" amh)) {
+				total++
+				rest = substr(rest, RSTART + RLENGTH)
+			}
+			entries = 0; unpinned = 0; instr = 0; esc = 0; start = 0
+			n = length(text)
+			for (i = 1; i <= n; i++) {
+				c = substr(text, i, 1)
+				if (instr) {
+					if (esc) esc = 0
+					else if (c == "\\") esc = 1
+					else if (c == "\"") instr = 0
+					continue
+				}
+				if (c == "\"") instr = 1
+				else if (c == "{") start = i
+				else if (c == "}" && start) {
+					obj = substr(text, start, i - start + 1)
+					start = 0
+					if (obj !~ "\"command\"[ \t\r\n]*:[ \t\r\n]*\"([^\"\\\\]|\\\\.)*" amh) continue
+					entries++
+					shell = ""
+					while (match(obj, /[{,][ \t\r\n]*"shell"[ \t\r\n]*:[ \t\r\n]*"[^"]*"/)) {
+						shell = substr(obj, RSTART, RLENGTH)
+						obj = substr(obj, RSTART + RLENGTH)
+					}
+					sub(/^[{,][ \t\r\n]*"shell"[ \t\r\n]*:[ \t\r\n]*"/, "", shell)
+					sub(/"$/, "", shell)
+					if (shell != "bash") unpinned++
+				}
+			}
+			print total, entries, unpinned
+		}
+	' "$settings") || verdict=''
+	read -r total entries unpinned <<<"$verdict"
+	case ${total:-}${entries:-}${unpinned:-} in
+	'' | *[!0-9]*)
+		warn "$settings could not be read, so the AMH hooks' shell pin was NOT checked — this rung checked NOTHING"
+		return
+		;;
+	esac
+	if [ "$total" -eq 0 ]; then
+		warn "$settings names no AMH hook script in any \"command\", so the shell pin was checked on NOTHING. If you installed the Claude adapter, its hooks are gone; if you did not, this file is yours and the warning is the price of reading it"
+		return
+	fi
+	if [ "$unpinned" -gt 0 ]; then
+		fail "$settings: $unpinned of $entries AMH hook(s) do not carry \"shell\": \"bash\". On Windows an unpinned hook can be handed to the file association, which runs it detached and reports success, so a guard's deny becomes an allow. Add \"shell\": \"bash\" beside each such entry's \"type\": \"command\", exactly as harness/templates/configs/claude-settings.json does"
+	fi
+	if [ "$entries" -ne "$total" ]; then
+		warn "$settings: $((total - entries)) of $total AMH hook command(s) are not in a flat {...} entry this rung can read, so their shell pin is UNVERIFIED, not present"
+	fi
+	if [ "$unpinned" -eq 0 ] && [ "$entries" -eq "$total" ]; then
+		ok "$entries AMH hook(s) in $settings carry \"shell\": \"bash\""
+	fi
+}
+
 # The section header is printed unconditionally, and the number of guards that actually
 # RAN is always reported. Both were conditional on finding a guard, so `rm -rf
 # scripts/guards` left this rung emitting nothing whatsoever — no header, no skip, no
@@ -1446,7 +1562,10 @@ advisories() {
 	if [ -n "$base" ]; then
 		local changed
 		changed=$(git diff --name-only "$base...HEAD" 2>/dev/null)
-		if [ -n "$changed" ] && ! printf '%s\n' "$changed" | grep -qF "$STATE_FILE"; then
+		# A `case` match, not `printf | grep -qF`: on a branch whose changed-file list passed a
+		# pipe buffer the early-exiting reader under `pipefail` made a listed state file read as
+		# missing. `case` needs no pipe and no temporary file (AMH ledger row DD110).
+		if [ -n "$changed" ] && ! case $changed in *"$STATE_FILE"*) true ;; *) false ;; esac; then
 			warn "this branch changes files but not $STATE_FILE — the checkpoint's changelog line is probably missing"
 		fi
 
@@ -1527,7 +1646,9 @@ advisories() {
 			# leaves the first one listed even though it ran.
 			note "destructive advisories fired and never re-attempted under this exact text (a bundled or reworded rerun still counts as never):"
 			# The signature is the rail's identity for a target set: a command kind,
-			# then each operand `%q`-quoted and joined. Printed with the joiner
+			# then each operand `%q`-quoted and joined — or, for a command behind
+			# `xargs`, `xargs:` and a digest of the command text, then the kind, which
+			# names no pipeline because the text is not stored. Printed with the joiner
 			# trimmed, because this line is read by a person and the trailing `|`
 			# says nothing to one. Nothing parses it back.
 			printf '%s\n' "$unresolved" | sed -e 's/ *|$//' -e 's/^/         /'
@@ -1661,6 +1782,7 @@ run_guards() {
 	guard_author_identity
 	guard_rail_selftests
 	guard_shipped_integrity
+	guard_claude_hook_shell
 	guard_repo_local
 	advisories
 }

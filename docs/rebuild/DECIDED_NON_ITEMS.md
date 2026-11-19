@@ -2,7 +2,7 @@
 
 Binding declines, moved verbatim from `docs/STATE.md` → **Decided non-items** at the owner's grant
 of 2026-10-06 (DD-037), which keeps the header and a pointer here. They are legislation, not
-working memory: change them only under the rule-review protocol (`docs/RUNBOOK.md`), and do not
+working memory: change them only under the rule-review protocol (`docs/PROTOCOLS.md`), and do not
 propose an item listed here unless the owner reopens it.
 
 - **No migration resets an already-snowballed `nightLightTemperature` (owner, 2026-09-21;

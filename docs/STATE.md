@@ -1,7 +1,7 @@
 # STATE — project state & session memory
 
 > **Length guard (DA-004).** Thresholds are in `amh.conf`; the compression rules, and the rule for
-> what may sit in `Current state` at all, are `docs/RUNBOOK.md` → **Working-memory compression**,
+> what may sit in `Current state` at all, are `docs/PROTOCOLS.md` → **Working-memory compression**,
 > and they bind whether or not you follow this pointer. Prose-only — no guard judges it.
 
 ## Project
@@ -12,7 +12,7 @@ adds super dimming and Privileged Display.
 
 ## Current state
 
-Harness AMH 15.1.0, scripts and hand-applied seed prose together (DD-066); the live ledger is
+Harness AMH 17.0.0, scripts and hand-applied seed prose together (DE-042); the live ledger is
 `LEDGER_E.md`. **Release standing is NOT recorded here:** the session banner computes it
 (`scripts/session-facts.sh`, DC-030), settled by hand with
 `git ls-remote --tags --refs origin 'refs/tags/v*'`.
@@ -72,7 +72,7 @@ investigation stays closed (DB-051…DB-060), and Scorecard.dev is a run-once lo
 > — a ladder guard warns if the header vanishes. Items leave only when done, answered or triaged;
 > then delete the item and record the outcome as a Changelog line or a ledger row. How to test an
 > item before restating it, and why every session's final message must:
-> `docs/RUNBOOK.md` → **Session discipline** 7.
+> `docs/PROTOCOLS.md` → **Session discipline** 7.
 >
 > **Plain language here — exempt from the tree's terse, ledger-ID-first register (DB-079, owner,
 > 2026-08-23)** because a person decides from it: say what to do, on what, what result means it
@@ -110,11 +110,15 @@ investigation stays closed (DB-051…DB-060), and Scorecard.dev is a run-once lo
 
 Binding owner declines live in `docs/rebuild/DECIDED_NON_ITEMS.md` (moved there by the owner's
 grant, DD-037), including the `docs/plans/REVIEW_TRIAGE_1.9.0.md` declines. Read it before
-proposing work; changing it is legislation under RUNBOOK's rule-review protocol.
+proposing work; changing it is legislation under PROTOCOLS' rule-review protocol.
 
 ## Changelog
 
 Newest first; ledger rows are the durable detail.
+
+- 2026-11-19 — **AMH upgraded 15.1.0 -> 17.0.0 (DE-042): the six binding sections now live in
+  `docs/PROTOCOLS.md`, with Session discipline 10–12 added (P21 test-first); the Claude adapter's
+  hooks are root-anchored and fail closed; the owner declined the sandbox.**
 
 - 2026-11-17 — **#161's D1–D5 decided (owner, DE-041): flashes stay on over other apps by default,
   and Live Debug adds Off (outside Tideo) and Off (everywhere), each governing every flash; the

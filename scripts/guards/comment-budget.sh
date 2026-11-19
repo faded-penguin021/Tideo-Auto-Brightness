@@ -519,7 +519,7 @@ fi
 
 # --- whole-tree mode (the ladder) ------------------------------------------------------------
 fails=0
-report=$(mktemp)
+report=$(mktemp) || { echo "comment-budget: mktemp failed — this guard checked nothing" >&2; exit 1; }
 trap 'rm -f "$report"' EXIT
 
 # `git ls-files -z` and a NUL-delimited read, so a tracked path containing a space or a newline
@@ -581,7 +581,7 @@ done
 # Provenance manifest. Every record the manifest names must still be present at least as often as
 # it says; new records are free. See the manifest's header for why the key is the coordinate set
 # and not the marker text.
-recs=$(mktemp)
+recs=$(mktemp) || { echo "comment-budget: mktemp failed — this guard checked nothing" >&2; exit 1; }
 trap 'rm -f "$report" "$recs"' EXIT
 tasker_provenance_records "${files[@]}" >"$recs"
 prov_total=$(wc -l <"$recs" | tr -d '[:space:]')

@@ -60,7 +60,7 @@ say() { printf '%s\n' "$*"; }
 # extra step. The rest of the name is quoted, so only the category slot globs — a repository
 # path containing a glob character stays a literal rather than widening the pattern. That slot
 # is a greedy `*` that does not cross `/`, so the widest reach is another repository's file of
-# exactly this shape under /tmp, and erasing one of those is harmless: an advisory that rearms
+# exactly this shape under /tmp or TMPDIR, and erasing one of those is harmless: an advisory that rearms
 # early blocks one extra command and explains why, which is the direction this file is allowed
 # to fail in. Erasing one too FEW removes a rail in silence, which is why the pattern is wide.
 #
@@ -89,8 +89,21 @@ say() { printf '%s\n' "$*"; }
 # that reach rather than closing it: the category slot is still a greedy `*`, so a neighbouring
 # repository whose path embeds this exact shape stays reachable. Contrived, and not a reason to
 # widen — but the absolute would be false.
+#
+# A marker that cannot be removed is REPORTED, not swallowed. A state file left behind is a
+# spent advisory this session inherits, so the rail is off for it with nothing on screen saying
+# so; a `.resumed` left behind makes both reports span earlier sessions. A `/tmp` this process
+# sees read-only while the hook that wrote there did not is the plain way to get either. The
+# warning names the directory by its ROLE — `/tmp` or `TMPDIR` — and prints neither the marker,
+# whose name embeds this repository's path (AMH ledger row DD097), nor TMPDIR's value, which
+# can embed a home directory. It is a banner line and nothing else: the exit status stays 0,
+# because a boot step that cannot clear a file must not stop the session (P14). The labels are
+# kept in a plain string, not read back through a here-string, which bash before 5.1 builds as
+# a temporary file — in the very directory that may be unwritable.
+ADVISORY_RESET_FAILED=''
 reset_command_guard_advisories() {
-	local slug uid f had_globignore old_globignore noglob=0
+	local slug uid f dir had_globignore old_globignore noglob=0 failed
+	local -a dirs=(/tmp)
 	case $- in *f*) noglob=1 ;; esac
 	set +f
 	had_globignore=${GLOBIGNORE+x}
@@ -99,9 +112,30 @@ reset_command_guard_advisories() {
 	slug=${ROOT//\//_}
 	slug=${slug// /_}
 	uid=${UID:-unknown}
-	for f in /tmp/amh-command-guard-*-advisory-"$uid"-"$slug" \
-		/tmp/amh-command-guard-*-advisory-"$uid"-"$slug".resumed; do
-		[ -e "$f" ] && rm -f -- "$f" 2>/dev/null
+	# Both places the command guard may have written: /tmp, and TMPDIR when it names an absolute
+	# directory (its advisory_state_dir). A hook that saw no TMPDIR wrote to /tmp even when this
+	# process sees one, so both are cleared. An unwritable directory with no marker in it says
+	# nothing; one holding a marker that stays after `rm` is reported (see above).
+	dir=${TMPDIR:-}
+	case $dir in /*) ;; *) dir= ;; esac
+	while [ "$dir" != "${dir%/}" ]; do dir=${dir%/}; done
+	[ -n "$dir" ] && [ "$dir" != /tmp ] && dirs+=("$dir")
+	for dir in "${dirs[@]}"; do
+		failed=0
+		for f in "$dir"/amh-command-guard-*-advisory-"$uid"-"$slug" \
+			"$dir"/amh-command-guard-*-advisory-"$uid"-"$slug".resumed; do
+			if [ -e "$f" ]; then
+				rm -f -- "$f" 2>/dev/null
+				[ -e "$f" ] && failed=1
+			fi
+		done
+		if [ "$failed" = 1 ]; then
+			if [ "$dir" = /tmp ]; then
+				ADVISORY_RESET_FAILED="$ADVISORY_RESET_FAILED /tmp"
+			else
+				ADVISORY_RESET_FAILED="$ADVISORY_RESET_FAILED TMPDIR"
+			fi
+		fi
 	done
 	if [ -n "$had_globignore" ]; then GLOBIGNORE=$old_globignore; else unset GLOBIGNORE; fi
 	[ "$noglob" = 1 ] && set -f
@@ -159,6 +193,14 @@ install_prepush_hook() {
 }
 
 say "── AMH session start ─────────────────────────────────────────"
+for d in /tmp TMPDIR; do
+	case "$ADVISORY_RESET_FAILED " in *" $d "*)
+		say "· ⚠ could not clear the command guard's one-time advisory state under $d — what an"
+		say "  earlier session spent or resumed there carries over: an advisory may never fire, and"
+		say "  the advisory reports may count earlier sessions. Make it clearable, then re-run this script."
+		;;
+	esac
+done
 
 # 1. Toolchain bootstrap — remote/ephemeral containers only, gated on an explicit
 #    flag. A heuristic here would surprise someone on their own machine.
@@ -311,6 +353,136 @@ else
 	say "· ⚠ $STATE_FILE is missing — working memory is where every session starts."
 fi
 
+# 3a. Newer working memory on top of this checkout.
+#
+# The state file is read first, so a checkout that is behind the work it records hands the
+# session a stale plan and nothing says so. The shape that earned this line (AMH ledger row
+# DD049): a unit finished in a second worktree and was pushed with `git push origin
+# <local>:<remote>`, which moves the remote branch and leaves this checkout's branch where it
+# was. The next session read the old state file, reported the finished unit as not started and
+# built the wrong artifact for a device check.
+#
+# The test is ancestry plus the state file, and never this branch's name or its upstream's,
+# which that shape spells differently. A ref or a detached worktree counts when HEAD is a strict
+# ancestor of it AND a commit in between changes the state file — a bot never edits that file,
+# and every unit does (the checkpoint invariant). Newest-commit-wins was refused: a bot's daily
+# bump is always newer, and commit dates do not follow ancestry.
+#
+# ONE name is used, DEFAULT_BRANCH, and only to tell the two cases apart. A HEAD with commits of
+# its own past the default branch is an ancestor only of work built on it, so every such ref
+# is a continuation. A HEAD with none — a session freshly cut — is an ancestor of every branch
+# cut since, and a sibling unit edits the state file exactly as a continuation does; which one
+# carries a train is the owner's to say, never a guess the banner may make. So there it judges
+# the default branch alone and says the rest was not judged.
+#
+# Refs as last fetched: this step does not fetch. A push updates the remote-tracking ref only
+# where the remote's fetch refspec maps the pushed branch — a single-branch clone's does not.
+# Every git call here runs with GIT_NO_LAZY_FETCH, so a partial clone reports that it could not
+# count rather than downloading trees (measured on git 2.43; a git that predates the variable
+# ignores it), and under `timeout` where one exists, so such a git or a huge history costs a
+# bounded wait, not a stalled session.
+# Missed, and said here: a continuation that was rebased, or cut from a newer commit than HEAD,
+# does not descend from HEAD; a shallow clone cannot see a branch whose history was cut off, so
+# its "nothing" is hedged. A detached worktree is named by its commit and never its path, which
+# can carry a home directory, and one whose directory is gone (prunable) is not a place to read.
+#
+# Three outcomes, as with the release line: found, none, or could not look — and the last is
+# never reported as none. An unborn HEAD prints nothing: no commit, so nothing can build on it.
+wm_git() {
+	if command -v timeout >/dev/null 2>&1; then
+		GIT_NO_LAZY_FETCH=1 GIT_TERMINAL_PROMPT=0 timeout 10 git "$@"
+	else
+		GIT_NO_LAZY_FETCH=1 GIT_TERMINAL_PROMPT=0 git "$@"
+	fi
+}
+
+wm_not_checked() { # <what could not be done>
+	say "· working memory: $1 — NOT checked, which is not evidence either way."
+}
+
+report_newer_state() {
+	local head base='' b label refs wts sha sym name n found=''
+	if ! git rev-parse --git-dir >/dev/null 2>&1; then
+		wm_not_checked "git could not read this repository"
+		return 0
+	fi
+	head=$(git rev-parse -q --verify HEAD 2>/dev/null) || return 0
+	for b in "refs/remotes/origin/$DEFAULT_BRANCH" "refs/heads/$DEFAULT_BRANCH"; do
+		git rev-parse -q --verify "$b^{commit}" >/dev/null 2>&1 || continue
+		base=$b
+		break
+	done
+	if [ -n "$base" ] && wm_git merge-base --is-ancestor "$head" "$base" 2>/dev/null; then
+		label=${base#refs/remotes/}
+		label=${label#refs/heads/}
+		if ! n=$(wm_git rev-list --count "$head..$base" -- "$STATE_FILE" 2>/dev/null); then
+			wm_not_checked "could not count what $label adds to $STATE_FILE"
+		elif [ "$n" -gt 0 ]; then
+			say "· ⚠ working memory: $STATE_FILE here is OLDER than on $label, and this checkout has no"
+			say "  commits of its own past it: $n newer commit(s) there change it. Bring this checkout up"
+			say "  to it before acting on it. Refs as last fetched."
+		else
+			say "· working memory: $label has no newer $STATE_FILE (refs as last fetched). This checkout"
+			say "  has no commits of its own, so branches cut from it are not judged: a sibling unit"
+			say "  cannot be told from a continuation."
+		fi
+		return 0
+	fi
+	# `:` separates the fields because a refname cannot contain one and an empty %(symref) must
+	# survive the split; IFS whitespace would collapse it. Symbolic refs (origin/HEAD) are aliases
+	# of a ref already listed.
+	if ! refs=$(wm_git for-each-ref --contains "$head" \
+		--format='%(objectname):%(symref):%(refname:short)' refs/heads refs/remotes 2>/dev/null) ||
+		! wts=$(wm_git worktree list --porcelain 2>/dev/null); then
+		wm_not_checked "could not list what builds on this checkout"
+		return 0
+	fi
+	# A worktree on a branch is already a ref above; only a detached one, still on disk, needs
+	# its own entry. Porcelain blocks end at a blank line.
+	wts=$(printf '%s\n\n' "$wts" | awk '
+		/^HEAD / { h = $2 } /^detached$/ { d = 1 } /^prunable/ { p = 1 }
+		/^$/ { if (d && !p && h != "") print h; h = ""; d = 0; p = 0 }')
+	while IFS=: read -r sha sym name; do
+		{ [ -n "$sha" ] && [ "$sha" != "$head" ] && [ -z "$sym" ]; } || continue
+		found="$found$sha $name"$'\n'
+	done <<<"$refs"
+	while IFS= read -r sha; do
+		{ [ -n "$sha" ] && [ "$sha" != "$head" ]; } || continue
+		wm_git merge-base --is-ancestor "$head" "$sha" 2>/dev/null || continue
+		found="${found}$sha a detached worktree"$'\n'
+	done <<<"$wts"
+	# One line per commit with every name for it, kept when its descent from HEAD changes the
+	# state file. A count that failed is marked, never read as zero.
+	found=$(printf '%s' "$found" | sort | awk '
+		$1 != s { if (s != "") print s, names; s = $1; names = ""; }
+		{ sub(/^[^ ]+ /, ""); names = (names == "" ? $0 : names ", " $0) }
+		END { if (s != "") print s, names }' |
+		while read -r sha name; do
+			n=$(wm_git rev-list --count "$head..$sha" -- "$STATE_FILE" 2>/dev/null) || n=x
+			[ "$n" = 0 ] || printf '%s %s %s\n' "$n" "$sha" "$name"
+		done)
+	# A `case` match, not `printf | grep -q`: with a failed count early in a long enough list the
+	# early-exiting reader under `pipefail` read it as absent and printed `x` as a count. `case`
+	# needs no pipe, and no temporary file, which a here-string past the pipe buffer does and a
+	# sandbox may not allow (AMH ledger row DD110).
+	if case $'\n'"$found" in *$'\n''x '*) true ;; *) false ;; esac; then
+		wm_not_checked "could not count the commits that build on this checkout"
+	elif [ -n "$found" ]; then
+		say "· ⚠ working memory: $STATE_FILE here is OLDER than on work that builds on this checkout:"
+		printf '%s\n' "$found" | while read -r n sha name; do
+			say "    $(git rev-parse --short "$sha" 2>/dev/null || printf '%s' "$sha") ($name): $n newer commit(s) change it"
+		done
+		say "  Read it there, or bring this checkout up to it, before acting on it. Refs as last fetched."
+	elif [ -f "$(git rev-parse --git-path shallow 2>/dev/null)" ]; then
+		wm_not_checked "nothing found, but this clone is shallow and cannot see a branch whose history was cut off"
+	else
+		say "· working memory: nothing that builds on this checkout changes $STATE_FILE (refs as last fetched)."
+	fi
+	return 0
+}
+
+report_newer_state
+
 # 3b. Runtime inventory: which declared tools are on PATH, and which adapter files this
 #     repository ships. Both lists come from amh.conf, so this script names no vendor.
 #
@@ -386,10 +558,11 @@ fi
 
 # 4. Protocol pointer.
 #
-# The runbook clause is conditional on the file EXISTING, because not every install profile
-# ships one and the smallest profile — the default — deliberately does not. Pointing a fresh
-# session at a document that is not there teaches it to distrust the banner, and the adopter
-# cannot fix it themselves: this script is overwritten on every upgrade by design.
+# The runbook clause is conditional on the file EXISTING. Every install profile ships one, so a
+# tree without it is an incomplete install or a legacy one — an older light profile went without,
+# and its adopters were told to fold the playbooks into the constitution. Pointing a session at a
+# document that is not there teaches it to distrust the banner, and the adopter cannot fix this
+# line themselves: this script is overwritten on every upgrade by design.
 if [ -f "$ROOT/docs/RUNBOOK.md" ]; then
 	say "· protocol: read $STATE_FILE first (incl. the Owner queue), then the matching"
 	say "  playbook in docs/RUNBOOK.md. Verify with scripts/ladder.sh. Never leave the branch red."

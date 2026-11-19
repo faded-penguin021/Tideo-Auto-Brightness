@@ -19,7 +19,7 @@
 > **Paths in rows (AMH 14.0.0).** A row's immutability covers its text, not the lifetime or location
 > of a file it names. A new path reference must resolve in the tree where the row is authored; a
 > committed row's target may later move or disappear, and that drift leaves the historical text
-> alone. A new path that does not resolve, and any citation of a plan's path (RUNBOOK **Session
+> alone. A new path that does not resolve, and any citation of a plan's path (PROTOCOLS **Session
 > discipline** 5), are both forbidden — and both are **prose-only here**: this repository ships no
 > path-reference guard and nothing scans rows for plan paths, so the rule-review pass is the whole
 > enforcement. The legacy plan citation below does not pin the plan it names.
