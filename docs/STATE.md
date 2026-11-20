@@ -39,7 +39,7 @@ investigation stays closed (DB-051…DB-060), and Scorecard.dev is a run-once lo
   (owner, 2026-10-21; D1–D5 decided; re-read 2026-11-11, DE-036, and 2026-11-20, DE-043). Every
   unit is pre-approved: Units 1–8 run hands-off from the plan-runner with no phone, and Unit 9 is the
   owner's phone check. This plan runs first in the train, and the flash plan follows it.
-  [x] 0 plan · [x] 1 dimming readout · [ ] 2 brightness labels · [ ] 3 PWM dimming chart ·
+  [x] 0 plan · [x] 1 dimming readout · [x] 2 brightness labels · [ ] 3 PWM dimming chart ·
   [ ] 4 `keepGlobalsFrom` · [ ] 5 formula dedups · [ ] 6 engine `dimDynamic` · [ ] 7 AGENTS.md rule ·
   [ ] 8 close-out and phone steps · [ ] 9 owner phone check.
 - **Display calibration (Pixel and HyperOS confirmed)** —
@@ -83,15 +83,15 @@ investigation stays closed (DB-051…DB-060), and Scorecard.dev is a run-once lo
 > fork, options, recommendation (D-167), dated (DA-006); credential leaks and external-content
 > escalations land here too.
 
-1. **[2026-10-04] Get 81 Chinese strings translated; they show in English until then.** #143 asks
+1. **[2026-10-04] Get 87 Chinese strings translated; they show in English until then.** #143 asks
    for 65 — four changed meaning and lost their old Chinese, the rest are new (DD-026, DD-035,
    DD-047, DD-050, DD-071…DD-077); since then two of those were replaced by eight
    `calibration_failed_*` messages, and `handoff_calibration_note_failed` was reworded (DE-032), and
    Live Debug's Night Light card added ten `debug_night_light_*` labels (DE-038), so #143 needs
-   those added. Missing keys fall back to English, so it does not block a
+   those added; light-refactor Unit 2 relabelled six brightness readouts (DE-045). Missing keys fall back to English, so it does not block a
    release (owner, 2026-10-08). Paste translations replied there into the file. Settles it: `comm -23 <(grep -v 'translatable="false"' app/src/main/res/values/strings.xml |
    grep -o 'name="[^"]*"' | sort) <(grep -o 'name="[^"]*"'
-   app/src/main/res/values-b+zh+Hans/strings.xml | sort) | wc -l` prints 0 (81 on 2026-11-14).
+   app/src/main/res/values-b+zh+Hans/strings.xml | sort) | wc -l` prints 0 (87 on 2026-11-20).
 
 2. **[2026-10-13] Decide whether to add a check that the output-redaction hook is still wired.**
    Since AMH 15.0.0 both adapters run `scripts/redact-tool-output.sh` after every tool call, but
@@ -118,6 +118,10 @@ proposing work; changing it is legislation under PROTOCOLS' rule-review protocol
 ## Changelog
 
 Newest first; ledger rows are the durable detail.
+
+- 2026-11-20 — **Light refactor Unit 2: one definition for each brightness readout, labelled
+  "Perceived" or "Hardware (written)" (DE-045).** Live Debug's perceived line now shows Android's
+  value while handed off; six relabelled strings lost their Chinese and join Owner-queue item 1.
 
 - 2026-11-20 — **Light refactor Unit 1: one dimming plan publishes the readout, zeroed on every
   disengage (DE-044).** The Dashboard and Super Dimming readouts now follow reapply and every

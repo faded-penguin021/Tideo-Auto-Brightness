@@ -37,7 +37,7 @@ class ScreensA11yTest {
         rawLux = 120.0,
         smoothedLux = 118.0,
         currentBrightness = 88,
-        targetBrightness = 90,
+        shownBrightness = 90,
         circadianScale = 0.85,
         dimmingStrength = 12.0,
         activeContext = "Home",

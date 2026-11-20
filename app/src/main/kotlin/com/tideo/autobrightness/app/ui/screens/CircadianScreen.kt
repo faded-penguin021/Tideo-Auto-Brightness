@@ -167,11 +167,9 @@ fun CircadianContent(
                         TaperChart(
                             draft.toBrightnessCurveConfig(), draft.scaleSpread,
                             Modifier.testTag("taper_chart"),
-                            // Live "Now" line at the current brightness, only while circadian scaling
-                            // is actually shifting the curve (scaleDynamic ≠ 1).
-                            currentBrightness = live.targetBrightness?.takeIf {
-                                live.serviceOn && !live.handedOff && live.scalingUse &&
-                                    kotlin.math.abs((live.scaleDynamic ?: 1.0) - 1.0) > 0.001
+                            // Only while circadian scaling is actually shifting the curve.
+                            currentBrightness = live.liveMarkerBrightness?.takeIf {
+                                live.scalingUse && kotlin.math.abs((live.scaleDynamic ?: 1.0) - 1.0) > 0.001
                             },
                         )
                     },

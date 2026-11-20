@@ -504,7 +504,7 @@ class AmbientMonitoringService : Service() {
 
     private data class NotificationModel(
         val smoothedLux: Double? = null,
-        val targetBrightness: Int? = null,
+        val shownBrightness: Int? = null,
         val paused: Boolean = false,
         val serviceOn: Boolean = true,
         val activeContext: String? = null,
@@ -520,7 +520,7 @@ class AmbientMonitoringService : Service() {
 
     private fun notificationModel(state: PipelineState, activeContext: String?) = NotificationModel(
         state.smoothedLux,
-        state.targetBrightness,
+        state.shownBrightness,
         state.paused,
         state.serviceOn,
         activeContext,
@@ -545,8 +545,8 @@ class AmbientMonitoringService : Service() {
             model.handedOff && model.smoothedLux != null ->
                 languageContext.getString(R.string.notif_text_handed_off_lux, model.smoothedLux.toInt())
             model.handedOff -> languageContext.getString(R.string.notif_text_handed_off)
-            model.smoothedLux != null && model.targetBrightness != null ->
-                languageContext.getString(R.string.notif_text_lux_brightness, model.smoothedLux.toInt(), model.targetBrightness)
+            model.smoothedLux != null && model.shownBrightness != null ->
+                languageContext.getString(R.string.notif_text_lux_brightness, model.smoothedLux.toInt(), model.shownBrightness)
             else -> languageContext.getString(R.string.notif_text_monitoring)
         }
         val contextLine = model.activeContext?.let { languageContext.getString(R.string.notif_subtext_context, it) }

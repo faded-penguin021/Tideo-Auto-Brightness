@@ -170,7 +170,7 @@ are in `e2e/scenarios.toml`.
     mistaken for a result once already (2026-08-30). So: service running, override detection on,
     **not paused**, force the top from the app side, let the sweep end and **fully settle** for
     several seconds, touch nothing, then read the card and `adb shell settings get system
-    screen_brightness`. Do NOT instead pair the card's "Current brightness" with that value at one
+    screen_brightness`. Do NOT instead pair Live Debug's "Hardware (written)" line (formerly "Current brightness") with that value at one
     instant: a ratio near 16 is produced both by the app converting and by the layer below it
     rescaling an identity write, so it separates nothing (DC-018). `screen_brightness_float` is
     `null` here (DC-024), so do not wait on it; where it exists, ≈1.0 and ≈0.06 corroborate.

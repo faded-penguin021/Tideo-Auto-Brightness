@@ -125,7 +125,7 @@ fun LiveDebugContent(
                 Metric(stringResource(R.string.debug_dynamic_threshold), fmtPercent(p.threshDynamic), "debug_dynamic_threshold")
                 Metric(stringResource(R.string.debug_dead_zone), "${fmtLux(p.threshAbsLow)} – ${fmtLux(p.threshAbsHigh)}", "debug_dead_zone")
                 Metric(stringResource(R.string.debug_current_bright), fmtInt(p.currentBrightness), "debug_current_bright")
-                Metric(stringResource(R.string.debug_target_bright), fmtInt(p.targetBrightness), "debug_target_bright")
+                Metric(stringResource(R.string.debug_target_bright), fmtInt(p.shownBrightness), "debug_target_bright")
             }
 
             DiagnosticCard(stringResource(R.string.debug_scale_title), "debug_scale") {

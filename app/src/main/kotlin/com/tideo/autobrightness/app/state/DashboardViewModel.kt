@@ -61,8 +61,8 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
         val handedOff: Boolean,
         val rawLux: Double?,
         val smoothedLux: Double?,
+        val shown: Int?,
         val current: Int?,
-        val target: Int?,
         val circadianScale: Double?,
         val dimmingStrength: Double,
         val throttleMs: Long?,
@@ -81,7 +81,7 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
     ) { p, ctx, running, staleness, profile ->
         Live(
             running, p.paused, p.pausedByOverride, p.handedOff, p.lastRawLux, p.smoothedLux,
-            p.currentBrightness, p.targetBrightness.takeUnless { p.handedOff },
+            p.shownBrightness, p.currentBrightness,
             p.scaleDynamicCompress, p.dimmingCurrent,
             p.throttleMs, ctx, profile, p.lastSampleMs, staleness == Staleness.STALE,
         )
@@ -112,8 +112,8 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
             handedOff = live.handedOff,
             rawLux = live.rawLux,
             smoothedLux = live.smoothedLux,
+            shownBrightness = live.shown,
             currentBrightness = live.current,
-            targetBrightness = live.target,
             circadianScale = live.circadianScale,
             dimmingStrength = live.dimmingStrength,
             throttleMs = live.throttleMs,

@@ -425,6 +425,13 @@ class AmbientMonitoringServiceTest {
         assertEquals(monitoring, textOf(service.foregroundNotification(PipelineState(serviceOn = true), null)), "no accepted reading yet: Monitoring is true")
     }
 
+    @Test
+    fun foregroundNotification_fallsBackToTheAppliedBaseline_withoutATarget() {
+        val service = Robolectric.buildService(AmbientMonitoringService::class.java).create().get()
+        val noTarget = PipelineState(serviceOn = true, smoothedLux = 42.7, lastAppliedBrightness = 30)
+        assertEquals(service.getString(R.string.notif_text_lux_brightness, 42, 30), textOf(service.foregroundNotification(noTarget, null)))
+    }
+
     // DC-068: steady light publishes nothing, so a live instance must not lose its state to a timer.
     @Test
     fun taskRemoved_inSteadyLight_keepsTheRunningState() {

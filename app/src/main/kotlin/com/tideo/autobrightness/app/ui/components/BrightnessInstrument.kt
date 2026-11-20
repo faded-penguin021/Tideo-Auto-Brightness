@@ -49,15 +49,13 @@ fun BrightnessInstrument(
     modifier: Modifier = Modifier,
 ) {
     val on = state.serviceEnabled
-    val applied = state.currentBrightness ?: state.targetBrightness
-    val target = state.targetBrightness
+    val shown = state.shownBrightness
     // D-156: explicit label for on/off switch.
     val serviceLabel = stringResource(R.string.a11y_service_toggle)
 
     // G3-F5: animate toward target (destination published at sweep START), not applied.
-    val displayValue = target ?: applied
     val animatedValue by animateIntAsState(
-        targetValue = displayValue ?: 0,
+        targetValue = shown ?: 0,
         animationSpec = tween(AabMotion.DURATION_MEDIUM),
         label = "instrument_value",
     )
@@ -75,7 +73,7 @@ fun BrightnessInstrument(
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
             Text(
-                stringResource(R.string.dashboard_applied_brightness).uppercase(),
+                stringResource(R.string.dashboard_perceived_brightness).uppercase(),
                 style = AabDataCaption,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -84,7 +82,7 @@ fun BrightnessInstrument(
 
         Row(verticalAlignment = Alignment.Bottom) {
             Text(
-                if (displayValue != null) animatedValue.toString() else "—",
+                if (shown != null) animatedValue.toString() else "—",
                 style = AabDataDisplayLarge,
                 color = numberColor,
                 modifier = Modifier.testTag("dashboard_brightness"),
@@ -104,7 +102,7 @@ fun BrightnessInstrument(
             )
         }
 
-        BrightnessTrack(applied = applied, target = target, enabled = on)
+        BrightnessTrack(shown, enabled = on)
     }
 }
 
@@ -119,9 +117,9 @@ private val AabDataDisplayLarge = androidx.compose.ui.text.TextStyle(
 )
 
 @Composable
-private fun BrightnessTrack(applied: Int?, target: Int?, enabled: Boolean) {
+private fun BrightnessTrack(shown: Int?, enabled: Boolean) {
     // G3-F5: ease toward destination in step with big number.
-    val fraction = ((target ?: applied ?: 0).coerceIn(0, 255)) / 255f
+    val fraction = ((shown ?: 0).coerceIn(0, 255)) / 255f
     val animated by animateFloatAsState(
         targetValue = fraction,
         animationSpec = tween(AabMotion.DURATION_MEDIUM),

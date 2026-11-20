@@ -121,15 +121,9 @@ fun CurveBrightnessContent(
             BrightnessCurveChart(
                 curveConfig,
                 modifier = Modifier.testTag("brightness_curve_chart"),
-                // G3-F2: live "Now" cross-hair (current smoothed lux × current brightness), only while
-                // the service is running. The chart draws both marker lines when BOTH are non-null.
-                // D-117: track the PERCEIVED brightness (targetBrightness, un-floored) like the Dashboard
-                // hero — in PWM-sensitive mode the hardware value is floored above the perceived one, and
-                // the crosshair should sit where the user actually sees the screen, not at the floor.
-                // Falls back to the applied value when they're equal (PWM-sensitive off → target==applied).
+                // G3-F2, D-117: live "Now" cross-hair at the perceived brightness; hidden handed off (DD-077).
                 currentLux = live.smoothedLux?.takeIf { live.serviceOn },
-                // DD-077: Android's reading can pass 255, off this chart's axis.
-                currentBrightness = live.shownBrightness?.takeIf { live.serviceOn && !live.handedOff },
+                currentBrightness = live.liveMarkerBrightness,
                 handoffLux = handoff?.effective,
                 overridePoints = overlay,
                 referenceCurve = referenceConfig,

@@ -152,7 +152,7 @@ fun ReactivityDiagnosticCard() {
 
 // G2R-F8: Circadian screen card
 
-/** G2R-F8: Circadian diagnostic (%AAB_ScaleDynamic, compressed scale, brightness). */
+/** G2R-F8: Circadian diagnostic (%AAB_ScaleDynamic, compressed scale) beside Tideo's applied baseline (DE-045). */
 @Composable
 fun CircadianDiagnosticCardContent(
     state: PipelineState,
@@ -187,7 +187,6 @@ fun CircadianDiagnosticCard(minBrightness: Int, maxBrightness: Int) {
 fun CurveBrightnessDiagnosticCardContent(state: PipelineState, minBrightness: Int, maxBrightness: Int) {
     DiagnosticCard(stringResource(R.string.diag_curve_title), "curve_diagnostic_card") {
         DiagnosticLine(R.string.diag_curve_smoothed_lux, "diag_curve_smoothed_lux", fmtLux(state.smoothedLux))
-        // D-117: PERCEIVED brightness (un-floored target); falls back to applied when equal.
         DiagnosticLine(
             R.string.diag_curve_current_bright, "diag_curve_current_bright",
             minBrightness.toString(), maxBrightness.toString(), fmtInt(state.shownBrightness),
@@ -222,7 +221,7 @@ fun MiscDiagnosticCard() {
 
 // G2R-F58: Super Dimming screen card
 
-/** G2R-F58: Super Dimming readout (strength, level, brightness). */
+/** G2R-F58: Super Dimming readout; its brightness is Tideo's applied baseline, "—" once hand-off lands, never Android's (DE-045). */
 @Composable
 fun SuperDimmingDiagnosticCardContent(state: PipelineState) {
     DiagnosticCard(stringResource(R.string.diag_dimming_title), "super_dimming_diagnostic_card") {

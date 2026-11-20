@@ -524,3 +524,10 @@
   and below ELEVATED or after a failed level or activation write the readout is 0. The callback is
   bound at construction through a `lateinit` controller in `AppModule`; `stop()` and panic publish
   off the consumer as one atomic state update, as `stop()` already did.
+- DE-045 [cited]: **`PipelineState` alone defines the two brightness readouts — perceived
+  `shownBrightness`, hardware `currentBrightness` — and a chart's "Now" marker,
+  `liveMarkerBrightness` (light refactor Unit 2, D2).** The Dashboard, notification, Live Debug and
+  the Curve, Taper and dimming charts read them, so Live Debug's "Perceived" line shows Android's
+  value while handed off, and a missing target falls back to the applied baseline. Labels say
+  "Perceived" or "Hardware (written)"; the circadian and dimming card lines keep Tideo's applied baseline,
+  "—" once a hand-off lands, because Android's value means nothing beside Tideo's scale and dim level.

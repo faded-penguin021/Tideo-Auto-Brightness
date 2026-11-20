@@ -85,11 +85,17 @@ data class PipelineState(
             return (smoothedLux ?: return false) !in BrightnessEngine.settledRange(band, lastRawLux ?: return false)
         }
 
+    /** Perceived brightness, the one value every readout of it shows (DE-045); Android's while handed off. */
     val shownBrightness: Int?
         get() = if (handedOff) systemBrightness else targetBrightness ?: lastAppliedBrightness
 
+    /** Hardware brightness, Tideo's applied baseline (DE-045); Android's while handed off, which may pass 255 (DD-077). */
     val currentBrightness: Int?
         get() = if (handedOff) systemBrightness else lastAppliedBrightness
+
+    /** A chart's live "Now" marker: [shownBrightness] while the service runs and Tideo owns brightness. */
+    val liveMarkerBrightness: Int?
+        get() = shownBrightness?.takeIf { serviceOn && !handedOff }
 
     fun unchanged(lux: Double): Boolean {
         val low = threshAbsLow ?: return false

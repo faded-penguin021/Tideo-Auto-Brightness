@@ -146,7 +146,7 @@ class UiShellTest {
                         serviceRunning = true,
                         smoothedLux = 42.0,
                         currentBrightness = 100,
-                        targetBrightness = 120,
+                        shownBrightness = 120,
                     ),
                     onToggleService = { toggled = it },
                     onResume = {},
