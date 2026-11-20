@@ -21,8 +21,7 @@ import kotlin.math.sqrt
  * Do NOT "simplify" to kotlin.math.round/%.2f — these are immutable fixtures for parity.
  */
 
-// Tasker task548 result: the final calculated brightness (round1) + the effective compressed
-// scale (%AAB_ScaleDynamicCompress), which task561/OverrideRules consumes.
+// Tasker task548 result: calculated brightness (round1) + compressed scale (%AAB_ScaleDynamicCompress, read by task561).
 data class CompressedScaleResult(val calculatedBrightness: Double, val effectiveScale: Double)
 
 class BrightnessEngine {
@@ -107,11 +106,8 @@ class BrightnessEngine {
         }
 
         val mappedBrightness = mapLuxToBrightness(smoothedLux, input.curve)
-        val scaleDynamic = if (input.dynamicScaling.enabled) {
-            computeDynamicScale(input.time, input.dynamicScaling, input.context)
-        } else {
-            input.overrides.baseScaleOverride ?: 1.0
-        }
+        val dynamic = if (input.dynamicScaling.enabled) dynamicScale(input.time, input.dynamicScaling, input.context) else null
+        val scaleDynamic = dynamic?.scaleDynamic ?: input.overrides.baseScaleOverride ?: 1.0
 
         // Tasker task661 act10-14: ScalingUse → task548 taper; else linear mapped*Scale+Offset.
         val scaleResult = if (input.curve.scalingUse) {
@@ -147,6 +143,7 @@ class BrightnessEngine {
             thresholdHigh = absThresholds.second,
             scaleDynamic = scaleDynamic,
             scaleDynamicCompress = scaleResult.effectiveScale,
+            dimDynamic = dynamic?.dimDynamic,
             outcome = outcome,
             threshDynamicPercent = threshDynamicPercent,
             lastRawLux = lastRawLux,
@@ -250,9 +247,6 @@ class BrightnessEngine {
         return calc.coerceIn(cfg.minBrightness.toDouble(), cfg.maxBrightness.toDouble())
     }
 
-    fun computeDynamicScale(time: TimeContext, scaling: DynamicScalingConfig, context: BrightnessContext): Double =
-        dynamicScale(time, scaling, context).scaleDynamic
-
     fun dynamicScale(time: TimeContext, scaling: DynamicScalingConfig, context: BrightnessContext): DynamicScaleResult =
         DynamicScaleEngine.compute(
             DynamicScaleInput(
@@ -264,6 +258,7 @@ class BrightnessEngine {
                 sunlightDurationMinutes = time.sunlightDurationMinutes,
                 isPolar = context.isPolarDayNight,
                 steepness = scaling.steepness,
+                dimSpreadPercent = scaling.dimSpreadPercent,
                 scaleSpreadPercent = scaling.spreadPercent,
             )
         )

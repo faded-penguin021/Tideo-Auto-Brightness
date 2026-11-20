@@ -6,6 +6,8 @@ import com.tideo.autobrightness.domain.brightness.BrightnessEngine
 import com.tideo.autobrightness.domain.brightness.BrightnessPolicyInput
 import com.tideo.autobrightness.domain.brightness.SoftwareDimming
 import com.tideo.autobrightness.domain.brightness.TimeContext
+import com.tideo.autobrightness.domain.circadian.DynamicScaleEngine
+import com.tideo.autobrightness.domain.circadian.DynamicScaleInput
 import com.tideo.autobrightness.platform.brightness.BrightnessWriteResult
 import com.tideo.autobrightness.platform.brightness.ScreenBrightnessController
 import com.tideo.autobrightness.platform.brightness.SecureDimmingController
@@ -91,9 +93,11 @@ class BrightnessPipelineControllerTest {
 
     private class FakeDimming : DimmingCoordinator {
         val applied = mutableListOf<Int>()
+        val multipliers = mutableListOf<Double?>()
         var disengaged = 0
         override fun apply(targetBrightness: Int, settings: AabSettings, dimDynamic: Double?) {
             applied += targetBrightness
+            multipliers += dimDynamic
         }
         override fun disengage() { disengaged++ }
     }
@@ -112,6 +116,43 @@ class BrightnessPipelineControllerTest {
         trustUnreliableSensor = true,
         scalingEnabled = false,
     )
+
+    // DE-048: dimming gets task90's %AAB_DimDynamic, not one rebuilt from the rounded scale.
+    @Test
+    fun circadianDimMultiplier_isTask90sDimDynamic_DE049() = runTest {
+        val sensor = FakeSensor()
+        val dimming = FakeDimming()
+        val circadian = settings.copy(scalingEnabled = true, scaleSpread = 1, dimSpread = 100)
+        val nowMs = 23_760_000L // 06:36, 30% into the default 06:00–08:00 morning ramp
+        val (controller, scope) = newController(sensor, clock = { nowMs }, settingsProvider = { circadian }, dimming = dimming)
+        controller.start()
+        sensor.flow.emit(sample(lux = 1.0))
+        advanceUntilIdle()
+        val t = TimeContext(secondsOfDay = 23_760.0)
+        val task90 = DynamicScaleEngine.compute(
+            DynamicScaleInput(
+                nowSecOfDay = t.secondsOfDay, morningStart = t.morningStart, morningEnd = t.morningEnd,
+                eveningStart = t.eveningStart, eveningEnd = t.eveningEnd, sunlightDurationMinutes = t.sunlightDurationMinutes,
+                isPolar = false, steepness = 6.0, dimSpreadPercent = 100.0, scaleSpreadPercent = 1.0,
+            ),
+        )
+        assertEquals(task90.dimDynamic, dimming.multipliers.last())
+        scope.cancel()
+    }
+
+    // D-072: task646 applies the multiplier only while %AAB_ScalingUse is on.
+    @Test
+    fun circadianDimMultiplier_isNoneWithScalingOff_D072() = runTest {
+        val sensor = FakeSensor()
+        val dimming = FakeDimming()
+        val (controller, scope) = newController(sensor, clock = { 23_760_000L }, dimming = dimming)
+        controller.start()
+        sensor.flow.emit(sample(lux = 1.0))
+        advanceUntilIdle()
+        assertTrue(dimming.multipliers.isNotEmpty())
+        assertTrue(dimming.multipliers.all { it == null })
+        scope.cancel()
+    }
 
     @Test
     fun stop_clearsDimmingAndRestoresBrightnessMode_DA038() = runTest {

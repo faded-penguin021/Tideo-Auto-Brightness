@@ -2,6 +2,7 @@ package com.tideo.autobrightness.domain.brightness
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class BrightnessEngineContractTest {
@@ -130,6 +131,26 @@ class BrightnessEngineContractTest {
 
         assertTrue(dayOutput.scaleDynamic > nightOutput.scaleDynamic)
         assertTrue(dayOutput.targetBrightness >= nightOutput.targetBrightness)
+    }
+
+    @Test
+    fun dimDynamic_isTask90sValue_onlyWithScalingOn_DE048() {
+        val time = TimeContext(secondsOfDay = 23_760.0) // 30% into the default morning ramp
+        val scaling = DynamicScalingConfig(enabled = true, spreadPercent = 1.0, dimSpreadPercent = 100.0)
+        val on = engine.evaluate(BrightnessPolicyInput(lux = 200.0, time = time, dynamicScaling = scaling, previous = null))
+        val task90 = engine.dynamicScale(time, scaling, BrightnessContext())
+        assertEquals(task90.dimDynamic, on.dimDynamic)
+        assertEquals(task90.scaleDynamic, on.scaleDynamic)
+        assertTrue(task90.dimDynamic != 1.0, "the chosen time must give a non-neutral multiplier")
+
+        val off = engine.evaluate(
+            BrightnessPolicyInput(lux = 200.0, time = time, dynamicScaling = scaling.copy(enabled = false), previous = null),
+        )
+        assertNull(off.dimDynamic)
+        val manual = engine.evaluate(
+            BrightnessPolicyInput(lux = 200.0, time = time, dynamicScaling = scaling, overrides = BrightnessOverrides(manualBrightness = 42)),
+        )
+        assertNull(manual.dimDynamic)
     }
 
     @Test

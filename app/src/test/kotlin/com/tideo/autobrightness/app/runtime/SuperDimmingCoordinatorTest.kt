@@ -245,18 +245,21 @@ class SuperDimmingCoordinatorTest {
     }
 
     // G2R-F90: circadian dimming was inert (dimDynamic hardcoded null, D-040). With %AAB_ScalingUse on,
-    // the dim strength is scaled by %AAB_DimDynamic (task646 act7). During daylight (scaleDynamic 1.15
-    // ⇒ modifier 1.0 at the default ScaleSpread 15):
+    // the dim strength is scaled by task90's %AAB_DimDynamic (task646 act7, DE-048). In full daylight
+    // (modifier 1.0):
     //   DimSpread 100  → DimDynamic 0   → dimming SUPPRESSED (level 0)
     //   DimSpread 0    → DimDynamic 1   → dims normally (identical to the no-scaling path)
     //   DimSpread −100 → DimDynamic 2   → dimming BOOSTED (level above the DimSpread-0 level)
     private val scalingDay = dimmingOn.copy(scalingEnabled = true, scaleSpread = 15)
-    private val daylightScale = 1.15 // 1 + (15/100)·1.0
+    private val middayMs = 13 * 3_600_000L // default windows: past morningEnd 08:00 ⇒ progress 1
+    private val rampMidpointMs = 7 * 3_600_000L // halfway through 06:00–08:00 ⇒ modifier 0
 
-    private fun engageLevel(settings: AabSettings, scaleDynamic: Double): Int {
+    private fun dimDynamicAt(nowMs: Long, settings: AabSettings): Double = liveDynamicScale(nowMs, null, settings).dimDynamic
+
+    private fun engageLevel(settings: AabSettings, dimDynamic: Double?): Int {
         val secure = FakeSecureDimming()
         SuperDimmingCoordinator(secure) { Tier.ELEVATED }
-            .apply(targetBrightness = 5, settings = settings, dimDynamic = circadianDimMultiplier(scaleDynamic, settings))
+            .apply(targetBrightness = 5, settings = settings, dimDynamic = dimDynamic)
         return secure.levels.last()
     }
 
@@ -268,7 +271,7 @@ class SuperDimmingCoordinatorTest {
         val secure = FakeSecureDimming()
         val suppressed = scalingDay.copy(dimSpread = 100)
         SuperDimmingCoordinator(secure) { Tier.ELEVATED }
-            .apply(targetBrightness = 5, settings = suppressed, dimDynamic = circadianDimMultiplier(daylightScale, suppressed))
+            .apply(targetBrightness = 5, settings = suppressed, dimDynamic = dimDynamicAt(middayMs, suppressed))
         assertTrue(
             secure.activated != true,
             "DimSpread 100 in daylight must not engage Extra Dim (no residual dim at level 0)",
@@ -282,27 +285,31 @@ class SuperDimmingCoordinatorTest {
     @Test
     fun circadian_spread0_daylight_matchesNonScaledDimming() {
         // DimSpread 0 ⇒ DimDynamic 1.0, which must equal the plain-strength (scaling off) level.
-        val scaled = engageLevel(scalingDay.copy(dimSpread = 0), daylightScale)
-        val plain = engageLevel(dimmingOn, scaleDynamic = 1.0) // scalingEnabled = false → dimDynamic null
+        val spread0 = scalingDay.copy(dimSpread = 0)
+        val scaled = engageLevel(spread0, dimDynamicAt(middayMs, spread0))
+        val plain = engageLevel(dimmingOn, dimDynamic = null) // scaling off → the pipeline passes none (D-072)
         assertEquals(plain, scaled, "DimSpread 0 must dim identically to the no-scaling path")
         assertTrue(scaled > 0, "normal dimming below the threshold should be a positive level")
     }
 
     @Test
     fun circadian_spreadNegative100_daylight_boostsBeyondNormal() {
-        val boosted = engageLevel(scalingDay.copy(dimSpread = -100), daylightScale)
-        val normal = engageLevel(scalingDay.copy(dimSpread = 0), daylightScale)
+        val boostSpread = scalingDay.copy(dimSpread = -100)
+        val spread0 = scalingDay.copy(dimSpread = 0)
+        val boosted = engageLevel(boostSpread, dimDynamicAt(middayMs, boostSpread))
+        val normal = engageLevel(spread0, dimDynamicAt(middayMs, spread0))
         assertTrue(boosted > normal, "DimSpread −100 should boost dimming above the DimSpread-0 level")
     }
 
     @Test
-    fun circadian_atNight_spreadHasNoEffect() {
-        // scaleDynamic 1.0 ⇒ modifier 0 ⇒ DimDynamic 1.0 for every spread (night = no circadian shift).
-        val night = 1.0
+    fun circadian_atRampMidpoint_spreadHasNoEffect() {
+        // Modifier 0 ⇒ DimDynamic 1.0 for every spread (no circadian shift at the ramp's midpoint).
+        val spread100 = scalingDay.copy(dimSpread = 100)
+        val spreadMinus100 = scalingDay.copy(dimSpread = -100)
         assertEquals(
-            engageLevel(scalingDay.copy(dimSpread = 100), night),
-            engageLevel(scalingDay.copy(dimSpread = -100), night),
-            "at night (no daylight modifier) the spread must not change the dim level",
+            engageLevel(spread100, dimDynamicAt(rampMidpointMs, spread100)),
+            engageLevel(spreadMinus100, dimDynamicAt(rampMidpointMs, spreadMinus100)),
+            "with no circadian modifier the spread must not change the dim level",
         )
     }
 

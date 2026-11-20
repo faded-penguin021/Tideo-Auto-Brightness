@@ -543,3 +543,8 @@
   fields. The draft's rebase and `apply` stay separate, because the draft edits `detectOverrides`.
   A non-factory title, which only a legacy Tasker import wrote, now persists and stops DD-031's
   built-in match; it has no readout, so this is noted, not fixed.
+- DE-048 [cited]: **Extra Dim takes task90's `%AAB_DimDynamic` from `BrightnessEngine.evaluate`, which
+  is null with `%AAB_ScalingUse` off (light refactor Unit 6, D5; revisits D-072(2)).** The pipeline
+  rebuilt it from the 3-decimal scale divided by `ScaleSpread`, scaling the rounding error by up to
+  DimSpread/ScaleSpread: at ScaleSpread 1, DimSpread 100 a multiplier of 1.838 arrived as 1.8, up to
+  5% of the dim level. At the defaults the change is at most 0.004; `circadianDimMultiplier` is gone.

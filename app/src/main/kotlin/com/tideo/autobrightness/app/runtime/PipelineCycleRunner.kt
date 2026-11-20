@@ -208,7 +208,7 @@ internal class PipelineCycleRunner(
 
     /** task646→650/645 on the un-floored target, never the PWM-floored hardware (F65); it publishes the readout (DE-044). */
     private fun applyDimming(output: BrightnessPolicyOutput, settings: AabSettings) =
-        dimming.apply(output.targetBrightness, settings, circadianDimMultiplier(output.scaleDynamic, settings))
+        dimming.apply(output.targetBrightness, settings, output.dimDynamic)
 
     private fun buildInput(rawLux: Double, settings: AabSettings, s: PipelineState): BrightnessPolicyInput {
         val previous = if (s.smoothedLux != null && s.threshDynamicPercent != null) {

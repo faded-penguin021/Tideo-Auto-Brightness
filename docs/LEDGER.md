@@ -1229,6 +1229,7 @@ Seeded by the S0 audit (details in CLAUDE.md "Facts & corrections ledger"):
   the ADB `pm grant` command ALWAYS offered (invariant asserted in tests).
   Affects S12.9b (closed); the override string is picked up by S12.9d's string extraction; the `dimSpread`
   −100..100 validator is S12.9c's deliverable #6 (the coordinator math already handles negatives).
+  → (2) is superseded: the multiplier now comes from task90 through the engine — DE-048.
 
 - D-073 [cited]: **(S12.9c) — schema ergonomics, validation & error handling landed; key decisions/deviations.**
   App-layer + docs only; domain/ + golden vectors + ChartCanvas untouched.

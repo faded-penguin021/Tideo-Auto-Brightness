@@ -19,6 +19,8 @@ data class BrightnessPolicyOutput(
     // %AAB_ScaleDynamicCompress — the taper's effective (compressed) scale. task561/OverrideRules
     // de-compress recorded overrides with this; gated on scalingUse=true AND value != 0.
     val scaleDynamicCompress: Double,
+    // %AAB_DimDynamic (task90); null with %AAB_ScalingUse off, as task646 then ignores it (D-072, DE-048).
+    val dimDynamic: Double? = null,
     // DEAD_BAND_STOP: only the band, the stored percent and lastRawLux mean anything (act20–23).
     val outcome: EvaluationOutcome = EvaluationOutcome.SMOOTHED,
     val threshDynamicPercent: Double = 0.0,

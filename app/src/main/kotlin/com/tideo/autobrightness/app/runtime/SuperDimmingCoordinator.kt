@@ -3,8 +3,6 @@ package com.tideo.autobrightness.app.runtime
 import com.tideo.autobrightness.app.settings.AabSettings
 import com.tideo.autobrightness.platform.brightness.SecureDimmingController
 import com.tideo.autobrightness.platform.privilege.Tier
-import java.math.BigDecimal
-import java.math.RoundingMode
 
 /** Super-dimming layer for the pipeline (S9b); applies `reduce_bright_colors` below threshold (task646, task650, task645). D-027: no synchronization needed (pipeline-only). */
 interface DimmingCoordinator {
@@ -18,14 +16,6 @@ interface DimmingCoordinator {
 object NoOpDimmingCoordinator : DimmingCoordinator {
     override fun apply(targetBrightness: Int, settings: AabSettings, dimDynamic: Double?) = Unit
     override fun disengage() = Unit
-}
-
-/** Circadian dim-strength multiplier (task646 act6/act7, G2R-F90). Replaces hardcoded `null` (D-040) to restore Spread effect.
- *  DimDynamic = 1 − (DimSpread/ScaleSpread)·(ScaleDynamic − 1), rounded HALF_UP to 3 decimals. */
-internal fun circadianDimMultiplier(scaleDynamic: Double, settings: AabSettings): Double? {
-    if (!settings.scalingEnabled || settings.scaleSpread == 0) return null
-    val raw = 1.0 - (settings.dimSpread.toDouble() / settings.scaleSpread) * (scaleDynamic - 1.0)
-    return BigDecimal(raw).setScale(3, RoundingMode.HALF_UP).toDouble()
 }
 
 class SuperDimmingCoordinator(
