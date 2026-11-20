@@ -32,6 +32,24 @@ propose an item listed here unless the owner reopens it.
   §11.39a C1/C2 as wontfix, a scripted `bmgr restore` step (DB-013; the owner ran it once by
   hand, DD-008), and migrating
   the test-only `ContextsContent` wrapper; the rest is in `docs/plans/REVIEW_TRIAGE_1.9.0.md`.
+- **Deliberate differences retained by the light-refactor decision (owner, 2026-10-21; DE-049).**
+  Do not propose unifying these contracts unless the owner reopens them:
+  - Alpha remains the transcribed Tasker preview; the brightness chart retains its base curve,
+    labelled as the base curve, and its final-output marker (D4; the label has not landed,
+    DE-049).
+  - The ordinary-mode dimming chart remains the transcribed Tasker graph, without the circadian
+    multiplier (DE-046).
+  - The wizard evaluator retains its distinct Tasker bounds and power handling, and its candidate
+    generation its `form3a` floor (DE-049).
+  - The brightness setting, display calibration and window brightness retain their own API
+    contracts (DE-036). This does not bar a change to any one of them, DE-019's included.
+  - Override tolerances 2 and 1 answer different questions (D-054, DC-005).
+  - `evaluate`/`calculatedBrightness` (DE-049) and `round3`/`bigScale3` (D-031) retain their
+    rounding contracts.
+  - Per-screen lux precision (DE-049) and domain/app animation defaults (DD-030) retain their
+    distinct uses.
+  - Night Light retains separate service-on/off state machines (DD-059, DD-092); this does not bar
+    the planned fixes or a shared write-order helper.
 - **Never synthesise unsupported display values on a device** (DB-071) — use a real settings UI;
   DB-077 is exempt, mask 7 having been written by Tideo v1.9.0.
 - Rejected by the #126/#127 plan and not to be reintroduced: keying wake behaviour on

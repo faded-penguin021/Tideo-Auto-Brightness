@@ -186,6 +186,21 @@ discipline 9), and two files sharing a feature does not mean their behaviour mus
 `scripts/guards/codemap.sh` fails the ladder on a stale `codemap/map.json` or a broken anchor;
 running the queries and registering new owners are prose-only (DE-021).
 
+**One source for each calculation and policy** (DE-049). Before adding or changing production
+logic, find its existing owner and callers with the codemap queries above, in the scope that
+paragraph gives each. Reuse one implementation for the same formula, readout selection or
+preserved-field policy; keep mathematics in `:domain` and presentation policy in its owning
+layer. Consumers use the shared definition
+matching what they claim to show. Runtime previews use the same calculation and applicable mode,
+inputs and rounding contract. Check every applicable entry point, including reapply and
+disengage, for shared application and publication. Preserve Tasker semantics and the independent
+golden and reference fixtures. Distinct contracts may stay separate, as the task663 plotting copy
+kept for cross-validation does: record the reason in a ledger row and cite it at the
+implementation. The row must show that the two contracts differ, and no row can reopen an owner
+decline. Read `docs/rebuild/DECIDED_NON_ITEMS.md` before proposing consolidation; only the owner
+can reopen its declines. Prose only: no guard detects duplication or missing callers, or judges
+whether a cited row earns its exemption.
+
 Keep explanatory prose in Markdown and leave concise pointers in source code. Durable lessons
 belong in ledger rows, and architectural explanations belong in `docs/rebuild/`. A source comment
 that carries a durable lesson should be one line naming the row, for example:

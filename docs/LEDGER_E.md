@@ -548,3 +548,18 @@
   rebuilt it from the 3-decimal scale divided by `ScaleSpread`, scaling the rounding error by up to
   DimSpread/ScaleSpread: at ScaleSpread 1, DimSpread 100 a multiplier of 1.838 arrived as 1.8, up to
   5% of the dim level. At the defaults the change is at most 0.004; `circadianDimMultiplier` is gone.
+- DE-049: **AGENTS.md gains the one-source rule, and Decided non-items keeps eight deliberate
+  differences as owner declines (owner, 2026-10-21; light refactor Unit 7).** Rows already hold
+  the reasons for the dimming chart (DE-046), the brightness APIs (DE-036), the override tolerances
+  (D-054's task696 ±2 sweep band, DC-005's one-unit commit deadband), the animation defaults
+  (DD-030), `round3`/`bigScale3` (D-031) and Night Light (DD-059, DD-092). The rest are distinct
+  contracts: the alpha chart is task557's preview; the curve chart plots the base mapping with the
+  perceived output as its "Now" marker (D4); the wizard's `evalCurve` keeps inclusive bounds and
+  `safePowDelta`, and the wizard floors its `form3a` candidates; `calculatedBrightness`, the golden
+  `calculated.csv` unit, skips `evaluate`'s final integer round; and the Dashboard shows whole lux
+  where Live Debug shows the stored value to up to three decimals. D4's "labelled as the base curve" is
+  not landed: the legend still says "Curve". The entry is their record, so the code gains no
+  citation; no guard backs the rule, since a duplication detector would be noisy or gamed (DA-004).
+- DE-050: **Two light-refactor findings are deferred scope, not declines: the settings schema
+  rewrite, as not light, and the settings contract's default strings, audited and all equal to the
+  code (light refactor, 2026-10-21).** A later plan may take either up without reopening anything.
