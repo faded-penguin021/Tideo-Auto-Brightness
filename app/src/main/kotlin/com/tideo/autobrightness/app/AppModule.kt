@@ -117,7 +117,9 @@ class AppModule(context: Context) {
             persistGeoIpAttemptDay = { day -> experimentPrefs.writeGeoIpAttemptDay(day) },
         )
 
-        val controller = BrightnessPipelineController(
+        // DE-044: the coordinator publishes into the controller that owns the state, built after it.
+        lateinit var controller: BrightnessPipelineController
+        controller = BrightnessPipelineController(
             lightSensor = AndroidLightSensorSource(appContext),
             brightness = brightness,
             brightnessObserver = AndroidBrightnessObserver(appContext, brightness),
@@ -130,6 +132,7 @@ class AppModule(context: Context) {
                 tierProvider = { privilegeManager.currentTier() },
                 refreshTier = { privilegeManager.refresh() },
                 debugSink = debugSink,
+                readout = { controller.publishDimming(it) },
             ),
             debugSink = debugSink,
             // G2R-F13: persist captured override points.

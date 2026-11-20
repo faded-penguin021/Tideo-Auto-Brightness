@@ -39,7 +39,7 @@ investigation stays closed (DB-051…DB-060), and Scorecard.dev is a run-once lo
   (owner, 2026-10-21; D1–D5 decided; re-read 2026-11-11, DE-036, and 2026-11-20, DE-043). Every
   unit is pre-approved: Units 1–8 run hands-off from the plan-runner with no phone, and Unit 9 is the
   owner's phone check. This plan runs first in the train, and the flash plan follows it.
-  [x] 0 plan · [ ] 1 dimming readout · [ ] 2 brightness labels · [ ] 3 PWM dimming chart ·
+  [x] 0 plan · [x] 1 dimming readout · [ ] 2 brightness labels · [ ] 3 PWM dimming chart ·
   [ ] 4 `keepGlobalsFrom` · [ ] 5 formula dedups · [ ] 6 engine `dimDynamic` · [ ] 7 AGENTS.md rule ·
   [ ] 8 close-out and phone steps · [ ] 9 owner phone check.
 - **Display calibration (Pixel and HyperOS confirmed)** —
@@ -118,6 +118,10 @@ proposing work; changing it is legislation under PROTOCOLS' rule-review protocol
 ## Changelog
 
 Newest first; ledger rows are the durable detail.
+
+- 2026-11-20 — **Light refactor Unit 1: one dimming plan publishes the readout, zeroed on every
+  disengage (DE-044).** The Dashboard and Super Dimming readouts now follow reapply and every
+  disengage, and read 0 when Extra Dim is not engaged (D1).
 
 - 2026-11-20 — **Light refactor made runner-ready and pre-approved (owner, DE-043).** Units 1–8 run
   hands-off with no phone, and Unit 9, the phone check, is last. Comment-budget raises are

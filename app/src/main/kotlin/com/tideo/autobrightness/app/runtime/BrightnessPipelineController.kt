@@ -126,6 +126,9 @@ class BrightnessPipelineController(
         postControl(PipelineEvent.OverrideDetected(observed, source))
     }
 
+    /** The dimming coordinator's readout callback (DE-044); stop() and panic reach it off the consumer. */
+    internal fun publishDimming(r: DimmingReadout) = _state.update { it.copy(dimmingCurrent = r.current, dimmingDS = r.ds) }
+
     /** Start the pipeline; the light sensor registers only once settings have loaded (DC-067). */
     fun start() {
         if (consumerJob != null) return

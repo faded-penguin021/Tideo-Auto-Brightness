@@ -928,6 +928,13 @@
     "super-dimming": {
       "declared": [
         {
+          "anchor": "DimmingPlan",
+          "files": [
+            "app/src/main/kotlin/com/tideo/autobrightness/app/runtime/DimmingPlan.kt"
+          ],
+          "symbol": "com.tideo.autobrightness.app.runtime.DimmingPlan"
+        },
+        {
           "anchor": "DimmingCoordinator",
           "files": [
             "app/src/main/kotlin/com/tideo/autobrightness/app/runtime/SuperDimmingCoordinator.kt"
@@ -982,6 +989,13 @@
           {
             "ambiguous": [],
             "anchors": [
+              "SoftwareDimming"
+            ],
+            "path": "app/src/main/kotlin/com/tideo/autobrightness/app/runtime/DimmingPlan.kt"
+          },
+          {
+            "ambiguous": [],
+            "anchors": [
               "DimmingCoordinator"
             ],
             "path": "app/src/main/kotlin/com/tideo/autobrightness/app/runtime/DisplayCalibrationRun.kt"
@@ -1003,16 +1017,15 @@
           {
             "ambiguous": [],
             "anchors": [
-              "DimmingCoordinator",
-              "SoftwareDimming"
+              "DimmingCoordinator"
             ],
             "path": "app/src/main/kotlin/com/tideo/autobrightness/app/runtime/PipelineCycleRunner.kt"
           },
           {
             "ambiguous": [],
             "anchors": [
-              "SecureDimmingController",
-              "SoftwareDimming"
+              "DimmingPlan",
+              "SecureDimmingController"
             ],
             "path": "app/src/main/kotlin/com/tideo/autobrightness/app/runtime/SuperDimmingCoordinator.kt"
           },
@@ -1039,6 +1052,7 @@
           }
         ],
         "owners": [
+          "app/src/main/kotlin/com/tideo/autobrightness/app/runtime/DimmingPlan.kt",
           "app/src/main/kotlin/com/tideo/autobrightness/app/runtime/SuperDimmingCoordinator.kt",
           "domain/src/main/kotlin/com/tideo/autobrightness/domain/brightness/SoftwareDimming.kt",
           "domain/src/main/kotlin/com/tideo/autobrightness/domain/circadian/DynamicScaleEngine.kt",

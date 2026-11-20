@@ -517,3 +517,10 @@
   because every module sat exactly at its budget. The train runs this plan before the flash plan,
   and the flash plan's Unit 1 makes the train's one bump. A Sol re-read against `0244923` found
   all seven findings still true, and added the notification to finding 2 and a 5% bound to finding 6.
+- DE-044 [cited]: **One `DimmingPlan` feeds the Extra Dim write and its readout, and the coordinator
+  publishes the readout itself: the plan's when engaged, zeros when not, and zeros first in every
+  `disengage` (light refactor Unit 1, D1).** Pause, override pause, screen off, panic, calibration,
+  hand-off and stop no longer leave a stale Dashboard value or "Now" marker, a reapply publishes,
+  and below ELEVATED or after a failed level or activation write the readout is 0. The callback is
+  bound at construction through a `lateinit` controller in `AppModule`; `stop()` and panic publish
+  off the consumer as one atomic state update, as `stop()` already did.

@@ -138,7 +138,7 @@ class HandoffPipelineTest {
 
     private class Dimming(private val log: MutableList<String>) : DimmingCoordinator {
         val applied = mutableListOf<Int>()
-        override fun apply(targetBrightness: Int, settings: AabSettings, scaleDynamic: Double) { applied += targetBrightness }
+        override fun apply(targetBrightness: Int, settings: AabSettings, dimDynamic: Double?) { applied += targetBrightness }
         override fun disengage() { log += "disengage" }
     }
 

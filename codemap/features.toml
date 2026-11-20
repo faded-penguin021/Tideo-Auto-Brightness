@@ -19,7 +19,7 @@ anchors = ["HandoffCoordinator", "HandoffRules", "HighBrightnessUpdates", "Displ
 keywords = ["handoff", "hbm", "calibration"]
 
 [super-dimming]
-anchors = ["SuperDimmingCoordinator", "DimmingCoordinator", "SoftwareDimming",
+anchors = ["SuperDimmingCoordinator", "DimmingCoordinator", "DimmingPlan", "SoftwareDimming",
            "SecureDimmingController", "DynamicScaleEngine"]
 keywords = ["dimming"]
 

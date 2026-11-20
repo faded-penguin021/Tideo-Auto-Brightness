@@ -4,11 +4,14 @@ import com.tideo.autobrightness.app.settings.AabSettings
 import com.tideo.autobrightness.app.settings.toBrightnessCurveConfig
 import com.tideo.autobrightness.domain.brightness.BrightnessEngine
 import com.tideo.autobrightness.domain.brightness.BrightnessPolicyInput
+import com.tideo.autobrightness.domain.brightness.SoftwareDimming
 import com.tideo.autobrightness.domain.brightness.TimeContext
 import com.tideo.autobrightness.platform.brightness.BrightnessWriteResult
 import com.tideo.autobrightness.platform.brightness.ScreenBrightnessController
+import com.tideo.autobrightness.platform.brightness.SecureDimmingController
 import com.tideo.autobrightness.platform.brightness.WriteStatus
 import com.tideo.autobrightness.platform.observe.BrightnessObserver
+import com.tideo.autobrightness.platform.privilege.Tier
 import com.tideo.autobrightness.platform.sensor.LightSample
 import com.tideo.autobrightness.platform.sensor.LightSensorSource
 import com.tideo.autobrightness.platform.sensor.ProximitySensorSource
@@ -88,11 +91,9 @@ class BrightnessPipelineControllerTest {
 
     private class FakeDimming : DimmingCoordinator {
         val applied = mutableListOf<Int>()
-        val scaleDynamics = mutableListOf<Double>()
         var disengaged = 0
-        override fun apply(targetBrightness: Int, settings: AabSettings, scaleDynamic: Double) {
+        override fun apply(targetBrightness: Int, settings: AabSettings, dimDynamic: Double?) {
             applied += targetBrightness
-            scaleDynamics += scaleDynamic
         }
         override fun disengage() { disengaged++ }
     }
@@ -656,25 +657,138 @@ class BrightnessPipelineControllerTest {
         scope.cancel()
     }
 
-    // G2R-F58: Super Dimming readout populated below threshold.
+    // G2R-F58: Super Dimming readout populated below threshold; DE-044: only when engaged.
     @Test
     fun dimmingReadout_populatedBelowThreshold() = runTest {
-        val sensor = FakeSensor()
-        val brightness = FakeBrightness()
-        val dim = settings.copy(minBrightness = 1, dimmingEnabled = true, dimmingThreshold = 40)
-        val scope = CoroutineScope(UnconfinedTestDispatcher(testScheduler))
-        val controller = BrightnessPipelineController(
-            lightSensor = sensor, brightness = brightness, brightnessObserver = FakeObserver(),
-            settingsProvider = { dim }, scope = scope, clock = { 1000L },
-        )
-        controller.start()
-        sensor.flow.emit(sample(lux = 1.0)) // maps to ~5, below the threshold 40
+        val rig = DimRig(this)
+        rig.controller.start()
+        rig.sensor.flow.emit(sample(lux = 1.0)) // maps to ~5, below the threshold 40
         advanceUntilIdle()
 
-        val st = controller.state.value
+        val st = rig.state
         assertTrue(st.dimmingDS > 0.0, "abs dimming level should be positive below the threshold")
         assertTrue(st.dimmingCurrent > 0.0, "relative dimming strength should be positive below the threshold")
-        scope.cancel()
+        rig.scope.cancel()
+    }
+
+    @Test
+    fun engagedLevelAndReadout_matchTheTaskFormulas_inBothModes() = runTest {
+        val pwm = dimmed.copy(dimmingEnabled = false, pwmSensitive = true)
+        for (mode in listOf(dimmed, pwm)) {
+            val rig = DimRig(this, active = mode)
+            rig.controller.start()
+            rig.sensor.flow.emit(sample(lux = 1.0))
+            advanceUntilIdle()
+            val t = rig.state.targetBrightness!!.toDouble()
+            val thr = mode.dimmingThreshold.toDouble()
+            val min = mode.minBrightness.toDouble()
+            val exp = mode.dimmingExponent.toDouble()
+            val expected = if (mode.pwmSensitive) {
+                SoftwareDimming.finalDimLevel(t, true, thr, mode.pwmExponent.toDouble()).let { it to it }
+            } else {
+                val ds = SoftwareDimming.dimShell(t, min, thr, exp, mode.dimmingStrength.toDouble(), null)
+                ds * SoftwareDimming.dimProgress(t, min, thr, exp) to ds
+            }
+            assertEquals(expected, rig.readout)
+            assertEquals(Math.round(expected.second).toInt(), rig.secure.levels.last())
+            rig.scope.cancel()
+        }
+    }
+
+    private class FakeSecureDimming : SecureDimmingController {
+        var failLevel = false
+        var failActivation = false
+        val levels = mutableListOf<Int>()
+        override fun setLevel(level: Int): Result<Unit> {
+            levels += level
+            return if (failLevel) Result.failure(SecurityException("revoked")) else Result.success(Unit)
+        }
+        override fun setActivated(on: Boolean): Result<Unit> =
+            if (failActivation) Result.failure(SecurityException("revoked")) else Result.success(Unit)
+    }
+
+    private val dimmed = settings.copy(minBrightness = 1, dimmingEnabled = true, dimmingThreshold = 40)
+
+    private inner class DimRig(
+        scope: TestScope,
+        tier: Tier = Tier.ELEVATED,
+        var active: AabSettings = dimmed,
+    ) {
+        val sensor = FakeSensor()
+        val observer = FakeObserver()
+        val brightness = FakeBrightness()
+        val secure = FakeSecureDimming()
+        var nowMs = 1000L
+        val scope = CoroutineScope(UnconfinedTestDispatcher(scope.testScheduler))
+        val controller: BrightnessPipelineController = BrightnessPipelineController(
+            lightSensor = sensor, brightness = brightness, brightnessObserver = observer,
+            settingsProvider = { active }, scope = this.scope, clock = { nowMs },
+            dimming = SuperDimmingCoordinator(secure, readout = { publish(it) }, tierProvider = { tier }),
+        )
+        private fun publish(readout: DimmingReadout) = controller.publishDimming(readout)
+        val state: PipelineState get() = controller.state.value
+        val readout: Pair<Double, Double> get() = state.dimmingCurrent to state.dimmingDS
+    }
+
+    @Test
+    fun readout_followsSetInitialBrightness_onAProfileSwitch() = runTest {
+        val rig = DimRig(this)
+        rig.controller.start()
+        rig.sensor.flow.emit(sample(lux = 1.0))
+        advanceUntilIdle()
+        assertTrue(rig.state.dimmingDS > 0.0, "precondition: dimming engaged")
+
+        rig.active = dimmed.copy(dimmingEnabled = false)
+        rig.controller.reapply()
+        advanceUntilIdle()
+        assertEquals(0.0 to 0.0, rig.readout, "a profile without dimming must not keep the old readout")
+
+        rig.active = dimmed
+        rig.controller.reapply()
+        advanceUntilIdle()
+        assertTrue(rig.state.dimmingDS > 0.0 && rig.state.dimmingCurrent > 0.0, "reapply publishes the readout")
+        rig.scope.cancel()
+    }
+
+    @Test
+    fun readout_isZeroedByAnOverridePause() = runTest {
+        val rig = DimRig(this)
+        rig.controller.start()
+        rig.sensor.flow.emit(sample(lux = 1.0))
+        advanceUntilIdle()
+        assertTrue(rig.state.dimmingDS > 0.0, "precondition: dimming engaged")
+
+        rig.brightness.current = 200
+        rig.observer.flow.emit(200)
+        advanceUntilIdle()
+        assertTrue(rig.state.pausedByOverride, "precondition: override pause")
+        assertEquals(0.0 to 0.0, rig.readout)
+        rig.scope.cancel()
+    }
+
+    @Test
+    fun readout_isZeroBelowElevated() = runTest {
+        val rig = DimRig(this, tier = Tier.BASIC)
+        rig.controller.start()
+        rig.sensor.flow.emit(sample(lux = 1.0))
+        advanceUntilIdle()
+        assertTrue(rig.state.targetBrightness!! < dimmed.dimmingThreshold, "precondition: below the threshold")
+        assertEquals(0.0 to 0.0, rig.readout, "dimming that was never applied must not be shown")
+        rig.scope.cancel()
+    }
+
+    @Test
+    fun readout_isZeroAfterAFailedLevelWrite_orAFailedActivation() = runTest {
+        for (fail in listOf<(FakeSecureDimming) -> Unit>({ it.failLevel = true }, { it.failActivation = true })) {
+            val rig = DimRig(this)
+            fail(rig.secure)
+            rig.controller.start()
+            rig.sensor.flow.emit(sample(lux = 1.0))
+            advanceUntilIdle()
+            assertTrue(rig.state.targetBrightness!! < dimmed.dimmingThreshold, "precondition: below the threshold")
+            assertEquals(0.0 to 0.0, rig.readout, "not engaged reads 0")
+            rig.scope.cancel()
+        }
     }
 
     @Test

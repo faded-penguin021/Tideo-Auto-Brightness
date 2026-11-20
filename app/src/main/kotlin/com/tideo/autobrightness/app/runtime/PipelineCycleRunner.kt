@@ -8,10 +8,10 @@ import com.tideo.autobrightness.app.settings.toThresholdConfig
 import com.tideo.autobrightness.domain.brightness.BrightnessContext
 import com.tideo.autobrightness.domain.brightness.BrightnessEngine
 import com.tideo.autobrightness.domain.brightness.BrightnessPolicyInput
+import com.tideo.autobrightness.domain.brightness.BrightnessPolicyOutput
 import com.tideo.autobrightness.domain.brightness.EvaluationOutcome
 import com.tideo.autobrightness.domain.brightness.OverrideRules
 import com.tideo.autobrightness.domain.brightness.PreviousState
-import com.tideo.autobrightness.domain.brightness.SoftwareDimming
 import com.tideo.autobrightness.platform.brightness.BrightnessWriteResult
 import com.tideo.autobrightness.platform.brightness.ScreenBrightnessController
 import com.tideo.autobrightness.platform.brightness.WriteStatus
@@ -34,7 +34,7 @@ internal interface PipelineRuntimeContext {
     fun postOverrideDetected(observed: Int, source: OverrideSource)
 }
 
-/** Pipeline per-event math: Set Initial Brightness, runCycle, override settle, super-dimming readout (D-027). */
+/** Pipeline per-event math: Set Initial Brightness, runCycle, override settle (D-027). */
 internal class PipelineCycleRunner(
     private val ctx: PipelineRuntimeContext,
     private val engine: BrightnessEngine,
@@ -163,10 +163,7 @@ internal class PipelineCycleRunner(
                 }
             }
 
-            // task646→650/645: F65 uses un-floored target, not PWM-floored hardware (task661/698 floor ⟂ task650).
-            if (!handedOff) dimming.apply(output.targetBrightness, settings, output.scaleDynamic)
-            val (dimCurrent, dimDS) =
-                if (handedOff) 0.0 to 0.0 else dimmingReadout(output.targetBrightness, settings, output.scaleDynamic)
+            if (!handedOff) applyDimming(output, settings)
 
             // DC-001: cycle time is state (cycleTimeMs, Live Debug), not a Graph Metrics Flash —
             // %AAB_Debug 7 times chart (re)draws (features_spec §4), not this pipeline timer.
@@ -195,8 +192,6 @@ internal class PipelineCycleRunner(
                     lastAppliedBrightness = applied,
                     lastBrightnessWrite = writeResult ?: it.lastBrightnessWrite,
                     targetBrightness = perceived,
-                    dimmingCurrent = dimCurrent,
-                    dimmingDS = dimDS,
                     luxAlpha = output.luxAlpha,
                     animationSteps = output.animationSteps,
                     animationWaitMs = output.animationWaitMs,
@@ -211,42 +206,9 @@ internal class PipelineCycleRunner(
         }
     }
 
-    /** task650 act28/act30: Super Dimming live readout (G2R-F58). @return (dimmingCurrent, dimmingDS) */
-    private fun dimmingReadout(target: Int, settings: AabSettings, scaleDynamic: Double): Pair<Double, Double> {
-        if (target >= settings.dimmingThreshold) return 0.0 to 0.0
-        // G2R-F90: reflect the circadian-scaled dim_shell applied (task646 act7).
-        val dimDynamic = circadianDimMultiplier(scaleDynamic, settings)
-        return when {
-            // PWM-sensitive: task700 finalDimLevel.
-            settings.pwmSensitive -> {
-                val ds = SoftwareDimming.finalDimLevel(
-                    targetBrightness = target.toDouble(),
-                    isElevated = true,
-                    dimmingThreshold = settings.dimmingThreshold.toDouble(),
-                    pwmExp = settings.pwmExponent.toDouble(),
-                )
-                ds to ds
-            }
-            settings.dimmingEnabled -> {
-                val ds = SoftwareDimming.dimShell(
-                    brightness = target.toDouble(),
-                    minBrightness = settings.minBrightness.toDouble(),
-                    dimmingThreshold = settings.dimmingThreshold.toDouble(),
-                    dimmingExponent = settings.dimmingExponent.toDouble(),
-                    dimmingStrength = settings.dimmingStrength.toDouble(),
-                    dimDynamic = dimDynamic,
-                )
-                val progress = SoftwareDimming.dimProgress(
-                    brightness = target.toDouble(),
-                    minBrightness = settings.minBrightness.toDouble(),
-                    dimmingThreshold = settings.dimmingThreshold.toDouble(),
-                    dimmingExponent = settings.dimmingExponent.toDouble(),
-                )
-                (ds * progress) to ds
-            }
-            else -> 0.0 to 0.0
-        }
-    }
+    /** task646→650/645 on the un-floored target, never the PWM-floored hardware (F65); it publishes the readout (DE-044). */
+    private fun applyDimming(output: BrightnessPolicyOutput, settings: AabSettings) =
+        dimming.apply(output.targetBrightness, settings, circadianDimMultiplier(output.scaleDynamic, settings))
 
     private fun buildInput(rawLux: Double, settings: AabSettings, s: PipelineState): BrightnessPolicyInput {
         val previous = if (s.smoothedLux != null && s.threshDynamicPercent != null) {
@@ -373,9 +335,8 @@ internal class PipelineCycleRunner(
             val perceived = output.targetBrightness
             brightness.forceManualMode()
             val result = brightness.write(target)
-            // F65: use un-floored target; F64: settle window.
-            dimming.apply(output.targetBrightness, settings, output.scaleDynamic)
-            // Re-arm from the END of the write so the full window covers the transition too.
+            applyDimming(output, settings)
+            // F64: re-arm from the END of the write so the full window covers the transition too.
             ctx.armInitialSettle(clock() + INITIAL_SETTLE_MS)
             ctx.update {
                 it.copy(

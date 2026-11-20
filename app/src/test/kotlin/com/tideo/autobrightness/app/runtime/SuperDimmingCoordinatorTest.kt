@@ -201,6 +201,19 @@ class SuperDimmingCoordinatorTest {
     }
 
     @Test
+    fun disengage_publishesAZeroReadout_evenWhenKnownOff_DE044() {
+        val published = mutableListOf<DimmingReadout>()
+        val coordinator = SuperDimmingCoordinator(FakeSecureDimming(), readout = { published += it }) { Tier.ELEVATED }
+        coordinator.apply(targetBrightness = 5, settings = dimmingOn)
+        assertTrue(published.last().ds > 0.0, "precondition: engaged")
+
+        coordinator.disengage()
+        coordinator.disengage()
+
+        assertEquals(listOf(DimmingReadout.NONE, DimmingReadout.NONE), published.takeLast(2))
+    }
+
+    @Test
     fun unprivilegedFallback_belowThreshold_flashesOverlayColour() {
         // G2R-F49: with dimming on + target below threshold but the tier unable to write secure
         // settings, the OVERLAY_PREVIEW category (level 6) flashes the computed overlay colour.
@@ -243,7 +256,7 @@ class SuperDimmingCoordinatorTest {
     private fun engageLevel(settings: AabSettings, scaleDynamic: Double): Int {
         val secure = FakeSecureDimming()
         SuperDimmingCoordinator(secure) { Tier.ELEVATED }
-            .apply(targetBrightness = 5, settings = settings, scaleDynamic = scaleDynamic)
+            .apply(targetBrightness = 5, settings = settings, dimDynamic = circadianDimMultiplier(scaleDynamic, settings))
         return secure.levels.last()
     }
 
@@ -253,8 +266,9 @@ class SuperDimmingCoordinatorTest {
         // The coordinator must DISENGAGE entirely — NOT write reduce_bright_colors_activated=1 at level
         // 0, which still leaves Android's Extra Dim engaged and dims the screen slightly on-device.
         val secure = FakeSecureDimming()
+        val suppressed = scalingDay.copy(dimSpread = 100)
         SuperDimmingCoordinator(secure) { Tier.ELEVATED }
-            .apply(targetBrightness = 5, settings = scalingDay.copy(dimSpread = 100), scaleDynamic = daylightScale)
+            .apply(targetBrightness = 5, settings = suppressed, dimDynamic = circadianDimMultiplier(daylightScale, suppressed))
         assertTrue(
             secure.activated != true,
             "DimSpread 100 in daylight must not engage Extra Dim (no residual dim at level 0)",

@@ -23,7 +23,7 @@ class PanicHandlerTest {
             override fun clearSelfWriteMarker() = Unit
         }
         val dimming = object : DimmingCoordinator {
-            override fun apply(targetBrightness: Int, settings: AabSettings, scaleDynamic: Double) = Unit
+            override fun apply(targetBrightness: Int, settings: AabSettings, dimDynamic: Double?) = Unit
             override fun disengage() { calls += "dimmingOff" }
         }
 
