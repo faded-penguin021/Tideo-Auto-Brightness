@@ -142,6 +142,38 @@ class SettingsViewModelTest {
         assertEquals(baseline.animSteps, result.animSteps)
     }
 
+    // DE-047: context swap, manual load, import and reset all keep one global set.
+    @Test
+    fun everySwapPath_keepsTheSameGlobalSet_DE047() {
+        fun globals(s: AabSettings) = listOf(
+            s.serviceEnabled, s.contextOverride, s.detectOverrides, s.debugLevel,
+            s.panicSensitivity, s.panicRequiresPlugged, s.setupTitle, s.schemaVersion,
+        )
+        // contextOverride = true: load and import latch it, so only then is the set path-independent.
+        val current = AabSettings(
+            serviceEnabled = false, contextOverride = true, detectOverrides = true, debugLevel = 5,
+            panicSensitivity = 3, panicRequiresPlugged = true, setupTitle = "Mine", minBrightness = 42,
+        )
+        val incoming = DefaultProfiles.Outdoors.copy(setupTitle = "Theirs", schemaVersion = 2)
+        fun run(expectedMin: Int, path: (SettingsViewModel) -> Unit): AabSettings {
+            runBlocking { app.settingsDataStore.updateData { current } }
+            idle()
+            path(SettingsViewModel(app))
+            return awaitCommitted { it.minBrightness != 42 }
+                .also { assertEquals(expectedMin, it.minBrightness, "the swap committed") }
+        }
+
+        val results = mapOf(
+            "context swap" to com.tideo.autobrightness.app.runtime.mergeProfile(current, incoming),
+            "manual load" to run(incoming.minBrightness) { it.applyProfile("Outdoors") },
+            "import" to run(incoming.minBrightness) { it.replaceAll(incoming) },
+            "reset" to run(AabSettings().minBrightness) { it.resetDefaults() },
+        )
+        results.forEach { (path, result) ->
+            assertEquals(globals(current), globals(result), "$path keeps the current global set")
+        }
+    }
+
     @Test
     fun resetDefaults_preservesGlobalDebugLevel() {
         runBlocking {

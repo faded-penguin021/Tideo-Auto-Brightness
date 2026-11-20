@@ -12,6 +12,7 @@
 - Unit 1 — done 2026-11-20.
 - Unit 2 — done 2026-11-20.
 - Unit 3 — done 2026-11-20.
+- Unit 4 — done 2026-11-20.
 - The owner asked on 2026-10-21 for a plan to lightly refactor Tideo where logic is duplicated or
   implemented differently. The owner accepted every recommendation in Owner decisions D1–D5
   (2026-10-21).

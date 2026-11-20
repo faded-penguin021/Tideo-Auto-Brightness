@@ -61,7 +61,27 @@ data class ScalingConfig(
     val scaleTransitionFactor: Float,
 )
 
-// Global prefs + runtime latches. mergeProfile preserves some; others are profile-swapped (G2-F8).
+/**
+ * The global fields every swap path keeps from the live settings: a context swap, a manual load,
+ * an import and a reset (DE-047). None is a task626 `_ContextResume` snapshot key.
+ *
+ * `%AAB_DetectOverrides` is a GLOBAL preference, so a swap must never silently disable
+ * manual-override detection (G2-F8) — likewise both panic prefs (D-116, DD-025). A blanket
+ * `copy(global = current.global)` is wrong: GlobalPrefs also holds
+ * `quickSettingsEnabled`/`notificationsEnabled`, which ARE per-profile (S12.9c #1).
+ */
+fun AabSettings.keepGlobalsFrom(current: AabSettings): AabSettings = copy(
+    serviceEnabled = current.serviceEnabled,
+    contextOverride = current.contextOverride,
+    detectOverrides = current.detectOverrides,
+    debugLevel = current.debugLevel,
+    panicSensitivity = current.panicSensitivity,
+    panicRequiresPlugged = current.panicRequiresPlugged,
+    setupTitle = current.setupTitle,
+    schemaVersion = current.schemaVersion,
+)
+
+// Global prefs + runtime latches. keepGlobalsFrom keeps some; others are profile-swapped (G2-F8).
 @Serializable
 data class GlobalPrefs(
     val serviceEnabled: Boolean,

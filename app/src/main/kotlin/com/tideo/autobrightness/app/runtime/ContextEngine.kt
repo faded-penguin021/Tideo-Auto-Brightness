@@ -5,6 +5,7 @@ import com.tideo.autobrightness.app.settings.ContextBaselineStore
 import com.tideo.autobrightness.app.settings.ContextRule
 import com.tideo.autobrightness.app.settings.ContextSignalTokens
 import com.tideo.autobrightness.app.settings.DefaultProfiles
+import com.tideo.autobrightness.app.settings.keepGlobalsFrom
 import com.tideo.autobrightness.app.settings.toSpec
 import com.tideo.autobrightness.domain.context.ContextOverrideResolver
 import com.tideo.autobrightness.domain.context.ContextResolution
@@ -120,7 +121,7 @@ class ContextEngine(
      * Non-suspend snapshot of the last resolved effective settings, or null before the first context
      * evaluation. Used by the panic source to read the GLOBAL `%AAB_PanicSensitivity` and
      * `%AAB_PanicPlugged` from a sensor callback (no coroutine, must not block) — both are identical in
-     * baseline and effective because mergeProfile preserves them (D-116, DD-025).
+     * baseline and effective because keepGlobalsFrom keeps them (D-116, DD-025).
      */
     val effectiveSnapshot: AabSettings? get() = _effective.value
 
@@ -652,22 +653,8 @@ interface ProfileCatalog {
 /**
  * Overlay a context profile's parameter set onto the baseline: task626 `_ContextResume`'s 39-key
  * snapshot, **plus the rebuild-only display-toggle fields (D-151/D-152: Night Light + temperature,
- * daltonizer, inversion, AOD, stay-awake-charging, experimental HDR disabling)**. Fields outside it (service
- * enable, manual context lock, debug level, setup title, schema version, `detectOverrides`) are
- * preserved from the baseline.
- *
- * `%AAB_DetectOverrides` is a GLOBAL preference, not a task626 snapshot key, so a swap must never
- * silently disable manual-override detection (G2-F8) — likewise both panic prefs (D-116, DD-025). A blanket
- * `copy(global = baseline.global)` is therefore wrong: GlobalPrefs also holds
- * `quickSettingsEnabled`/`notificationsEnabled`, which ARE per-profile (S12.9c #1).
+ * daltonizer, inversion, AOD, stay-awake-charging, experimental HDR disabling)**. The global
+ * fields outside it are kept from the baseline ([keepGlobalsFrom]).
  */
-internal fun mergeProfile(baseline: AabSettings, profile: AabSettings): AabSettings = profile.copy(
-    serviceEnabled = baseline.serviceEnabled,
-    contextOverride = baseline.contextOverride,
-    detectOverrides = baseline.detectOverrides,
-    debugLevel = baseline.debugLevel,
-    panicSensitivity = baseline.panicSensitivity,
-    panicRequiresPlugged = baseline.panicRequiresPlugged,
-    setupTitle = baseline.setupTitle,
-    schemaVersion = baseline.schemaVersion,
-)
+internal fun mergeProfile(baseline: AabSettings, profile: AabSettings): AabSettings =
+    profile.keepGlobalsFrom(baseline)

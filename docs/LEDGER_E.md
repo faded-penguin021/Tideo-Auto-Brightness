@@ -536,3 +536,10 @@
   `dimming_graph.md` (light refactor Unit 3, D3).** The "Now" line at the live target crosses that
   curve; draft settings and the runtime's rounding to an integer level keep it a preview. Ordinary
   mode stays Tasker's graph, without the circadian multiplier.
+- DE-047 [cited]: **Context swap, manual load, import and reset keep one global set,
+  `AabSettings.keepGlobalsFrom` (light refactor Unit 4).** Load, import and reset now also keep
+  `setupTitle` and `schemaVersion`; load and import took them from the incoming profile and reset took
+  the defaults. Each path states its extras at the call site: the context lock, import's secure-display
+  fields. The draft's rebase and `apply` stay separate, because the draft edits `detectOverrides`.
+  A non-factory title, which only a legacy Tasker import wrote, now persists and stops DD-031's
+  built-in match; it has no readout, so this is noted, not fixed.

@@ -15,7 +15,7 @@ class ProfileApplier(
     // D-170: manual loads clear pre-override baseline snapshot (task626).
     private val baselineStore = DataStoreContextBaselineStore(appContext.contextBaselineDataStore)
 
-    // Apply a saved profile; preserve service/detectOverrides/debugLevel. Latch manual context lock (G2R-F30, D-014).
+    // Apply a saved profile, keeping the globals. Latch manual context lock (G2R-F30, D-014).
     // DB-035: false = no such profile, so an external caller can be told rather than left guessing.
     suspend fun applyProfile(name: String): Boolean {
         val profile = (userProfiles.get(name) ?: DefaultProfiles.all[name] ?: return false).validate()
@@ -23,14 +23,8 @@ class ProfileApplier(
         // DA-018: persist loaded profile as %AAB_ProfileUser (fallback for Resume/no-match).
         baselineStore.setUserProfileName(name)
         val updated = appContext.settingsDataStore.updateData { current ->
-            DefaultProfiles.keepUserChoices(name, profile, current).copy(
-                serviceEnabled = current.serviceEnabled,
-                detectOverrides = current.detectOverrides,
-                debugLevel = current.debugLevel,
-                panicSensitivity = current.panicSensitivity,
-                panicRequiresPlugged = current.panicRequiresPlugged,
-                contextOverride = true, // latch the manual context lock (G2R-F30)
-            )
+            DefaultProfiles.keepUserChoices(name, profile, current).keepGlobalsFrom(current)
+                .copy(contextOverride = true)
         }
         LiveRuntimeState.setActiveProfile(name)
         if (updated.serviceEnabled) AutoBrightnessRuntime.reapply(appContext)

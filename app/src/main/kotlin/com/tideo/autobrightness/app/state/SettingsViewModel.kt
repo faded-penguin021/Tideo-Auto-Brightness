@@ -13,6 +13,7 @@ import com.tideo.autobrightness.app.settings.ProfileApplier
 import com.tideo.autobrightness.app.settings.SavedProfile
 import com.tideo.autobrightness.app.settings.SettingsValidator
 import com.tideo.autobrightness.app.settings.UserProfileStore
+import com.tideo.autobrightness.app.settings.keepGlobalsFrom
 import com.tideo.autobrightness.app.settings.validate
 import com.tideo.autobrightness.app.storage.contextBaselineDataStore
 import com.tideo.autobrightness.app.storage.settingsDataStore
@@ -71,16 +72,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     /** Reset parameters to task570 defaults, preserving runtime/identity + global prefs (G2R-F9, G2-F8). */
     fun resetDefaults() {
         viewModelScope.launch {
-            val updated = app.settingsDataStore.updateData { current ->
-                AabSettings(
-                    serviceEnabled = current.serviceEnabled,
-                    contextOverride = current.contextOverride,
-                    detectOverrides = current.detectOverrides,
-                    debugLevel = current.debugLevel,
-                    panicSensitivity = current.panicSensitivity,
-                    panicRequiresPlugged = current.panicRequiresPlugged,
-                )
-            }
+            val updated = app.settingsDataStore.updateData { current -> AabSettings().keepGlobalsFrom(current) }
             if (updated.serviceEnabled) AutoBrightnessRuntime.reapply(app)
         }
     }
@@ -96,13 +88,8 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
             DataStoreContextBaselineStore(app.contextBaselineDataStore).clear()
             val updated = app.settingsDataStore.updateData { current ->
                 val incoming = newSettings.validate()
-                // Preserve service flag, DetectOverrides (G2-F8), debugLevel (G2R-F9). Neither belongs to imported profile.
-                (profileName?.let { DefaultProfiles.keepUserChoices(it, incoming, current) } ?: incoming).copy(
-                    serviceEnabled = current.serviceEnabled,
-                    detectOverrides = current.detectOverrides,
-                    debugLevel = current.debugLevel,
-                    panicSensitivity = current.panicSensitivity,
-                    panicRequiresPlugged = current.panicRequiresPlugged,
+                val profile = profileName?.let { DefaultProfiles.keepUserChoices(it, incoming, current) } ?: incoming
+                profile.keepGlobalsFrom(current).copy(
                     contextOverride = true,
                     // No per-capability preview on import: keep secure fields unchanged (visible preview on profile apply).
                     dimmingEnabled = current.dimmingEnabled,
