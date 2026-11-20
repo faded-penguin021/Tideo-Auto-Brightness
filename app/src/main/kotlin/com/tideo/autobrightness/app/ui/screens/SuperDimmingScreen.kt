@@ -121,6 +121,8 @@ fun SuperDimmingContent(
                             // Only while Extra Dim is engaged.
                             currentBrightness = live.liveMarkerBrightness
                                 ?.takeIf { live.dimmingDS > 0.0 || live.dimmingCurrent > 0.0 },
+                            pwmSensitive = draft.pwmSensitive,
+                            pwmExponent = draft.pwmExponent.toDouble(),
                         )
                     },
                     ChartSlot(stringResource(R.string.sd_graph_circadian), "circadian_dimming_chart") {

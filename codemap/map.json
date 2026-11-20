@@ -1064,6 +1064,7 @@
           "app/src/test/kotlin/com/tideo/autobrightness/app/runtime/HandoffPipelineTest.kt",
           "app/src/test/kotlin/com/tideo/autobrightness/app/runtime/PanicHandlerTest.kt",
           "app/src/test/kotlin/com/tideo/autobrightness/app/runtime/SuperDimmingCoordinatorTest.kt",
+          "app/src/test/kotlin/com/tideo/autobrightness/app/ui/graph/DimmingChartModeTest.kt",
           "domain/src/test/kotlin/com/tideo/autobrightness/domain/parity/CircadianParityTest.kt",
           "domain/src/test/kotlin/com/tideo/autobrightness/domain/parity/CorePipelineParityTest.kt",
           "domain/src/test/kotlin/com/tideo/autobrightness/domain/reference/TaskerReference.kt"

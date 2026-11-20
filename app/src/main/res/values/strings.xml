@@ -262,6 +262,7 @@
     <string name="chart_dim_x">Dim ×</string>
     <string name="chart_dim_pct">Dim %</string>
     <string name="chart_dim_shell">Dim shell</string>
+    <string name="chart_pwm_dim_level">PWM dim level</string>
     <string name="chart_night">Night</string>
     <string name="chart_day">Day</string>
     <string name="chart_power_w">Power (W)</string>
@@ -272,6 +273,7 @@
          fields are not repeated. -->
     <string name="a11y_graph_brightness_curve">Brightness curve graph: maps ambient light to screen brightness from %1$d to %2$d.</string>
     <string name="a11y_graph_dimming">Super dimming graph: dimming ramps up as brightness falls below %1$d, reaching %2$d percent strength.</string>
+    <string name="a11y_graph_dimming_pwm">Super dimming graph, PWM mode: the Extra Dim level rises as brightness falls below %1$d.</string>
     <string name="a11y_graph_reactivity">Reactivity graph: the light-change percentage needed to trigger a brightness update, across the light range.</string>
     <string name="a11y_graph_alpha">Smoothing response graph: how strongly brightness reacts to a relative change in light.</string>
     <string name="a11y_graph_circadian_dimming">Circadian dimming graph: the night-time dimming multiplier across the day, peaking overnight.</string>

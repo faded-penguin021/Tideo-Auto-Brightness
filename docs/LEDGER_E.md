@@ -531,3 +531,8 @@
   value while handed off, and a missing target falls back to the applied baseline. Labels say
   "Perceived" or "Hardware (written)"; the circadian and dimming card lines keep Tideo's applied baseline,
   "—" once a hand-off lands, because Android's value means nothing beside Tideo's scale and dim level.
+- DE-046 [cited]: **In PWM-sensitive mode the Super Dimming chart plots the runtime's task700 Extra Dim
+  level (`finalDimLevel`, `isElevated = true`, unrounded) over Tasker's x-range, departing from
+  `dimming_graph.md` (light refactor Unit 3, D3).** The "Now" line at the live target crosses that
+  curve; draft settings and the runtime's rounding to an integer level keep it a preview. Ordinary
+  mode stays Tasker's graph, without the circadian multiplier.
