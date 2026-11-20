@@ -2,10 +2,16 @@
 
 ## Status
 
-- **Spec only. No code has changed.** The owner asked on 2026-10-21 for a plan to lightly refactor
-  Tideo where logic is duplicated or implemented differently, then authorised **Unit 0 only**:
-  committing this file. Every later unit needs the owner's separate go-ahead.
-- The owner accepted every recommendation in Owner decisions D1–D5 (2026-10-21).
+- **Every unit is pre-approved and runs hands-off (owner, 2026-11-20; DE-043).** Units 1–8 run in
+  sequence from the plan-runner with no further go-ahead, the owner absent and no phone
+  connected. Nothing in them needs a device. The one step that needs the phone is Unit 9, the
+  last, and it is the owner's. Execution rules say what each unit decides for itself.
+- After this plan the same train runs `docs/plans/FLASH_VISIBILITY_TOGGLE.md`. The PR, the merge
+  and the tag are the owner's.
+- Unit 0 — done 2026-10-21 (this file); made runner-ready and re-read on 2026-11-20 (DE-043).
+- The owner asked on 2026-10-21 for a plan to lightly refactor Tideo where logic is duplicated or
+  implemented differently. The owner accepted every recommendation in Owner decisions D1–D5
+  (2026-10-21).
 - Three independent audits fed it: Opus, Astra (`gpt-6-astra`, high effort) and an earlier ChatGPT
   review of v1.14.1. Every finding below was re-checked against `math-explained` at `20ad58b`. A
   finding that one model made and the code did not bear out was dropped.
@@ -17,34 +23,46 @@
   - Unit 4 is a behaviour change;
   - Unit 5 reuses the hand-off helper that already exists;
   - the conversion freeze is gone from Unit 7's entry.
+- **Re-read against `0244923` on 2026-11-20**, after the 1.15.3 merge (DE-043). All seven findings
+  hold, and 1.15.3 added no new copy of the readouts these units target. The corrections are
+  folded in below:
+  - finding 2 adds the notification, which reads `targetBrightness` directly;
+  - finding 6's bound at extreme spreads is up to 5% of the dim level, not 1 level;
+  - Unit 6's engine plumbing is already half there;
+  - the Night Light order fix has landed;
+  - line references, gates and caller lists are corrected throughout.
 - Rows this plan asks for go in the live ledger volume, whatever its prefix is by then.
 - It does not touch the Night Light write paths, which had their own plan, now closed
   (DD-090…DD-093). The two plans share no files.
 
 ## The motivating example
 
-Live Debug's **Current brightness** (`LiveDebugScreen.kt:124`) shows `PipelineState.currentBrightness`,
-which is the hardware value. The Dashboard, widget, notification and curve chart show the perceived
-value, `shownBrightness`. With PWM-sensitive mode off the two are equal. With it on, the hardware
-write is floored to the dimming threshold and the perceived value is not: for an engine target of 5
-and a threshold of 40, Live Debug says 40 and the Dashboard says 5.
+Live Debug's **Current brightness** (`LiveDebugScreen.kt:127`) shows `PipelineState.currentBrightness`,
+the hardware value: Tideo's last applied baseline. The Dashboard, widget and curve chart show the
+perceived value, `shownBrightness`. The notification reads `targetBrightness` itself. After a
+settled, successful write with PWM-sensitive mode off, the two are equal. They can differ
+during an animation or after a failed write. With PWM mode on, the hardware write is floored to the
+dimming threshold and the perceived value is not: for an engine target of 5 and a threshold of 40,
+Live Debug says 40 and the Dashboard says 5.
 
 - **Both numbers are right and both are needed** (D-109; pinned by `BrightnessPipelineControllerTest`).
   The defect is that each screen chooses between them on its own, and the labels contradict each other:
   - the Dashboard labels the perceived value **"Applied brightness"**;
   - Live Debug labels the hardware value **"Current brightness"**.
-- The perceived value is really the *requested* one. It is published even when the write fails.
+- While Tideo controls brightness, the perceived value is the unfloored engine target, which is
+  published even when the write fails. With no target it falls back to the applied baseline.
+  During hand-off both getters show Android's reading (`PipelineState.kt:88`).
 
 ## Findings, ranked
 
 | # | Duplicated logic | Copies | Visible today? | Unit |
 |---|---|---|---|---|
 | 1 | Dimming level and its readout | `SuperDimmingCoordinator.apply`, `PipelineCycleRunner.dimmingReadout`, `emitOverlayPreview` | **Yes**: stale and over-reporting readout | 1 |
-| 2 | Which brightness a screen shows | `PipelineState.shownBrightness`, hand-rebuilt in `DashboardViewModel`/`BrightnessInstrument`; Circadian and Super Dimming charts read `targetBrightness` directly; `DiagnosticCard` mixes both | **Yes**: PWM mode, contradictory labels | 2 |
+| 2 | Which brightness a screen shows | `PipelineState.shownBrightness`, hand-rebuilt in `DashboardViewModel`/`BrightnessInstrument`; Circadian and Super Dimming charts and the notification read `targetBrightness` directly; `DiagnosticCard` mixes both | **Yes**: PWM mode, contradictory labels | 2 |
 | 3 | Dimming chart vs runtime formula | `DimmingChart` always plots ordinary dimming; runtime uses `finalDimLevel` in PWM mode | **Yes**: PWM mode | 3 |
 | 4 | Global fields kept across a profile swap | `mergeProfile`, `ProfileApplier`, `SettingsViewModel.resetDefaults`, `.replaceAll` | Latent; lists already differ (`setupTitle`, `schemaVersion`) | 4 |
-| 5 | Small pure formulas written twice | validator's 1000-lux curve and min-required MaxBright; wizard result → settings; effective hand-off lux; haversine | Latent | 5 |
-| 6 | Circadian dim multiplier | runtime rebuilds it from the rounded `scaleDynamic` (D-072); `DynamicScaleEngine` computes it directly, and the chart uses that | Small: up to 1 dim level at extreme spreads | 6 |
+| 5 | Small pure formulas written twice | validator's 1000-lux curve, and its argument mapping and `ceil` for min-required MaxBright (both already share `zone2EndBrightness`); wizard result → settings; effective hand-off lux; haversine | Latent | 5 |
+| 6 | Circadian dim multiplier | runtime rebuilds it from the rounded `scaleDynamic` (D-072); `DynamicScaleEngine` computes it directly, and the chart uses that | Small at the defaults (≤ 0.004); at extreme spreads up to 5% of the dim level (63 vs 60 at strength 60) | 6 |
 | 7 | Nothing stops the next copy | no "one source" rule; deliberate differences recorded only in this plan | Future drift | 7 |
 
 ### 1. Dimming: one calculation, one result, published everywhere
@@ -54,13 +72,17 @@ and a threshold of 40, Live Debug says 40 and the Dashboard says 5.
   - The coordinator also checks the privilege tier, rounds the level, disengages at level ≤ 0 and
     handles a failed write. The readout does none of these.
 - **Visible effects:**
-  - **Never cleared on disengage.** None of the 8 `dimming.disengage()` sites clears
-    `dimmingCurrent`/`dimmingDS`: override pause, screen off, panic, calibration, hand-off, stop. The
-    Dashboard dimming value and the Super Dimming chart's "Now" marker keep the last value. That
-    marker uses `dimmingDS > 0` as its "engaged" test.
-  - **Missed on reapply.** `setInitialBrightness` (profile switch, resume, screen on) applies dimming
-    but never publishes the readout. A switch to a profile without dimming keeps showing the old
-    profile's dimming until a sensor cycle passes the dead band.
+  - **Disengage itself leaves the readout stale.** None of the 8 direct `dimming.disengage()` sites
+    clears `dimmingCurrent`/`dimmingDS`: pause, override pause, screen off, panic, calibration,
+    hand-off, stop. Only a completed handed-off cycle publishes zeros, and panic teardown resets
+    the state. Otherwise the Dashboard dimming value and the Super Dimming chart's "Now" marker
+    keep the last value. That marker's gate is `serviceOn && (dimmingDS > 0 || dimmingCurrent > 0)`
+    with a non-null target (`SuperDimmingScreen.kt:121`).
+  - **Missed on reapply.** `setInitialBrightness` (profile switch, resume, screen on, and the
+    reapply after a display calibration) applies dimming but never publishes the readout. A switch
+    to a profile without dimming keeps showing the old profile's dimming until a sensor cycle passes
+    the dead band. The calibration sweep has no dimming calculation of its own, so the disengage and
+    reapply paths cover it.
   - **Over-reports.** Below ELEVATED, the readout shows dimming that was never applied.
 - **Change:**
   - **Pure plan.** One pure `DimmingPlan` (mode, raw DS, relative readout, integer level) computed
@@ -73,9 +95,13 @@ and a threshold of 40, Live Debug says 40 and the Dashboard says 5.
   - **Disengage.** `disengage` publishes zeros itself, before its `engaged == false` early return.
     None of the 8 call sites changes, and a ninth cannot miss it. The call sites are the wrong
     place: `PanicHandler` holds no pipeline state.
-  - **Pipeline.** One pipeline helper calls `apply` for both `runCycle` and `setInitialBrightness`,
-    which removes the duplicated floor → write → dim tail of those two functions. Neither
+  - **Pipeline.** `runCycle` and `setInitialBrightness` share the floor and the dimming step through
+    one pipeline helper. Their write paths stay distinct: `runCycle` may skip the write, write,
+    animate or return on an override, while `setInitialBrightness` writes directly. Neither
     function writes `dimmingCurrent`/`dimmingDS` itself any more.
+  - **Overlay preview.** `emitOverlayPreview` (debug category 6) is a copy of the *ordinary*
+    `dimShell` level converted to overlay alpha, even when PWM mode alone triggered it. Sharing
+    the plan keeps that input and output exactly.
   - **Wiring, for the unit to settle.** `AppModule` builds the coordinator before the controller
     that owns the state, so the unit picks how the callback is bound.
   - **Glue review.** `stop()` and the panic path call `disengage` off the pipeline coroutine. The
@@ -96,34 +122,48 @@ and a threshold of 40, Live Debug says 40 and the Dashboard says 5.
 - **Definitions.** `PipelineState` becomes the only place that defines the two values (KDoc on each):
   - **perceived:** `shownBrightness`;
   - **hardware:** `currentBrightness`.
-  - **Chart marker.** Add one `liveMarkerBrightness` that applies the service-on / not-handed-off gate
-    the charts repeat.
+  - **Chart marker.** Add one `liveMarkerBrightness` holding the service-on / not-handed-off gate
+    that the Curve chart and Circadian's Taper chart repeat (`CurveBrightnessScreen.kt:132`,
+    `CircadianScreen.kt:166`). Local gates stay at their charts: Taper's active scaling and
+    `abs(scaleDynamic - 1) > 0.001`, and Super Dimming's dimming-value test.
+  - **Readout sources.** Display calibration's Android readout already reaches
+    `PipelineState.systemBrightness` through one runtime path. `levelFor(raw)` can extrapolate
+    above 255, and the HBM flag follows the stored raw boundary, not the rounded number. The
+    definitions keep both.
 - **Dashboard.** It takes `shownBrightness` and `currentBrightness` instead of rebuilding them.
 - **Charts.** The Circadian and Super Dimming charts take the shared marker instead of
   `targetBrightness`.
+- **Notification.** It takes `shownBrightness` instead of `targetBrightness`, and keeps its own
+  hand-off text.
 - **Labels.** Each label names the value it shows:
-  - Live Debug already shows both, as "Current" (hardware) and "Target" (perceived). They become
-    "Hardware (written)" and "Perceived";
+  - Live Debug already shows both, as "Current brightness" (`debug_current_bright`, hardware) and
+    "Target brightness" (`debug_target_bright`, perceived). They become "Hardware (written)" and
+    "Perceived" (D2). During hand-off the hardware line shows Android's reading under the same
+    label. The separate write-diagnostic lines keep their own requested and acknowledged fields;
   - the Dashboard's "Applied" label stops describing a perceived number;
   - the Curve card's "Current brightness" (`diag_curve_current_bright`) shows the perceived value
     under the words Live Debug uses for the hardware one, so it takes the perceived label;
   - the `DiagnosticCard` circadian and dimming lines say "hardware".
 - **No value changes outside hand-off.** Only selection and labels change, with one exception and
-  one line that deliberately stays as it is:
+  one line that deliberately stays as it is. A consumer moved off `targetBrightness` also gains
+  `shownBrightness`'s applied-baseline fallback when there is no target:
   - **Live Debug's perceived line reads `shownBrightness`.** Today it reads `targetBrightness`,
     which is not gated on hand-off, so it shows the last target from before Android took over.
     After the change it shows what the Dashboard shows.
   - **The `DiagnosticCard` circadian and dimming lines keep reading `lastAppliedBrightness`.** They
     describe Tideo's own write, and show "—" while handed off. `currentBrightness` would put
-    Android's value beside Tideo's scale and dim level. This is the one consumer that does not go
-    through the two definitions, and the KDoc says why.
+    Android's value beside Tideo's scale and dim level. These two lines are the only readout
+    that bypasses the two definitions, and the KDoc says why. The write diagnostic
+    (`lastBrightnessWrite`) is a different record and stays as it is.
 - **Strings.** Changed strings join Owner-queue item 1 (untranslated Chinese strings).
 
 ### 3. Dimming chart follows the active mode
 
 - `DimmingChart` takes `pwmSensitive` and `pwmExponent`.
-- In PWM mode it plots `SoftwareDimming.finalDimLevel` over the same x-range, so the live marker sits
-  on the curve the runtime uses.
+- In PWM mode it plots `SoftwareDimming.finalDimLevel` over the same x-range with `isElevated = true`,
+  as the runtime calls it. The live marker is a vertical line at the live target on the brightness
+  axis, so it crosses the curve the runtime uses. Draft settings and the runtime's integer
+  rounding can still give a different level, and that is a preview by design.
 - This departs from Tasker's dimming graph (`dimming_graph.md`), so it needs a ledger row.
 - **Ordinary mode stays as Tasker draws it.** There the chart plots `dimmingstrength × dim_progress`
   without the circadian multiplier the runtime applies. That is the transcribed graph, and the
@@ -136,11 +176,12 @@ and a threshold of 40, Live Debug says 40 and the Dashboard says 5.
 - Manual load, import and reset call it. They state their own extras at the call site:
   - the context lock;
   - import's preserved secure-display fields.
-- **This changes behaviour, so it gets a ledger row.** Manual load and import take `setupTitle` and
-  `schemaVersion` from the incoming profile today, and reset takes the defaults. With the helper
-  all three keep the current ones, as a context swap already does. Nothing reads either field in
-  a way a user would see: the schema migration only raises the number, and the stored settings
-  are already at the current one.
+- **This changes behaviour, so it gets a ledger row.** The swap paths differ in which fields they
+  keep. Manual load and import take `setupTitle` and `schemaVersion` from the incoming profile
+  today, and reset takes the defaults. Native import migrates the payload first, so the schema it
+  supplies is already the current one. With the helper all three keep the current fields, as a
+  context swap already does. Neither field has a screen readout. The schema gates native import
+  and export writes both, and the unit's test checks that neither changes.
 - **The draft stays separate, at both of its sites** in `DraftSettingsViewModel`: the rebase in
   its settings collector, and the commit in `apply`. The draft edits `detectOverrides` on purpose,
   so neither takes the helper.
@@ -153,7 +194,8 @@ and a threshold of 40, Live Debug says 40 and the Dashboard says 5.
 
 - **Validator.** `SettingsValidator` calls the raw `BrightnessEngine.mapLuxToBrightness(1000.0, …)`
   instead of its own three zones. Keep it raw: no scale, offset or clamp. It also calls
-  `AabSettings.minRequiredMaxBrightness()` instead of recomputing it. That helper moves from
+  `AabSettings.minRequiredMaxBrightness()` instead of repeating its argument mapping and `ceil`
+  around the shared `BrightnessFormulae.zone2EndBrightness`. That helper moves from
   `app.state` (`SettingsViewModel.kt`) to `app.settings`, so the validator imports nothing from
   `state`.
 - **Wizard.** `AabSettings.withCurveSuggestion(cfg)` replaces the two five-field copies in
@@ -170,7 +212,10 @@ and a threshold of 40, Live Debug says 40 and the Dashboard says 5.
 ### 6. Take the circadian dim multiplier from the engine (D5: yes)
 
 - **Change:**
-  - `BrightnessEngine.dynamicScale` passes `dimSpreadPercent` and publishes `dimDynamic`.
+  - `BrightnessEngine.dynamicScale` already returns `DynamicScaleResult`, and the app mapper already
+    puts `dimSpreadPercent` in `DynamicScalingConfig`. The engine forwards it into
+    `DynamicScaleInput` and carries the returned `dimDynamic` through `evaluate` and
+    `BrightnessPolicyOutput` to the two dimming callers. Today evaluation keeps only `scaleDynamic`.
   - The pipeline passes that to `apply` in place of the value it rebuilds, and
     `circadianDimMultiplier` is deleted. Unit 1 already made the multiplier the input, so no
     dimming signature changes here.
@@ -181,8 +226,10 @@ and a threshold of 40, Live Debug says 40 and the Dashboard says 5.
   - Worked example (Astra): ScaleSpread 1, DimSpread 100, strength 25. The chart says 1.540, the
     runtime 1.500: level 39 vs 38.
   - At the defaults (15 / 100) the difference is ≤ 0.004.
-- **Needs the owner's decision.** It revisits D-072 and changes an output interface, so it needs a
-  ledger row.
+  - The bound at extreme spreads: the scale's rounding error (±0.0005) times DimSpread/ScaleSpread
+    (100) is up to 0.05, or 5% of the dim level. ScaleSpread 1, DimSpread 100, strength 60 at full
+    progress gives 63 from the engine and 60 from the rebuild (re-read 2026-11-20).
+- **Decided by D5.** It revisits D-072 and changes an output interface, so it needs a ledger row.
 
 ### 7. Keep it from coming back (owner, 2026-10-21)
 
@@ -260,14 +307,16 @@ It also found three over-reaches:
 ## Deliberately left alone
 
 - **Night Light service-on vs service-off writes:**
-  - The two paths share the order bug, and the existing plan fixes it in both.
+  - The order fix has landed: both paths turn Night Light off, write the Kelvin, then turn it back
+    on, and restore is a third inline site with its own failure handling (DD-059).
   - They otherwise differ by design: anchors, restore and ticks on one side, a device-snapshot diff on
     the other.
   - At most a tiny shared write-order helper, which is that plan's Unit 3 (owner, 2026-10-25).
     It was not landed, since it came out longer than the inline orders (DD-092).
 - **Brightness curve chart:**
-  - It plots the base curve, but its "Now" marker shows the final output, which includes
-    scale/offset/taper.
+  - It plots the base mapping, clamped to the draft range. Its "Now" crosshair, shown while the
+    service is on and Tideo controls brightness, takes live smoothed lux and the final output,
+    which includes the taper on the scaling branch or scale plus offset otherwise.
   - So the marker can sit off the line. That is a preview, by design (Tasker scene). Owner decision D4
     picks between a label and a change.
 - **Alpha response chart, and the wizard's own curve evaluator:**
@@ -281,7 +330,8 @@ It also found three over-reaches:
 - **Brightness conversions:**
   - The brightness setting, display calibration and window brightness: different APIs.
   - The setting is no longer converted at all. From 1.15.3 Tideo reads and writes it as 0–255 on
-    every device (DE-023).
+    every device (DE-023). The three 0–255 clamps left in `ScreenBrightnessController` (`write`,
+    `toDevice`, `toDomain`) are invisible and stay.
   - Nothing here is frozen. The freeze DC-019 named ended with the owner's ruling in DC-026, DE-023
     has since overruled part of that ruling, and DE-019 holds the fix for a device shown to read a
     wider scale. Learning the scale stays declined (DC-026).
@@ -309,32 +359,51 @@ It also found three over-reaches:
 
 ## Execution rules
 
+- **Runner.** One unit per plan-runner session, on the train's session branch (owner,
+  2026-11-20). Nothing before Unit 9 waits for the owner, so a unit never stops to ask. It decides
+  what this plan leaves to it, such as Unit 1's callback wiring, and records the choice in its
+  ledger row. At a genuine choice between two designs it may use its one Astra call (`-e low`).
 - **Units.** One unit at a time, each SHIPPABLE:
-  - a STATE Changelog line;
-  - `scripts/ladder.sh` green;
-  - the commit;
-  - `--guards-only`;
-  - a push to the session branch.
+  - its own Status line in this file's `## Status`, in the unit's commit:
+    `- Unit N — done YYYY-MM-DD.` The line says done and nothing more, because the runner reads
+    "parked", "blocked", "owner queue" or "needs the owner" in a new Status line as the unit
+    parking itself;
+  - the STATE `## Active work` box ticked, and a STATE Changelog line;
+  - `scripts/ladder.sh` green, then the commit, then `scripts/ladder.sh --guards-only`;
+  - the push. Under the runner the runner pushes, after its own green ladder run, and the unit
+    never pushes. A unit run by hand pushes to the session branch.
 - **Reviews.**
-  - Units 1, 2 and 6 touch runtime glue, so they get the glue review.
   - Each code unit gets a Sol review before its commit.
+  - Units 1, 2 and 6 touch runtime glue, so they get the glue review (`docs/PROTOCOLS.md`). Their
+    Sol run is the glue review, with the glue checklist in its prompt.
+  - **A test that existed before the unit** may need to change: a signature in Unit 1, a label
+    in Unit 2, a kept field in Unit 4, the deleted function in Unit 6. That is P21's separate
+    decision (AGENTS.md). The unit's Sol run gets an explicit instruction to judge each changed
+    pre-existing test against this plan and the specification, never against the new code. The
+    pass has no self-review fallback. The golden vectors and references stay untouched.
+  - Without Sol quota (exit 75) the unit stops uncommitted and the runner parks it.
 - **Records.**
-  - Behaviour-changing units (1, 2, 3, 4, 6) get ledger rows and ride the train's next version
-    bump; they never bump on their own.
+  - Behaviour-changing units (1, 2, 3, 4, 6) get ledger rows. None of them bumps the version.
+  - **The train's one bump is the flash plan's Unit 1** (1.16.0 / vc34), which runs after this
+    plan. Its `changelogs/34.txt` also describes this plan's user-visible changes.
   - Code cites ledger rows, never this file.
-- **Comment budget.** A comment-budget raise, if one is needed, is a rule change and is asked for
-  first.
+- **Comment budget (owner, 2026-11-20).** Every module starts at exactly its budget, so a new
+  citation needs room. A unit first frees lines by removing comments that only restate code, or
+  by citing on an existing comment line. Failing that, it is **pre-approved to raise the budget**
+  of the module it touches by the lines it adds, and no more. The raise is a rule change, so that
+  unit also runs `bash .orch/codex.sh rules` (DA-005) and records the verdict in its commit body.
 - **Rule review for Unit 7.** Unit 7 edits `AGENTS.md` and Decided non-items, so it runs the
   rule-review protocol (DA-005):
-  - a fresh-context reviewer at the strongest tier;
+  - `bash .orch/codex.sh rules`: a fresh-context reviewer, Sol at `-e high`, the tier DE-042's
+    rule review used and one the runner allows;
   - no self-review fallback;
-  - the verdict goes in the commit body.
+  - the verdict, and the unit's triage of each finding, go in the commit body.
 
   It runs after Units 1–6, so that the rows it cites exist.
 
 ## Units (sequential)
 
-0. Commit this plan, and add the STATE `## Active work` checklist. **Stop.**
+0. Commit this plan, and add the STATE `## Active work` checklist (done).
 1. Dimming plan, one publish path, zeroed on disengage (finding 1, D1).
 2. Brightness readout definitions and labels (finding 2, D2).
 3. PWM-aware dimming chart (finding 3, D3).
@@ -343,7 +412,12 @@ It also found three over-reaches:
 6. Engine-sourced `dimDynamic` (finding 6, D5).
 7. AGENTS.md "one source" paragraph, the Decided non-items entry and the scope-deferral row
    (finding 7), under rule review.
-8. Owner device check of Units 1–3 in PWM mode, then close out:
+8. Close-out, device-free:
    - confirm that every item under "Deliberately left alone" has a lasting record: a Decided
      non-items line, a ledger row, or a landed plan;
-   - then delete this file.
+   - write the phone steps for Unit 9 as a new section of `docs/rebuild/DEVICE_TEST_SCRIPT.md`:
+     Units 1–3 in PWM mode (the readout on disengage and on reapply, the two labels, the PWM
+     chart's marker on its curve).
+9. **Owner:** run that section on the phone. This is the only step that needs a device, and the
+   runner stops here. The owner may run it alongside the flash plan's phone run (its Unit 4).
+   When it passes, a session records `- Unit 9 — done` and deletes this file before the PR.

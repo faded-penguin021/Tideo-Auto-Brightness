@@ -36,10 +36,12 @@ investigation stays closed (DB-051…DB-060), and Scorecard.dev is a run-once lo
   event-driven readout · [ ] 10 push foreground app · [ ] 11 live HDR · [ ] 12 finer steps
   (optional) · [ ] 13 close-out.
 - **Light refactor of duplicated logic** — `docs/plans/LIGHT_REFACTOR_CONSOLIDATION.md`, spec only
-  (owner, 2026-10-21; D1–D5 decided; re-read and corrected 2026-11-11, DE-036). Each unit runs on
-  the owner's go-ahead.
+  (owner, 2026-10-21; D1–D5 decided; re-read 2026-11-11, DE-036, and 2026-11-20, DE-043). Every
+  unit is pre-approved: Units 1–8 run hands-off from the plan-runner with no phone, and Unit 9 is the
+  owner's phone check. This plan runs first in the train, and the flash plan follows it.
   [x] 0 plan · [ ] 1 dimming readout · [ ] 2 brightness labels · [ ] 3 PWM dimming chart ·
-  [ ] 4 `keepGlobalsFrom` · [ ] 5 formula dedups · [ ] 6 engine `dimDynamic` · [ ] 7 AGENTS.md rule · [ ] 8 close-out.
+  [ ] 4 `keepGlobalsFrom` · [ ] 5 formula dedups · [ ] 6 engine `dimDynamic` · [ ] 7 AGENTS.md rule ·
+  [ ] 8 close-out and phone steps · [ ] 9 owner phone check.
 - **Display calibration (Pixel and HyperOS confirmed)** —
   `docs/plans/DISPLAY_CALIBRATION_CEILING.md`, Units 1–4 in code (owner, 2026-10-26; DE-005, revised
   DE-015). D1 (a), amended; D2 (a), D3 (a), D4 (a) (DE-027); battery saver refuses a run
@@ -63,6 +65,7 @@ investigation stays closed (DB-051…DB-060), and Scorecard.dev is a run-once lo
   `docs/plans/FLASH_VISIBILITY_TOGGLE.md`, spec only (owner, 2026-11-17; AAB-first waived on #161,
   DE-040). D1–D5 decided (DE-041); each unit runs on the owner's go-ahead.
   Runs from the Docker host's plan-runner, phone on wireless adb, device work only via `e2e/run.sh`.
+  It runs after the light refactor, in the same train, and its Unit 1 makes the train's one bump (DE-043).
   [x] 0 plan · [ ] 1 predictable background flashes and a truthful status · [ ] 2 the three-state
   setting and bump · [ ] 3 §19 steps and e2e scenarios · [ ] 4 phone run · [ ] 5 close-out.
 
@@ -115,6 +118,11 @@ proposing work; changing it is legislation under PROTOCOLS' rule-review protocol
 ## Changelog
 
 Newest first; ledger rows are the durable detail.
+
+- 2026-11-20 — **Light refactor made runner-ready and pre-approved (owner, DE-043).** Units 1–8 run
+  hands-off with no phone, and Unit 9, the phone check, is last. Comment-budget raises are
+  pre-approved under rule review. The plan was re-read against `0244923`, and the flash plan
+  follows it in the same train and makes the one bump.
 
 - 2026-11-19 — **AMH upgraded 15.1.0 -> 17.0.0 (DE-042): the six binding sections now live in
   `docs/PROTOCOLS.md`, with Session discipline 10–12 added (P21 test-first); the Claude adapter's

@@ -511,3 +511,9 @@
   it was deleted again, as `docs/HARNESS_LOCAL.md` records. The machine-mode guard installed on
   2026-11-09 matched no release tag (measured: `sha256sum` against amh-v16.1.0, 16.1.1 and 17.0.0;
   `diff` 13 lines from 16.1.1), so a copy's version cannot be read from its install date.
+- DE-043: **The light refactor is pre-approved to run hands-off from the plan-runner (owner,
+  2026-11-20): Units 1–8 need no go-ahead and no phone, and Unit 9, the owner's phone check, is
+  last.** Units may raise a module's comment budget by what they add, under `codex.sh rules`,
+  because every module sat exactly at its budget. The train runs this plan before the flash plan,
+  and the flash plan's Unit 1 makes the train's one bump. A Sol re-read against `0244923` found
+  all seven findings still true, and added the notification to finding 2 and a 5% bound to finding 6.
