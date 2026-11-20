@@ -7,6 +7,7 @@ import com.tideo.autobrightness.app.settings.ContextSignalTokens
 import com.tideo.autobrightness.app.settings.DefaultProfiles
 import com.tideo.autobrightness.app.settings.keepGlobalsFrom
 import com.tideo.autobrightness.app.settings.toSpec
+import com.tideo.autobrightness.domain.context.ContextMatching
 import com.tideo.autobrightness.domain.context.ContextOverrideResolver
 import com.tideo.autobrightness.domain.context.ContextResolution
 import com.tideo.autobrightness.domain.context.ContextSignals
@@ -339,7 +340,7 @@ class ContextEngine(
                 val prevLat = lastLocEvalLat
                 val prevLon = lastLocEvalLon
                 val moved = prevLat == null || prevLon == null ||
-                    haversineMeters(prevLat, prevLon, loc.lat, loc.lon) >= LOCATION_DEBOUNCE_M
+                    ContextMatching.distanceMeters(prevLat, prevLon, loc.lat, loc.lon) >= LOCATION_DEBOUNCE_M
                 if (moved) {
                     lastLocEvalLat = loc.lat
                     lastLocEvalLon = loc.lon
@@ -530,21 +531,10 @@ class ContextEngine(
         }
     }
 
-    /** Great-circle distance in metres for the ≥100 m location debounce (F45). */
-    private fun haversineMeters(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Double {
-        val dLat = Math.toRadians(lat2 - lat1)
-        val dLon = Math.toRadians(lon2 - lon1)
-        val a = kotlin.math.sin(dLat / 2) * kotlin.math.sin(dLat / 2) +
-            kotlin.math.cos(Math.toRadians(lat1)) * kotlin.math.cos(Math.toRadians(lat2)) *
-            kotlin.math.sin(dLon / 2) * kotlin.math.sin(dLon / 2)
-        return EARTH_RADIUS_M * 2 * kotlin.math.atan2(kotlin.math.sqrt(a), kotlin.math.sqrt(1 - a))
-    }
-
     private companion object {
         const val APP_POLL_INTERVAL_MS = 2500L
         const val BATTERY_DELTA_THRESHOLD = 5
         const val LOCATION_DEBOUNCE_M = 100.0
-        const val EARTH_RADIUS_M = 6_371_000.0
     }
 }
 

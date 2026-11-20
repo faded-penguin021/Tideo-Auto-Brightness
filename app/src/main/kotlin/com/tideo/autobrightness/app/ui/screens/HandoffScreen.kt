@@ -95,7 +95,7 @@ internal data class HandoffPreview(val minimum: Int?, val effective: Int?)
 internal fun handoffPreview(draft: AabSettings, curve: BrightnessCurveConfig): HandoffPreview? {
     if (!draft.handoffEnabled) return null
     val minimum = HandoffRules.minimumHandoffLux(curve)
-    return HandoffPreview(minimum, minimum?.let { maxOf(draft.handoffLux, it) })
+    return HandoffPreview(minimum, HandoffRules.effectiveThreshold(draft.handoffLux, minimum))
 }
 
 @Composable

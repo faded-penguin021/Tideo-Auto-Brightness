@@ -9,7 +9,7 @@ import kotlin.math.sqrt
  * Shared per-dimension trigger matching from Tasker: task43 `_EvaluateContexts V2`
  * (extracted; behavior-preserving). Precedence (priority/specificity) is caller policy, not here.
  */
-internal object ContextMatching {
+object ContextMatching {
 
     private const val EARTH_RADIUS_M = 6_371_000.0
     internal const val SECONDS_PER_DAY = 86_400L
@@ -81,7 +81,7 @@ internal object ContextMatching {
     }
 
     /** Great-circle (haversine) distance in metres. Agrees to metre-scale with Tasker ellipsoidal. */
-    private fun distanceMeters(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Double {
+    fun distanceMeters(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Double {
         val dLat = Math.toRadians(lat2 - lat1)
         val dLon = Math.toRadians(lon2 - lon1)
         val a = sin(dLat / 2) * sin(dLat / 2) +

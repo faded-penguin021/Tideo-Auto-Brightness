@@ -1,6 +1,7 @@
 package com.tideo.autobrightness.app.state
 
 import com.tideo.autobrightness.app.settings.AabSettings
+import com.tideo.autobrightness.app.settings.minRequiredMaxBrightness
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull

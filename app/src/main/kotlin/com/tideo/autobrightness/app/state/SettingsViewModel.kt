@@ -14,6 +14,7 @@ import com.tideo.autobrightness.app.settings.SavedProfile
 import com.tideo.autobrightness.app.settings.SettingsValidator
 import com.tideo.autobrightness.app.settings.UserProfileStore
 import com.tideo.autobrightness.app.settings.keepGlobalsFrom
+import com.tideo.autobrightness.app.settings.minRequiredMaxBrightness
 import com.tideo.autobrightness.app.settings.validate
 import com.tideo.autobrightness.app.storage.contextBaselineDataStore
 import com.tideo.autobrightness.app.storage.settingsDataStore
@@ -21,7 +22,6 @@ import com.tideo.autobrightness.domain.brightness.BrightnessFormulae
 import com.tideo.autobrightness.domain.wizard.OverridePoint
 import com.tideo.autobrightness.platform.privilege.PrivilegeManager
 import com.tideo.autobrightness.platform.privilege.Tier
-import kotlin.math.ceil
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
@@ -147,18 +147,6 @@ fun AabSettings.derivedCoefficients(): BrightnessFormulae.ContinuityCoefficients
         zone2End = zone2End.toDouble(),
         maxBrightness = maxBrightness.toDouble(),
     )
-
-/** Min MaxBright needed by current curve (ceil of brightness at Zone 2 End); below it form3A < 0 (D-169). */
-fun AabSettings.minRequiredMaxBrightness(): Int =
-    ceil(
-        BrightnessFormulae.zone2EndBrightness(
-            form1A = form1A.toDouble(),
-            form2B = form2B.toDouble(),
-            form2C = form2C.toDouble(),
-            zone1End = zone1End.toDouble(),
-            zone2End = zone2End.toDouble(),
-        ),
-    ).toInt()
 
 /** Result of [raiseMaxBrightnessForCurve]: the (possibly) adjusted settings + the new value if raised. */
 data class MaxBrightnessFix(val settings: AabSettings, val raisedTo: Int?)

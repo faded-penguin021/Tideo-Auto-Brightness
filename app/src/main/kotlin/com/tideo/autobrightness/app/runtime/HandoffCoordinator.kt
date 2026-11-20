@@ -90,6 +90,6 @@ internal class HandoffCoordinator(
         val cfg = settings.toBrightnessCurveConfig()
         val cached = minimumByCurve
         val lowest = if (cached?.first == cfg) cached.second else HandoffRules.minimumHandoffLux(cfg).also { minimumByCurve = cfg to it }
-        return lowest?.let { maxOf(settings.handoffLux, it) }
+        return HandoffRules.effectiveThreshold(settings.handoffLux, lowest)
     }
 }

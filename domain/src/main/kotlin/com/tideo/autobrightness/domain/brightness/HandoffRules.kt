@@ -17,7 +17,9 @@ object HandoffRules {
     }
 
     fun effectiveThreshold(storedLux: Int, cfg: BrightnessCurveConfig): Int? =
-        minimumHandoffLux(cfg)?.let { maxOf(storedLux, it) }
+        effectiveThreshold(storedLux, minimumHandoffLux(cfg))
+
+    fun effectiveThreshold(storedLux: Int, minimum: Int?): Int? = minimum?.let { maxOf(storedLux, it) }
 
     fun exitLux(thresholdLux: Int, hysteresis: Double): Double = thresholdLux * hysteresis
 

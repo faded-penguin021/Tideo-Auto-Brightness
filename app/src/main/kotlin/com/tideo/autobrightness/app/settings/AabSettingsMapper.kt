@@ -7,6 +7,7 @@ import com.tideo.autobrightness.domain.brightness.DynamicScalingConfig
 import com.tideo.autobrightness.domain.brightness.HandoffRules
 import com.tideo.autobrightness.domain.brightness.ThresholdConfig
 import com.tideo.autobrightness.platform.display.SecureDisplayController
+import kotlin.math.ceil
 
 // Domain config mappings for BrightnessPolicyInput.
 
@@ -54,6 +55,27 @@ fun AabSettings.toBrightnessCurveConfig(): BrightnessCurveConfig {
         scale = scale.toDouble(),
     )
 }
+
+// G2R-F70: form1A (Double) lands exactly; Int fields round.
+fun AabSettings.withCurveSuggestion(cfg: BrightnessCurveConfig): AabSettings = copy(
+    form1A = cfg.form1A,
+    zone1End = Math.round(cfg.zone1End).toInt(),
+    form2B = cfg.form2B.toFloat(),
+    form2C = Math.round(cfg.form2C).toInt(),
+    zone2End = Math.round(cfg.zone2End).toInt(),
+)
+
+/** Min MaxBright needed by current curve (ceil of brightness at Zone 2 End); below it form3A < 0 (D-169). */
+fun AabSettings.minRequiredMaxBrightness(): Int =
+    ceil(
+        BrightnessFormulae.zone2EndBrightness(
+            form1A = form1A.toDouble(),
+            form2B = form2B.toDouble(),
+            form2C = form2C.toDouble(),
+            zone1End = zone1End.toDouble(),
+            zone2End = zone2End.toDouble(),
+        ),
+    ).toInt()
 
 fun AabSettings.toDynamicScalingConfig(): DynamicScalingConfig = DynamicScalingConfig(
     enabled = scalingEnabled,

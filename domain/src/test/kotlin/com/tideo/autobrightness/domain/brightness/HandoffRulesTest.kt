@@ -105,6 +105,16 @@ class HandoffRulesTest {
     }
 
     @Test
+    fun effectiveThreshold_fromAKnownMinimum_matchesTheCurveForm() {
+        val cfg = BrightnessCurveConfig()
+        val minimum = HandoffRules.minimumHandoffLux(cfg)
+        for (stored in listOf(1_000, 25_132, 30_000)) {
+            assertEquals(HandoffRules.effectiveThreshold(stored, cfg), HandoffRules.effectiveThreshold(stored, minimum))
+        }
+        assertNull(HandoffRules.effectiveThreshold(30_000, null as Int?))
+    }
+
+    @Test
     fun exitLux_isThresholdTimesHysteresis() {
         assertEquals(20_105.6, HandoffRules.exitLux(25_132, 0.8), 1e-9)
         assertEquals(25_132.0, HandoffRules.exitLux(25_132, 1.0))

@@ -53,6 +53,7 @@ import com.tideo.autobrightness.app.runtime.PowerDrawCalibrator
 import com.tideo.autobrightness.app.runtime.PowerDrawProgress
 import com.tideo.autobrightness.app.settings.toBrightnessCurveConfig
 import com.tideo.autobrightness.app.settings.validate
+import com.tideo.autobrightness.app.settings.withCurveSuggestion
 import com.tideo.autobrightness.app.state.ControlPrefsViewModel
 import com.tideo.autobrightness.app.state.CurveSuggestionPreview
 import com.tideo.autobrightness.app.state.PowerDrawViewModel
@@ -116,14 +117,7 @@ fun ToolsScreen(
         // Tasker's task38 → preview → task655; leaving the screen discards it. (Was: auto-draw a fitted
         onPreviewGraph = { result ->
             CurveSuggestionPreview.request { s ->
-                val cfg = CurveSuggestionEngine.applyToLiveCurve(result, s.toBrightnessCurveConfig())
-                s.copy(
-                    form1A = cfg.form1A,
-                    zone1End = Math.round(cfg.zone1End).toInt(),
-                    form2B = cfg.form2B.toFloat(),
-                    form2C = Math.round(cfg.form2C).toInt(),
-                    zone2End = Math.round(cfg.zone2End).toInt(),
-                )
+                s.withCurveSuggestion(CurveSuggestionEngine.applyToLiveCurve(result, s.toBrightnessCurveConfig()))
             }
             navController.navigate(AppRoute.CurveBrightness.route)
         },
@@ -135,16 +129,8 @@ fun ToolsScreen(
         },
         onApplyWizard = { result ->
             val cfg = CurveSuggestionEngine.applyToLiveCurve(result, settings.toBrightnessCurveConfig())
-            vm.update { s ->
-                // G2R-F70: form1A (Double) lands exactly; Int fields round. DD-012: memory = disk.
-                s.copy(
-                    form1A = cfg.form1A,
-                    zone1End = Math.round(cfg.zone1End).toInt(),
-                    form2B = cfg.form2B.toFloat(),
-                    form2C = Math.round(cfg.form2C).toInt(),
-                    zone2End = Math.round(cfg.zone2End).toInt(),
-                ).validate()
-            }
+            // DD-012: memory = disk.
+            vm.update { s -> s.withCurveSuggestion(cfg).validate() }
         },
         powerSamples = powerSamples,
         powerRunning = powerRunning,

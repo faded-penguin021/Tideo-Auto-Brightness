@@ -1,10 +1,7 @@
 package com.tideo.autobrightness.app.settings
 
-import com.tideo.autobrightness.domain.brightness.BrightnessFormulae
+import com.tideo.autobrightness.domain.brightness.BrightnessEngine
 import com.tideo.autobrightness.platform.display.SecureDisplayController
-import kotlin.math.ceil
-import kotlin.math.pow
-import kotlin.math.sqrt
 
 /** Severity of a [FieldError]. CRITICAL errors block Apply (S12.6d, G2R-F18); ADVISORY only warn. */
 enum class Severity { CRITICAL, ADVISORY }
@@ -34,38 +31,25 @@ data class FieldError(
  */
 object SettingsValidator {
 
+    private val engine = BrightnessEngine()
+
     fun validate(settings: AabSettings): List<FieldError> {
         val errors = mutableListOf<FieldError>()
 
-        val maxBright = settings.maxBrightness.toDouble()
-
-        // Derive continuity coefficients (these are what task583 calls %aab_form2a / %aab_form3a)
-        val coeffs = BrightnessFormulae.deriveContinuityCoefficients(
-            form1A = settings.form1A.toDouble(),
-            form2B = settings.form2B.toDouble(),
-            form2C = settings.form2C.toDouble(),
-            zone1End = settings.zone1End.toDouble(),
-            zone2End = settings.zone2End.toDouble(),
-            maxBrightness = maxBright,
-        )
+        // The curve's derived form2A / form3A are what task583 calls %aab_form2a / %aab_form3a.
+        val curve = settings.toBrightnessCurveConfig()
 
         // task583 rule 1: form2A < 0 → CRITICAL (blocks Apply, G2R-F18/D-052)
-        if (coeffs.form2A < 0.0) {
-            errors += FieldError("form2A", "%.3f (automatic) — form2A < 0, adjust form1A or zone1End".format(coeffs.form2A), Severity.CRITICAL)
+        if (curve.form2A < 0.0) {
+            errors += FieldError("form2A", "%.3f (automatic) — form2A < 0, adjust form1A or zone1End".format(curve.form2A), Severity.CRITICAL)
         }
 
         // task583 rule 2 / _SaveButtonMisc: form3A < 0 means MaxBright is too low for the curve (zone 3
         // has no headroom). No longer blocks Apply (D-169, owner-approved revision of D-052 for this
         // case) — Apply auto-raises MaxBright to the value the curve needs (min_req_bright). Kept as an
         // ADVISORY so the derived readout reddens live like Tasker task583; the message states the fix.
-        if (coeffs.form3A < 0.0) {
-            val minReq = BrightnessFormulae.zone2EndBrightness(
-                form1A = settings.form1A.toDouble(),
-                form2B = settings.form2B.toDouble(),
-                form2C = settings.form2C.toDouble(),
-                zone1End = settings.zone1End.toDouble(),
-                zone2End = settings.zone2End.toDouble(),
-            ).let { ceil(it).toInt() }
+        if (curve.form3A < 0.0) {
+            val minReq = settings.minRequiredMaxBrightness()
             val message = if (settings.maxBrightness < 255 && minReq <= 255) {
                 "Max brightness (${settings.maxBrightness}) is too low for this curve — Apply will raise it to $minReq (value at Zone 2 End)."
             } else {
@@ -156,25 +140,8 @@ object SettingsValidator {
             )
         }
 
-        // task707: compute predicted brightness at 1000 lux using the correct zone formula
-        // %aab_form2d = zone1End (derived coefficient form2D = zone1End, defaults_audit)
-        val safeVal: Double = when {
-            settings.zone1End > 1000 -> {
-                // Zone 1: form1A * sqrt(1000)
-                settings.form1A.toDouble() * sqrt(1000.0)
-            }
-            settings.zone2End > 1000 -> {
-                // Zone 2: form2A + form2B * ((1000-form2C)^0.33 - (form2D-form2C)^0.33)
-                // form2D = zone1End (D-004)
-                val a = (1000.0 - settings.form2C).pow(0.33)
-                val b = (settings.zone1End.toDouble() - settings.form2C).pow(0.33)
-                coeffs.form2A + settings.form2B.toDouble() * (a - b)
-            }
-            else -> {
-                // Zone 3: MaxBright - (form3A / 1000) * MaxBright
-                maxBright - (coeffs.form3A / 1000.0) * maxBright
-            }
-        }
+        // task707: the raw three-zone value at 1000 lux — no scale, offset or clamp.
+        val safeVal = engine.mapLuxToBrightness(1000.0, curve)
 
         // task707 safety rule: predicted brightness@1000lux < 25 → warning + is_safe=no
         if (safeVal < 25.0) {

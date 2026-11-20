@@ -40,7 +40,7 @@ investigation stays closed (DB-051…DB-060), and Scorecard.dev is a run-once lo
   unit is pre-approved: Units 1–8 run hands-off from the plan-runner with no phone, and Unit 9 is the
   owner's phone check. This plan runs first in the train, and the flash plan follows it.
   [x] 0 plan · [x] 1 dimming readout · [x] 2 brightness labels · [x] 3 PWM dimming chart ·
-  [x] 4 `keepGlobalsFrom` · [ ] 5 formula dedups · [ ] 6 engine `dimDynamic` · [ ] 7 AGENTS.md rule ·
+  [x] 4 `keepGlobalsFrom` · [x] 5 formula dedups · [ ] 6 engine `dimDynamic` · [ ] 7 AGENTS.md rule ·
   [ ] 8 close-out and phone steps · [ ] 9 owner phone check.
 - **Display calibration (Pixel and HyperOS confirmed)** —
   `docs/plans/DISPLAY_CALIBRATION_CEILING.md`, Units 1–4 in code (owner, 2026-10-26; DE-005, revised
@@ -118,6 +118,9 @@ proposing work; changing it is legislation under PROTOCOLS' rule-review protocol
 ## Changelog
 
 Newest first; ledger rows are the durable detail.
+
+- 2026-11-20 — **Light refactor Unit 5: small pure formulas, one copy each (no behaviour change).**
+  The validator, wizard, hand-off threshold and location debounce call the shared helpers.
 
 - 2026-11-20 — **Light refactor Unit 4: every swap path keeps one global set (DE-047).** Load,
   import and reset now keep the setup title and schema version, as a context swap already did.
