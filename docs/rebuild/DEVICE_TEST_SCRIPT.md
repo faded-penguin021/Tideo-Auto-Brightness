@@ -850,6 +850,53 @@ N lx". Watch Live Debug's Light Sensor card for smoothed lux.
     asks to turn Adaptive Brightness off; with battery saver on, it says the calibration was not
     started, and the screen does not change at all. No other cause mentions DUMP.
 
+## 20. Readouts in PWM-sensitive mode [ELEVATED] (DE-044…DE-046)
+
+E2E auto: none; every row, with its reason, is in `e2e/scenarios.toml`.
+
+§19 and steps 62–66 are reserved for the flash plan's section (`docs/plans/FLASH_VISIBILITY_TOGGLE.md`),
+which goes above this one.
+
+Setup: on **Reactivity**, switch **Use override detection** on. On **Super Dimming**, switch
+**Use software dimming (PWM-sensitive)** on, set **PWM threshold** to 40, keep **Software exponent
+(PWM)** at 0.8 and Misc's Min brightness at 10, and Apply. On **Profiles**, save this as profile P.
+Switch PWM-sensitive and Super dimming both off, **Apply** (Save stores the applied settings), save
+that as profile Q, and load P. No context rule may match during the run, since a wake ends a
+manual load's lock and a rule could replace P. Work in a dark room, below about 4.4 lx, with the
+phone lying still: the light then stays inside the dead band, so a light reading publishes
+nothing and every change below comes from the step itself. Leave no unapplied edits on Super
+Dimming, since its chart plots the draft.
+
+67. **Two values, two labels (DE-045).** **Expected:** Live Debug Info → Core Metrics reads
+    **Hardware (written)** 40 and **Perceived** 10, and
+    `adb shell settings get system screen_brightness` reads 40. The Dashboard's **PERCEIVED
+    BRIGHTNESS**, the notification's brightness and Curve & Brightness's "Perceived brightness"
+    line show 10, never 40. Super Dimming's Live super dimming card reads "Dimming level (abs) 51.4
+    at 40 hardware brightness". **Fail:** a brightness readout shows 40 as the perceived value, or
+    is still labelled "Applied brightness", "Current brightness" or "Target brightness".
+68. **The PWM chart's marker sits on its curve (DE-046).** Super Dimming → Dimming curve.
+    **Expected:** the legend shows one series, **PWM dim level**, not Tasker's reference, dim
+    shell and dim % lines. The red **Now** line stands at brightness 10 and crosses the curve at
+    about 51, the card's level; `adb shell settings get secure reduce_bright_colors_level` reads 51,
+    and the Dashboard shows "Super dimming 51%". Change the software exponent without applying: the
+    curve moves and the line stays at 10, since the chart previews the draft. Discard.
+69. **Disengage zeroes the readout, and reapply restores it (DE-044).** Move the system
+    brightness slider far enough that Tideo pauses for a manual override. **Expected:**
+    `adb shell settings get secure reduce_bright_colors_activated` reads 0, the Dashboard's
+    "Super dimming" line is gone, the Live super dimming card reads 0.0 on both dimming lines, and
+    the chart has no Now line. 1.15.3 kept the last value here, so this half is the one that
+    tells the builds apart. Tap **Discard** on the override notification without moving the phone.
+    **Expected:** within a few seconds `reduce_bright_colors_activated` reads 1 again at level 51,
+    and the Dashboard line, the card and the Now line come back as in step 68. Turn the screen off
+    for 10 s and on again: once the sensor's first reading after the wake arrives, the same
+    readout is back.
+70. **A profile switch publishes at once (DE-044).** With the light unchanged, load Q by hand on
+    Profiles. **Expected:** within a few seconds `reduce_bright_colors_activated` reads 0, the
+    Dashboard line and the Now line disappear, the card reads 0.0, and Live Debug's Hardware
+    (written) and Perceived both read 10. **Fail:** P's dimming value stays on screen until the
+    light changes. Load P again: step 68's readout returns within a few seconds. Tap **Resume
+    context automation** afterwards, since a manual load pauses it (step 25).
+
 ---
 
 **On completion:** flip the affected `PARITY_CHECKLIST.md` rows to `device-verified`; record any failures

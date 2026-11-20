@@ -525,3 +525,24 @@ reason = "entering the hand-off needs bright light; the pre-service mode and the
 id = "s18_61"
 status = "manual"
 reason = "calibration sweeps the live panel, a ceiling case needs a Pixel or the POCO F4, the HBM readout needs direct sunlight, and each failure cause needs its own device state"
+
+# §20 Readouts in PWM-sensitive mode (light refactor, Unit 9's phone check)
+[[scenario]]
+id = "s20_67"
+status = "manual"
+reason = "needs ELEVATED and a dark room held steady below the PWM threshold; added for the owner's one-off phone check, not yet scripted"
+
+[[scenario]]
+id = "s20_68"
+status = "manual"
+reason = "the chart's marker against its curve is a visual check; needs ELEVATED and a steady dark room"
+
+[[scenario]]
+id = "s20_69"
+status = "manual"
+reason = "the override pause needs the system slider and the reapply needs the light held unchanged across it and across a screen-off"
+
+[[scenario]]
+id = "s20_70"
+status = "manual"
+reason = "needs two saved profiles and a manual load, which pauses context automation, with the light held unchanged"

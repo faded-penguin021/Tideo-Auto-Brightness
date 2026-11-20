@@ -41,7 +41,7 @@ investigation stays closed (DB-051…DB-060), and Scorecard.dev is a run-once lo
   owner's phone check. This plan runs first in the train, and the flash plan follows it.
   [x] 0 plan · [x] 1 dimming readout · [x] 2 brightness labels · [x] 3 PWM dimming chart ·
   [x] 4 `keepGlobalsFrom` · [x] 5 formula dedups · [x] 6 engine `dimDynamic` · [x] 7 AGENTS.md rule ·
-  [ ] 8 close-out and phone steps · [ ] 9 owner phone check.
+  [x] 8 close-out and phone steps · [ ] 9 owner phone check.
 - **Display calibration (Pixel and HyperOS confirmed)** —
   `docs/plans/DISPLAY_CALIBRATION_CEILING.md`, Units 1–4 in code (owner, 2026-10-26; DE-005, revised
   DE-015). D1 (a), amended; D2 (a), D3 (a), D4 (a) (DE-027); battery saver refuses a run
@@ -119,6 +119,9 @@ proposing work; changing it is legislation under PROTOCOLS' rule-review protocol
 
 Newest first; ledger rows are the durable detail.
 
+- 2026-11-20 — **Light refactor Unit 8: every retained difference has a record, and Unit 9's
+  phone steps are `DEVICE_TEST_SCRIPT.md` §20 (steps 67–70, PWM-mode readouts and chart; §19 stays
+  the flash plan's).**
 - 2026-11-20 — **Light refactor Unit 7: AGENTS.md's one-source rule, and eight retained
   differences in Decided non-items (DE-049; deferred scope DE-050).** Prose only, under rule review.
 
