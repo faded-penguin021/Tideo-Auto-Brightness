@@ -341,6 +341,7 @@
   its revision-0 values the current ones, once, and keeps any the user edited. Accepted: a v3 user
   who had set all four back to exactly 20/25/65/1310 cannot be told from one who never touched them
   and moves too; on-device behaviour is unverified.
+  → A kept global such as a legacy title is not an edit: DE-055.
 - DD-031 [cited]: **Loading an untouched built-in profile keeps the user's "Trust unreliable
   sensor" and Quick Settings choices, closing a parity gap open since the port (2026-10-05).**
   task592's `getBaseProfile()` never wrote `reactivity.detect_overrides`,

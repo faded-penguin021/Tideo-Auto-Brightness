@@ -603,3 +603,10 @@
   (DD-048) skips the service write, as a thrown key write already did. Unchanged: `applyLocked`
   records the desired state before its diff writes and ignores their results, so a refused toggle
   write is not retried until the desired value changes, as a thrown one already was not.
+- DE-055 [cited]: **DD-030's one-time factory upgrade ignores the global set a load keeps anyway
+  (`keepGlobalsFrom`), as DE-053 made DD-031's built-in match do (owner, 2026-11-21).** It compared
+  every field but `schemaVersion` with the revision-0 built-in, so a built-in saved back unedited
+  with a legacy `setupTitle`, the context lock or another kept global stayed at the 3.0 midpoint
+  for good, since the revision is recorded whatever the outcome. The upgraded profile takes the
+  factory's profile fields and `schemaVersion` and keeps the globals it held, which no load reads
+  (DE-047). A difference in any profile field still keeps the profile as the user left it.

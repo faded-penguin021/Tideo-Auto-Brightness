@@ -60,6 +60,25 @@ class UserProfileStoreTest {
         assertEquals(SavedProfiles.FACTORY_REVISION, read.factoryRevision)
     }
 
+    @Test
+    fun readFrom_upgradesAnUntouchedBuiltInSavedWithOtherGlobals() = runTest {
+        // A legacy import's title persists (DE-047), and a manual load latches the context lock.
+        val saved = legacyBuiltIns.map {
+            when (it.name) {
+                "Outdoors" -> it.copy(settings = it.settings.copy(setupTitle = "My AAB", debugLevel = 5))
+                "Default" -> it.copy(settings = it.settings.copy(contextOverride = true, serviceEnabled = false))
+                else -> it
+            }
+        }
+        val read = SavedProfilesSerializer.readFrom(revision0(saved).byteInputStream())
+
+        val byName = read.profiles.associate { it.name to it.settings }
+        assertEquals(4.255, byName.getValue("Outdoors").thresholdMidpoint, "globals do not make a built-in edited")
+        assertEquals(4.0, byName.getValue("Default").thresholdMidpoint, "globals do not make a built-in edited")
+        assertEquals(DefaultProfiles.Outdoors.copy(setupTitle = "My AAB", debugLevel = 5), byName.getValue("Outdoors"))
+        assertEquals(DefaultProfiles.Default.copy(contextOverride = true, serviceEnabled = false), byName.getValue("Default"))
+    }
+
     private val v113Default = """
         {"schemaVersion":3,"serviceEnabled":true,"detectOverrides":false,"minBrightness":10,"maxBrightness":255,
         "offset":0,"scale":1.0,"zone1End":35,"zone2End":10000,"form1A":5.0,"form2B":8.8,"form2C":18,

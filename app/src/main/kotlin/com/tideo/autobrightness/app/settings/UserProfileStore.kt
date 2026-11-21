@@ -65,13 +65,15 @@ object SavedProfilesSerializer : Serializer<SavedProfiles> {
         }.getOrDefault(defaultValue)
 
     // DD-030: revision 1 moved the built-ins' midpoint 3.0 → 4.0; only an untouched built-in follows.
+    // DE-055: the globals a load keeps anyway never make a built-in "edited", and the upgrade keeps them.
     internal fun upgradeFactory(saved: SavedProfiles): SavedProfiles {
         if (saved.factoryRevision >= SavedProfiles.FACTORY_REVISION) return saved
         val profiles = saved.profiles.map { profile ->
-            val factory = DefaultProfiles.all[profile.name]
-            if (factory != null && profile.builtIn &&
-                profile.settings.copy(schemaVersion = 0) == factory.copy(thresholdMidpoint = 3.0, schemaVersion = 0)
-            ) profile.copy(settings = factory) else profile
+            val factory = DefaultProfiles.all[profile.name] ?: return@map profile
+            val revision0 = factory.copy(thresholdMidpoint = 3.0)
+            if (profile.builtIn && profile.settings.keepGlobalsFrom(revision0) == revision0) {
+                profile.copy(settings = factory.keepGlobalsFrom(profile.settings).copy(schemaVersion = factory.schemaVersion))
+            } else profile
         }
         return saved.copy(profiles = profiles, factoryRevision = SavedProfiles.FACTORY_REVISION)
     }

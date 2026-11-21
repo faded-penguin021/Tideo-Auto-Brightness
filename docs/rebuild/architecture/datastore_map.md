@@ -41,9 +41,10 @@ reconcile a hand-off.
   object's absent animation keys to their v3 values unless all four are absent; it is also applied
   to a baseline snapshot and an imported export. The version stays 3 on purpose: a bump makes an
   older build reject the file and reset to defaults on a downgrade or an equal-versionCode
-  reinstall. `userProfiles` always wrote every key; its `factoryRevision` moves an untouched
-  built-in to new factory values once. A future default change must extend that pin to its key
-  (layer: `AabSettingsMigrationTest`'s frozen-defaults test fails until it is looked at).
+  reinstall. `userProfiles` always wrote every key; its `factoryRevision` moves a built-in whose
+  profile fields are untouched to new factory values once, keeping its globals (DE-055). A future
+  default change must extend that pin to its key (layer: `AabSettingsMigrationTest`'s
+  frozen-defaults test fails until it is looked at).
 - The five **Preferences** stores (`service_health`, `experiment_prefs`, `power_draw`, `control_prefs`,
   `display_prefs`) are intentionally schema-less key/value bags (no serializer, no version); they hold
   disposable/optional data or device facts.
