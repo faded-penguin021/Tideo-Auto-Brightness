@@ -82,6 +82,77 @@ class SecureDisplayControllerTest {
         }
     }
 
+    @Test
+    fun refusedSettingsWrites_reportFailure_whenElevated() {
+        grantElevated()
+        val attempted = mutableListOf<Pair<String, String>>()
+        val refusing = AndroidSecureDisplayController(
+            context, privilegeManager,
+            sdkInt = Build.VERSION_CODES.UPSIDE_DOWN_CAKE,
+            nightLightAvailable = true,
+            alwaysOnDisplayAvailable = true,
+            settingsWrite = { key, value ->
+                attempted += key to value
+                false
+            },
+        )
+
+        mapOf(
+            "Night Light" to refusing.setNightLight(true),
+            "Night Light temperature" to refusing.setNightLightTemperature(3_000),
+            "colour correction" to refusing.setDaltonizer(DaltonizerMode.GRAYSCALE),
+            "colour correction off" to refusing.setDaltonizer(DaltonizerMode.OFF),
+            "inversion" to refusing.setInversion(true),
+            "Always-on display" to refusing.setAlwaysOnDisplay(true),
+            "stay awake" to refusing.setStayAwakePlugged(true),
+            "HDR force SDR" to refusing.setHdrForceSdr(true),
+            "HDR allowed" to refusing.setHdrForceSdr(false),
+        ).forEach { (name, result) ->
+            assertTrue(result.isFailure, "a refused $name write must not read as written")
+        }
+        assertEquals(
+            listOf(
+                "night_display_activated" to "1",
+                "night_display_color_temperature" to "3000",
+                "accessibility_display_daltonizer" to "0",
+                "accessibility_display_daltonizer_enabled" to "0",
+                "accessibility_display_inversion_enabled" to "1",
+                "doze_always_on" to "1",
+                Settings.Global.STAY_ON_WHILE_PLUGGED_IN to "15",
+                "user_disabled_hdr_formats" to "1,2,3,4",
+                "are_user_disabled_hdr_formats_allowed" to "1",
+            ),
+            attempted,
+            "a refused first write stops the writes that depend on it",
+        )
+    }
+
+    @Test
+    fun aRefusedSecondWrite_reportsFailure_whenElevated() {
+        grantElevated()
+        val attempted = mutableListOf<String>()
+        val refusedSecond = setOf("accessibility_display_daltonizer_enabled", "are_user_disabled_hdr_formats_allowed")
+        val refusing = AndroidSecureDisplayController(
+            context, privilegeManager,
+            sdkInt = Build.VERSION_CODES.UPSIDE_DOWN_CAKE,
+            settingsWrite = { key, _ -> attempted += key; key !in refusedSecond },
+        )
+
+        assertTrue(refusing.setDaltonizer(DaltonizerMode.GRAYSCALE).isFailure, "a refused enable must not read as written")
+        assertTrue(refusing.setHdrForceSdr(true).isFailure, "a refused allowed-flag write must not read as written")
+        assertEquals(
+            listOf("accessibility_display_daltonizer", "accessibility_display_daltonizer_enabled",
+                "user_disabled_hdr_formats", "are_user_disabled_hdr_formats_allowed"),
+            attempted,
+        )
+
+        val refusingClear = AndroidSecureDisplayController(
+            context, privilegeManager,
+            sdkInt = Build.VERSION_CODES.UPSIDE_DOWN_CAKE,
+            settingsWrite = { key, _ -> key != "user_disabled_hdr_formats" },
+        )
+        assertTrue(refusingClear.setHdrForceSdr(false).isFailure, "a refused format clear must not read as written")
+    }
 
     @Test
     fun reads_workWithoutPrivilege_defaultingToOff() {

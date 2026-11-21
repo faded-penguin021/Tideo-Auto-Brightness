@@ -103,6 +103,7 @@ proposing work; changing it is legislation under PROTOCOLS' rule-review protocol
 
 Newest first; ledger rows are the durable detail.
 
+- 2026-11-21 — **Refused Privileged Display writes read as failed (owner, DE-054).**
 - 2026-11-21 — **Light-refactor follow-ups done (owner): the Super Dimming chart no longer
   crashes with the draft threshold below the minimum; a refused Extra Dim write reads as failed
   (DE-052); kept globals such as a legacy title no longer stop DD-031's built-in match (DE-053).**

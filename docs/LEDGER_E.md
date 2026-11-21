@@ -583,9 +583,23 @@
   takes the path a thrown write already took: readout 0, a clear only while `engaged` reads true
   (an UNKNOWN latch waits for the next `disengage`), and a retry on the next pipeline event.
   `SecureDisplayController`'s writes discard the same Boolean and are not changed here.
+  → `SecureDisplayController` is fixed: DE-054.
 - DE-053 [cited]: **DD-031's built-in match ignores the global set a load keeps anyway
   (`keepGlobalsFrom`), so an untouched built-in saved back with a legacy `setupTitle` or another
   global still keeps the user's Trust and Quick Settings choices (light-refactor follow-up, owner,
   2026-11-21).** The match compared every field but `schemaVersion`, so after DE-047 let a legacy
   title persist, saving an unedited built-in from the live settings made every later load of it
   read as edited. A difference in any profile field still counts as an edit.
+- DE-054 [cited]: **`AndroidSecureDisplayController` fails a Night Light, Kelvin, colour
+  correction, inversion, Always-on display, stay-awake or HDR write whose `Settings.Secure` or
+  `Settings.Global` put returns false (owner, 2026-11-21), as DE-052 did for Extra Dim.** Every
+  Boolean was discarded, so a refused write read as landed: the screen's Apply reported no failure,
+  the coordinator advanced `deviceTempK` and dropped DD-059's restore record over a Kelvin or
+  activation whose key never landed. A refused write now fails like a thrown one, and a refused
+  first write of a pair (colour correction's mode before its enable, HDR's two rows) stops the
+  second. So `NightLightTemperatureRoute` also reports a refused key write as failed after a
+  DC-057 service write showed the Kelvin, which repeats the service write on the next tick and
+  keeps the record, and a refused key write while the service holds an out-of-range Kelvin
+  (DD-048) skips the service write, as a thrown key write already did. Unchanged: `applyLocked`
+  records the desired state before its diff writes and ignores their results, so a refused toggle
+  write is not retried until the desired value changes, as a thrown one already was not.

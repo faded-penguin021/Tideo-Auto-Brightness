@@ -10,7 +10,7 @@ import com.tideo.autobrightness.platform.privilege.Tier
 
 /** Privileged Display Control (D-149, reworked into profile fields by D-151/D-152): read/write AOSP
  *  display toggles via WRITE_SECURE_SETTINGS. Extra Dim keys (D-048, D-144) owned elsewhere. Writes
- *  ELEVATED-gated and runCatching-wrapped for revoked/stale grant safety. */
+ *  ELEVATED-gated; a write that throws or is refused fails (DE-054). */
 interface SecureDisplayController {
     val nightLightAvailable: Boolean
     fun readNightLight(): Boolean
@@ -105,6 +105,7 @@ class AndroidSecureDisplayController(
     override val nightLightAvailable: Boolean = context.frameworkDisplayCapabilities().nightLightAvailable,
     override val alwaysOnDisplayAvailable: Boolean = context.frameworkDisplayCapabilities().alwaysOnDisplayAvailable,
     override val nightLightRange: NightLightKelvinRange = context.frameworkDisplayCapabilities().nightLightRange,
+    private val settingsWrite: ((key: String, value: String) -> Boolean)? = null,
 ) : SecureDisplayController {
     // DB-041: backing rows do not establish display-feature support or a live service update path.
     private val resolver: ContentResolver get() = context.contentResolver
@@ -116,11 +117,22 @@ class AndroidSecureDisplayController(
         return runCatching { write() }
     }
 
+    private fun written(key: String, landed: Boolean) = check(landed) { "$key not written" }
+
+    private fun putSecure(key: String, value: Int) =
+        written(key, settingsWrite?.invoke(key, value.toString()) ?: Settings.Secure.putInt(resolver, key, value))
+
+    private fun putGlobal(key: String, value: Int) =
+        written(key, settingsWrite?.invoke(key, value.toString()) ?: Settings.Global.putInt(resolver, key, value))
+
+    private fun putGlobal(key: String, value: String) =
+        written(key, settingsWrite?.invoke(key, value) ?: Settings.Global.putString(resolver, key, value))
+
     override fun readNightLight(): Boolean = nightLightAvailable &&
         Settings.Secure.getInt(resolver, KEY_NIGHT_DISPLAY_ACTIVATED, 0) == 1
 
     override fun setNightLight(on: Boolean): Result<Unit> = capabilityWrite(nightLightAvailable) {
-        Settings.Secure.putInt(resolver, KEY_NIGHT_DISPLAY_ACTIVATED, if (on) 1 else 0)
+        putSecure(KEY_NIGHT_DISPLAY_ACTIVATED, if (on) 1 else 0)
     }
 
     override fun readNightLightTemperature(): Int? {
@@ -130,7 +142,7 @@ class AndroidSecureDisplayController(
     }
 
     override fun setNightLightTemperature(kelvin: Int): Result<Unit> = capabilityWrite(nightLightAvailable) {
-        Settings.Secure.putInt(resolver, KEY_NIGHT_DISPLAY_TEMPERATURE, kelvin.coerceIn(SecureDisplayController.NIGHT_LIGHT_RAIL_K))
+        putSecure(KEY_NIGHT_DISPLAY_TEMPERATURE, kelvin.coerceIn(SecureDisplayController.NIGHT_LIGHT_RAIL_K))
     }
 
     override fun readNightLightAutoMode(): NightLightAutoMode = if (nightLightAvailable) {
@@ -149,11 +161,11 @@ class AndroidSecureDisplayController(
 
     override fun setDaltonizer(mode: DaltonizerMode): Result<Unit> = elevatedWrite {
         if (mode == DaltonizerMode.OFF) {
-            Settings.Secure.putInt(resolver, KEY_DALTONIZER_ENABLED, 0)
+            putSecure(KEY_DALTONIZER_ENABLED, 0)
         } else {
             // Value before enabled to avoid frame flash of previous matrix.
-            Settings.Secure.putInt(resolver, KEY_DALTONIZER_VALUE, mode.value)
-            Settings.Secure.putInt(resolver, KEY_DALTONIZER_ENABLED, 1)
+            putSecure(KEY_DALTONIZER_VALUE, mode.value)
+            putSecure(KEY_DALTONIZER_ENABLED, 1)
         }
     }
 
@@ -161,14 +173,14 @@ class AndroidSecureDisplayController(
         Settings.Secure.getInt(resolver, KEY_INVERSION_ENABLED, 0) == 1
 
     override fun setInversion(on: Boolean): Result<Unit> = elevatedWrite {
-        Settings.Secure.putInt(resolver, KEY_INVERSION_ENABLED, if (on) 1 else 0)
+        putSecure(KEY_INVERSION_ENABLED, if (on) 1 else 0)
     }
 
     override fun readAlwaysOnDisplay(): Boolean = alwaysOnDisplayAvailable &&
         Settings.Secure.getInt(resolver, KEY_DOZE_ALWAYS_ON, 0) == 1
 
     override fun setAlwaysOnDisplay(on: Boolean): Result<Unit> = capabilityWrite(alwaysOnDisplayAvailable) {
-        Settings.Secure.putInt(resolver, KEY_DOZE_ALWAYS_ON, if (on) 1 else 0)
+        putSecure(KEY_DOZE_ALWAYS_ON, if (on) 1 else 0)
     }
 
     // DB-077: `!= 0` here is what made the DB-068 diff skip a device holding v1.9.0's own mask.
@@ -180,11 +192,7 @@ class AndroidSecureDisplayController(
         }
 
     override fun setStayAwakePlugged(on: Boolean): Result<Unit> = elevatedWrite {
-        Settings.Global.putInt(
-            resolver,
-            Settings.Global.STAY_ON_WHILE_PLUGGED_IN,
-            if (on) STAY_ON_ANY_CHARGER else 0,
-        )
+        putGlobal(Settings.Global.STAY_ON_WHILE_PLUGGED_IN, if (on) STAY_ON_ANY_CHARGER else 0)
     }
 
     override val hdrForceSdrAvailable: Boolean
@@ -208,11 +216,11 @@ class AndroidSecureDisplayController(
             }
             // DB-044 TODO: use DisplayManager if a safe, non-hidden live API becomes available.
             if (on) {
-                Settings.Global.putString(resolver, KEY_HDR_DISABLED_FORMATS, ALL_HDR_FORMATS)
-                Settings.Global.putInt(resolver, KEY_HDR_FORMATS_ALLOWED, 0)
+                putGlobal(KEY_HDR_DISABLED_FORMATS, ALL_HDR_FORMATS)
+                putGlobal(KEY_HDR_FORMATS_ALLOWED, 0)
             } else {
-                Settings.Global.putInt(resolver, KEY_HDR_FORMATS_ALLOWED, 1)
-                Settings.Global.putString(resolver, KEY_HDR_DISABLED_FORMATS, "")
+                putGlobal(KEY_HDR_FORMATS_ALLOWED, 1)
+                putGlobal(KEY_HDR_DISABLED_FORMATS, "")
             }
         }
     }
