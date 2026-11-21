@@ -71,7 +71,7 @@ fun DimmingChart(
     }
 
     val markers = currentBrightness?.let {
-        listOf(ChartMarker(color = MaterialTheme.colorScheme.error, x = it.toFloat().coerceIn(xStart, xEnd), label = stringResource(R.string.chart_now)))
+        listOf(ChartMarker(color = MaterialTheme.colorScheme.error, x = it.toFloat().coerceIn(minOf(xStart, xEnd), maxOf(xStart, xEnd)), label = stringResource(R.string.chart_now)))
     } ?: emptyList()
 
     ChartCanvas(

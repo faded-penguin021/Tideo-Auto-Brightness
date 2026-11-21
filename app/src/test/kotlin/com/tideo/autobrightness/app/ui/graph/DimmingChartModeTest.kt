@@ -52,4 +52,25 @@ class DimmingChartModeTest {
         }
         assertEquals(0f, points.last().y)
     }
+
+    private fun showBelowMinimum(pwm: Boolean) = compose.setContent {
+        MaterialTheme {
+            DimmingChart(
+                minBrightness = 25, dimmingThreshold = 4, dimmingExponent = 2.5, dimmingStrength = 80,
+                currentBrightness = 25, pwmSensitive = pwm,
+            )
+        }
+    }
+
+    @Test
+    fun nowMarker_survivesADraftThresholdBelowTheMinimum() {
+        showBelowMinimum(pwm = false)
+        compose.onNodeWithContentDescription("below 4", substring = true).assertIsDisplayed()
+    }
+
+    @Test
+    fun pwmNowMarker_survivesADraftThresholdBelowTheMinimum() {
+        showBelowMinimum(pwm = true)
+        compose.onNodeWithContentDescription("below 4", substring = true).assertIsDisplayed()
+    }
 }

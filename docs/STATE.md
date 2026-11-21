@@ -26,6 +26,11 @@ investigation stays closed (DB-051…DB-060), and Scorecard.dev is a run-once lo
 
 ## Active work
 
+- **Light-refactor follow-ups (owner, 2026-11-21)** — four Tideo defects the refactor's units
+  noted and left, fixed in this train before the flash plan's Unit 1, one unit each, no plan
+  file. The runner machine's QEMU test flakes and missing pytest are out of scope.
+  [x] 1 dimming chart crash below the minimum · [ ] 2 secure dimming write result · [ ] 3 base
+  curve label (D4, DE-049) · [ ] 4 legacy `setupTitle` and the built-in match (DE-047, DD-031).
 - **Faster Shizuku paths and Android 17 display APIs** — `docs/plans/PRIVILEGED_FAST_PATHS.md`,
   spec only (owner, 2026-10-19). Unit 1 is the owner's Astra review. Units 2–13 wait until the
   owner's OnePlus 13 runs ColorOS 17, and each unit runs on the owner's go-ahead. Unit 5 also
@@ -112,6 +117,10 @@ proposing work; changing it is legislation under PROTOCOLS' rule-review protocol
 ## Changelog
 
 Newest first; ledger rows are the durable detail.
+
+- 2026-11-21 — **Follow-up 1: the Super Dimming chart no longer crashes when the draft threshold
+  sits below the minimum brightness while Extra Dim is engaged.** The "Now" marker's clamp got an
+  empty range there (minimum 25, threshold 4: range 25..15).
 
 - 2026-11-21 — **Light refactor Unit 9: the owner's OnePlus 13 passed §20, steps 67–70 (DE-051);
   the plan is done and deleted.** Step 67's shell check now expects the stored 0–4095 value where
