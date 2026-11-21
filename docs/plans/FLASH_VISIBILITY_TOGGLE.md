@@ -178,8 +178,8 @@ Each unit ends shippable: STATE Changelog line, `scripts/ladder.sh` green, commi
 2 ship in one train (recommended), Unit 1 bumps to **1.16.0 / vc34**, since Unit 2 adds a setting
 (RUNBOOK playbook 6: minor), and Unit 2 does not bump again. If Unit 1 ships alone, it is
 **1.15.4 / vc34**. The bump adds `changelogs/34.txt` and re-checks `MATH_EXPLAINED.md` (DE-039).
-This plan changes no `domain/` code. **The light refactor
-(`docs/plans/LIGHT_REFACTOR_CONSOLIDATION.md`) runs earlier in the same train and does not bump
+This plan changes no `domain/` code. **The light refactor (DE-044…DE-051; its plan is done and
+retired) runs earlier in the same train and does not bump
 (owner, 2026-11-20; DE-043).** This bump is the train's only one. Its changelog also describes the
 refactor's user-visible changes. Its `MATH_EXPLAINED.md` re-check covers the refactor's dimming
 readout, chart and `domain/` changes, so it is more than a re-pin.

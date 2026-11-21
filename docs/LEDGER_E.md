@@ -563,3 +563,14 @@
 - DE-050: **Two light-refactor findings are deferred scope, not declines: the settings schema
   rewrite, as not light, and the settings contract's default strings, audited and all equal to the
   code (light refactor, 2026-10-21).** A later plan may take either up without reopening anything.
+- DE-051: **DE-044…DE-046 are device-verified: on the owner's OnePlus 13 (Android 16), the light
+  refactor's debug build at `2f3cb75` passed `DEVICE_TEST_SCRIPT.md` §20, steps 67–70, at 0 lx
+  with ELEVATED and PWM-sensitive mode (owner, 2026-11-21), so the refactor's Unit 9 is done.**
+  Live Debug read Hardware (written) 40 and Perceived 10; the Dashboard, notification and Curve
+  card showed 10; the card read 51.4 at 40; the chart's one series, PWM dim level, crossed the Now
+  line at 10 near 51.4, and `reduce_bright_colors_level` read 51. An override pause set
+  `reduce_bright_colors_activated` to 0 and cleared the Dashboard line, the card and the Now line;
+  Discard restored 1 at 51 in under 3 s, as did the first reading after a 10 s screen-off; loading
+  Q cleared the readout at once and loading P restored it. Step 67's shell read 642, not the 40 the
+  script expected: the script's error, since this OnePlus stores 0–4095 below the Settings API
+  (DC-025) and 40 × 4095 / 255 ≈ 642, so the step now names both scales. No other anomaly.

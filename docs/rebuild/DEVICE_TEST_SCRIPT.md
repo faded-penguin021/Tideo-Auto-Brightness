@@ -869,7 +869,9 @@ Dimming, since its chart plots the draft.
 
 67. **Two values, two labels (DE-045).** **Expected:** Live Debug Info → Core Metrics reads
     **Hardware (written)** 40 and **Perceived** 10, and
-    `adb shell settings get system screen_brightness` reads 40. The Dashboard's **PERCEIVED
+    `adb shell settings get system screen_brightness` reads the stored value of 40: 40 itself
+    where the shell shares the app's 0–255 scale, and 40 × 4095 / 255 ≈ 642 where it stores
+    0–4095 below the Settings API, as the owner's OnePlus does (DC-025, DE-051). The Dashboard's **PERCEIVED
     BRIGHTNESS**, the notification's brightness and Curve & Brightness's "Perceived brightness"
     line show 10, never 40. Super Dimming's Live super dimming card reads "Dimming level (abs) 51.4
     at 40 hardware brightness". **Fail:** a brightness readout shows 40 as the perceived value, or

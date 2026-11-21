@@ -35,16 +35,6 @@ investigation stays closed (DB-051…DB-060), and Scorecard.dev is a run-once lo
   [ ] 6 resident helper · [ ] 7 BrightnessInfo readout · [ ] 8 compileSdk 36.1 · [ ] 9
   event-driven readout · [ ] 10 push foreground app · [ ] 11 live HDR · [ ] 12 finer steps
   (optional) · [ ] 13 close-out.
-- **Light refactor of duplicated logic** — `docs/plans/LIGHT_REFACTOR_CONSOLIDATION.md`, spec only
-  (owner, 2026-10-21; D1–D5 decided; re-read 2026-11-11, DE-036, and 2026-11-20, DE-043). Every
-  unit is pre-approved: Units 1–8 run hands-off from the plan-runner with no phone, and Unit 9 is the
-  owner's phone check. This plan runs first in the train, and the flash plan follows it.
-  Unit 9 (owner, 2026-11-21): §20 runs now, on its own, from a debug APK built at `2f3cb75`; a
-  failing step is fixed in this train before the flash plan's Unit 1 starts; the PR waits until
-  the flash plan is done too.
-  [x] 0 plan · [x] 1 dimming readout · [x] 2 brightness labels · [x] 3 PWM dimming chart ·
-  [x] 4 `keepGlobalsFrom` · [x] 5 formula dedups · [x] 6 engine `dimDynamic` · [x] 7 AGENTS.md rule ·
-  [x] 8 close-out and phone steps · [ ] 9 owner phone check.
 - **Display calibration (Pixel and HyperOS confirmed)** —
   `docs/plans/DISPLAY_CALIBRATION_CEILING.md`, Units 1–4 in code (owner, 2026-10-26; DE-005, revised
   DE-015). D1 (a), amended; D2 (a), D3 (a), D4 (a) (DE-027); battery saver refuses a run
@@ -68,7 +58,8 @@ investigation stays closed (DB-051…DB-060), and Scorecard.dev is a run-once lo
   `docs/plans/FLASH_VISIBILITY_TOGGLE.md`, spec only (owner, 2026-11-17; AAB-first waived on #161,
   DE-040). D1–D5 decided (DE-041); each unit runs on the owner's go-ahead.
   Runs from the Docker host's plan-runner, phone on wireless adb, device work only via `e2e/run.sh`.
-  It runs after the light refactor, in the same train, and its Unit 1 makes the train's one bump (DE-043).
+  It follows the light refactor (done, DE-051) in the same train, its Unit 1 makes the train's
+  one bump (DE-043), and the train's one PR waits until this plan is done (owner, 2026-11-21).
   [x] 0 plan · [ ] 1 predictable background flashes and a truthful status · [ ] 2 the three-state
   setting and bump · [ ] 3 §19 steps and e2e scenarios · [ ] 4 phone run · [ ] 5 close-out.
 
@@ -122,6 +113,9 @@ proposing work; changing it is legislation under PROTOCOLS' rule-review protocol
 
 Newest first; ledger rows are the durable detail.
 
+- 2026-11-21 — **Light refactor Unit 9: the owner's OnePlus 13 passed §20, steps 67–70 (DE-051);
+  the plan is done and deleted.** Step 67's shell check now expects the stored 0–4095 value where
+  the device has one (642 for 40, DC-025). Next is the flash plan's Unit 1.
 - 2026-11-21 — **Light refactor Unit 9 scheduled (owner):** §20 now and alone, fix before the
   flash plan, one PR after it.
 - 2026-11-20 — **Light refactor Unit 8: every retained difference has a record, and Unit 9's
