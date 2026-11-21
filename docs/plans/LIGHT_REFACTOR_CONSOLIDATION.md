@@ -427,5 +427,5 @@ It also found three over-reaches:
      Units 1–3 in PWM mode (the readout on disengage and on reapply, the two labels, the PWM
      chart's marker on its curve).
 9. **Owner:** run that section on the phone. This is the only step that needs a device, and the
-   runner stops here. The owner may run it alongside the flash plan's phone run (its Unit 4).
-   When it passes, a session records `- Unit 9 — done` and deletes this file before the PR.
+   runner stops here. The owner chose (2026-11-21) to run it on its own, before the flash plan; a
+   failing step is fixed in this train before the flash plan's Unit 1 starts. When it passes, a session records `- Unit 9 — done` and deletes this file before the PR.
