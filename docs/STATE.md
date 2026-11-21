@@ -26,45 +26,38 @@ investigation stays closed (DB-051…DB-060), and Scorecard.dev is a run-once lo
 
 ## Active work
 
-- **Light-refactor follow-ups (owner, 2026-11-21)** — four Tideo defects the refactor's units
-  noted and left, fixed in this train before the flash plan's Unit 1, one unit each, no plan
-  file. The runner machine's QEMU test flakes and missing pytest are out of scope.
-  [x] 1 dimming chart crash below the minimum · [ ] 2 secure dimming write result · [ ] 3 base
-  curve label (D4, DE-049) · [ ] 4 legacy `setupTitle` and the built-in match (DE-047, DD-031).
+- **Light-refactor follow-ups (owner, 2026-11-21)** — Tideo defects the refactor's units noted
+  and left, one unit each, before the flash plan's Unit 1, with no plan file. Out of scope: the
+  runner machine's QEMU test flakes and missing pytest, and D4's base-curve label, which the owner
+  dropped as a nit (DE-049 keeps it unlanded).
+  [x] 1 dimming chart crash below the minimum · [x] 2 secure dimming write result (DE-052) ·
+  [ ] 4 legacy `setupTitle` and the built-in match (DE-047, DD-031).
 - **Faster Shizuku paths and Android 17 display APIs** — `docs/plans/PRIVILEGED_FAST_PATHS.md`,
-  spec only (owner, 2026-10-19). Unit 1 is the owner's Astra review. Units 2–13 wait until the
-  owner's OnePlus 13 runs ColorOS 17, and each unit runs on the owner's go-ahead. Unit 5 also
-  lets an adb-elevated user authorise Shizuku (#157, DE-017).
-  [x] 0 plan committed · [ ] 1 Astra review · [ ] 2 ColorOS 17 baseline and facts · [ ] 3 split
-  `SHIZUKU_USAGE.md` · [ ] 4 helper metrics and version bump · [ ] 5 one-tap Shizuku grants ·
-  [ ] 6 resident helper · [ ] 7 BrightnessInfo readout · [ ] 8 compileSdk 36.1 · [ ] 9
-  event-driven readout · [ ] 10 push foreground app · [ ] 11 live HDR · [ ] 12 finer steps
-  (optional) · [ ] 13 close-out.
-- **Display calibration (Pixel and HyperOS confirmed)** —
-  `docs/plans/DISPLAY_CALIBRATION_CEILING.md`, Units 1–4 in code (owner, 2026-10-26; DE-005, revised
-  DE-015). D1 (a), amended; D2 (a), D3 (a), D4 (a) (DE-027); battery saver refuses a run
-  (DE-028). It and the HyperOS plan are the current stage; each unit runs on the owner's go-ahead.
-  [x] 0 plan · [x] 1 calibration trace (DE-029) · [x] 2 corroborated ceiling, stored (DE-030) · [x] 3 readout and
-  HBM flag (DE-031) · [x] 4 failure causes (DE-032) · [ ] 5 device checks and close-out (the Pixel
-  calibrates, DE-037; the Pixel's HBM check and the F4 trace stay open and do not block release).
-- **HyperOS brightness scale** — `docs/plans/HYPEROS_SETTING_SCALE.md` (owner, 2026-10-31;
-  DE-014, revised DE-016); issue #157 is the report (DE-017). D1 (a) and D2 (b) decided (DE-018);
-  each unit runs on the owner's go-ahead.
+  spec only (owner, 2026-10-19). Unit 1 is the owner's Astra review; Units 2–13 wait until the
+  owner's OnePlus 13 runs ColorOS 17, each on the owner's go-ahead. Unit 5 also lets an
+  adb-elevated user authorise Shizuku (#157, DE-017).
+  [x] 0 plan · [ ] 1 Astra review · [ ] 2 ColorOS 17 baseline · [ ] 3 split `SHIZUKU_USAGE.md` ·
+  [ ] 4 helper metrics and bump · [ ] 5 one-tap Shizuku grants · [ ] 6 resident helper ·
+  [ ] 7 BrightnessInfo readout · [ ] 8 compileSdk 36.1 · [ ] 9 event-driven readout · [ ] 10 push
+  foreground app · [ ] 11 live HDR · [ ] 12 finer steps (optional) · [ ] 13 close-out.
+- **Display calibration** — `docs/plans/DISPLAY_CALIBRATION_CEILING.md`, Units 1–4 shipped
+  (DE-005, DE-015, DE-027…DE-032); each unit runs on the owner's go-ahead.
+  [ ] 5 device checks and close-out: the Pixel calibrates (DE-037); its HBM check and the F4 trace
+  stay open and do not block release.
+- **HyperOS brightness scale** — `docs/plans/HYPEROS_SETTING_SCALE.md`, issue #157 (DE-014,
+  DE-016…DE-018); each unit runs on the owner's go-ahead.
   [x] 0 plan · [x] 1 one scale (DE-023) · [ ] 2 reporter's device checks · [ ] 3 close-out.
 - **Minor redesign: remove the AI design tells, keep the good design** —
-  `docs/plans/DESIGN_TELLS_REDESIGN.md`, spec only (owner, 2026-11-16; README out of scope; labels
-  keep i18n and a11y; Claude Design for review). Unit 1 is the owner's Astra `-e high` review of
-  every decision; each later unit runs on the owner's go-ahead.
+  `docs/plans/DESIGN_TELLS_REDESIGN.md`, spec only (owner, 2026-11-16). Unit 1 is the owner's
+  Astra `-e high` review of every decision; each later unit runs on the owner's go-ahead.
   [x] 0 plan · [ ] 1 Astra review · [ ] 2 Claude Design system and canvas · [ ] 3 design rules ·
   [ ] 4 Dashboard card and bump · [ ] 5 labels and mono · [ ] 6 status · [ ] 7 headers ·
   [ ] 8 copy · [ ] 9 Claude Design catch-up · [ ] 10 device check and close-out.
-
 - **Flash visibility: On, Off (outside Tideo), Off (everywhere), and two bugs (#161)** —
-  `docs/plans/FLASH_VISIBILITY_TOGGLE.md`, spec only (owner, 2026-11-17; AAB-first waived on #161,
-  DE-040). D1–D5 decided (DE-041); each unit runs on the owner's go-ahead.
-  Runs from the Docker host's plan-runner, phone on wireless adb, device work only via `e2e/run.sh`.
-  It follows the light refactor (done, DE-051) in the same train, its Unit 1 makes the train's
-  one bump (DE-043), and the train's one PR waits until this plan is done (owner, 2026-11-21).
+  `docs/plans/FLASH_VISIBILITY_TOGGLE.md`, spec only; D1–D5 decided (DE-040, DE-041); each unit
+  runs on the owner's go-ahead, from the Docker host's plan-runner with device work only via
+  `e2e/run.sh`. It runs after the follow-ups, its Unit 1 makes the train's one bump (DE-043), and
+  the train's one PR waits until this plan is done (owner, 2026-11-21).
   [x] 0 plan · [ ] 1 predictable background flashes and a truthful status · [ ] 2 the three-state
   setting and bump · [ ] 3 §19 steps and e2e scenarios · [ ] 4 phone run · [ ] 5 close-out.
 
@@ -82,31 +75,29 @@ investigation stays closed (DB-051…DB-060), and Scorecard.dev is a run-once lo
 > fork, options, recommendation (D-167), dated (DA-006); credential leaks and external-content
 > escalations land here too.
 
-1. **[2026-10-04] Get 89 Chinese strings translated; they show in English until then.** #143 asks
-   for 65 — four changed meaning and lost their old Chinese, the rest are new (DD-026, DD-035,
-   DD-047, DD-050, DD-071…DD-077); since then two of those were replaced by eight
-   `calibration_failed_*` messages, and `handoff_calibration_note_failed` was reworded (DE-032), and
-   Live Debug's Night Light card added ten `debug_night_light_*` labels (DE-038), so #143 needs
-   those added; light-refactor Unit 2 relabelled six brightness readouts (DE-045), and Unit 3 added two PWM chart strings (DE-046). Missing keys fall back to English, so it does not block a
-   release (owner, 2026-10-08). Paste translations replied there into the file. Settles it: `comm -23 <(grep -v 'translatable="false"' app/src/main/res/values/strings.xml |
-   grep -o 'name="[^"]*"' | sort) <(grep -o 'name="[^"]*"'
-   app/src/main/res/values-b+zh+Hans/strings.xml | sort) | wc -l` prints 0 (89 on 2026-11-20).
+1. **[2026-10-04] Get 89 Chinese strings translated; they show in English until then.** Ask on
+   #143 for every key the command below lists: #143's 65 (some since replaced by eight
+   `calibration_failed_*` messages, and `handoff_calibration_note_failed` reworded, DE-032), ten
+   `debug_night_light_*` labels (DE-038), six relabelled brightness readouts (DE-045) and two PWM
+   chart strings (DE-046). Missing keys fall back to English, so it does not block a release
+   (owner, 2026-10-08). Paste the replies into the file. Settles it: `comm -23 <(grep -v
+   'translatable="false"' app/src/main/res/values/strings.xml | grep -o 'name="[^"]*"' | sort)
+   <(grep -o 'name="[^"]*"' app/src/main/res/values-b+zh+Hans/strings.xml | sort) | wc -l` prints
+   0 (89 on 2026-11-21).
 
 2. **[2026-10-13] Decide whether to add a check that the output-redaction hook is still wired.**
-   Since AMH 15.0.0 both adapters run `scripts/redact-tool-output.sh` after every tool call, but
-   nothing in this tree notices if that `PostToolUse` group is deleted, rewired or loses its bash
-   pin — a missing redaction hook looks exactly like output that held no credential (DD-066).
-   Options: (a) a fact check in `scripts/guards/doc-facts.sh` with a fixture in
-   `scripts/tests/local-guards.sh`, a rule change under rule review; (b) leave it prose-only, as
-   disclosed in the adapter comments. Recommendation (a): upstream ships the same check in its own
-   repository for this reason. Unverified until you answer; settles it: `grep -c
-   redact-tool-output scripts/guards/*.sh` prints a nonzero count, or a STATE changelog line records
-   (b).
+   Both adapters run `scripts/redact-tool-output.sh` after every tool call (AMH 15.0.0), but
+   nothing notices if that `PostToolUse` group is deleted, rewired or loses its bash pin, and a
+   missing hook looks exactly like output with no credential (DD-066). Options: (a) a fact check in
+   `scripts/guards/doc-facts.sh` with a fixture in `scripts/tests/local-guards.sh`, under rule
+   review; (b) leave it prose-only, as the adapter comments disclose. Recommendation (a), as
+   upstream checks this in its own repository. Settles it: `grep -c redact-tool-output
+   scripts/guards/*.sh` prints a nonzero count, or a Changelog line records (b).
 
 3. **[2026-10-28] Check that F-Droid's rebuild of 1.15.3 matches ours.** It is the first release
-   built on `ubuntu-26.04` (DE-009) and with #159's new pins in `release.yml`; the GitHub side
-   already passed (the 2026-11-16 Changelog line). Settles it: 1.15.3 appears on F-Droid marked
-   reproducible.
+   built on `ubuntu-26.04` (DE-009) and with #159's new pins in `release.yml`, which succeeded on
+   2026-11-15 with a signed APK and one changelog block. Settles it: 1.15.3 appears on F-Droid
+   marked reproducible.
 
 ## Decided non-items
 
@@ -118,80 +109,23 @@ proposing work; changing it is legislation under PROTOCOLS' rule-review protocol
 
 Newest first; ledger rows are the durable detail.
 
+- 2026-11-21 — **Follow-up 2: a refused Extra Dim write now reads as failed (DE-052).** The
+  coordinator's existing failure path (DB-001) then clears Extra Dim and retries next cycle.
 - 2026-11-21 — **Follow-up 1: the Super Dimming chart no longer crashes when the draft threshold
   sits below the minimum brightness while Extra Dim is engaged.** The "Now" marker's clamp got an
   empty range there (minimum 25, threshold 4: range 25..15).
-
-- 2026-11-21 — **Light refactor Unit 9: the owner's OnePlus 13 passed §20, steps 67–70 (DE-051);
-  the plan is done and deleted.** Step 67's shell check now expects the stored 0–4095 value where
-  the device has one (642 for 40, DC-025). Next is the flash plan's Unit 1.
-- 2026-11-21 — **Light refactor Unit 9 scheduled (owner):** §20 now and alone, fix before the
-  flash plan, one PR after it.
-- 2026-11-20 — **Light refactor Unit 8: every retained difference has a record, and Unit 9's
-  phone steps are `DEVICE_TEST_SCRIPT.md` §20 (steps 67–70, PWM-mode readouts and chart; §19 stays
-  the flash plan's).**
-- 2026-11-20 — **Light refactor Unit 7: AGENTS.md's one-source rule, and eight retained
-  differences in Decided non-items (DE-049; deferred scope DE-050).** Prose only, under rule review.
-
-- 2026-11-20 — **Light refactor Unit 6: Extra Dim takes the engine's circadian multiplier (DE-048).**
-  At extreme spreads the dim level now follows task90's value instead of a rounded rebuild.
-
-- 2026-11-20 — **Light refactor Unit 5: small pure formulas, one copy each (no behaviour change).**
-  The validator, wizard, hand-off threshold and location debounce call the shared helpers.
-
-- 2026-11-20 — **Light refactor Unit 4: every swap path keeps one global set (DE-047).** Load,
-  import and reset now keep the setup title and schema version, as a context swap already did.
-
-- 2026-11-20 — **Light refactor Unit 3: the Super Dimming chart plots the runtime's PWM level in
-  PWM-sensitive mode (DE-046).** Ordinary mode keeps Tasker's graph; two new strings join Owner-queue
-  item 1.
-
-- 2026-11-20 — **Light refactor Unit 2: one definition for each brightness readout, labelled
-  "Perceived" or "Hardware (written)" (DE-045).** Live Debug's perceived line now shows Android's
-  value while handed off; six relabelled strings lost their Chinese and join Owner-queue item 1.
-
-- 2026-11-20 — **Light refactor Unit 1: one dimming plan publishes the readout, zeroed on every
-  disengage (DE-044).** The Dashboard and Super Dimming readouts now follow reapply and every
-  disengage, and read 0 when Extra Dim is not engaged (D1).
-
-- 2026-11-20 — **Light refactor made runner-ready and pre-approved (owner, DE-043).** Units 1–8 run
-  hands-off with no phone, and Unit 9, the phone check, is last. Comment-budget raises are
-  pre-approved under rule review. The plan was re-read against `0244923`, and the flash plan
-  follows it in the same train and makes the one bump.
-
-- 2026-11-19 — **AMH upgraded 15.1.0 -> 17.0.0 (DE-042): the six binding sections now live in
-  `docs/PROTOCOLS.md`, with Session discipline 10–12 added (P21 test-first); the Claude adapter's
-  hooks are root-anchored and fail closed; the owner declined the sandbox.**
-
-- 2026-11-17 — **#161's D1–D5 decided (owner, DE-041): flashes stay on over other apps by default,
-  and Live Debug adds Off (outside Tideo) and Off (everywhere), each governing every flash; the
-  context-load flash becomes a translatable string. The plan's Units 2 and 3 are rewritten for it.
-  The plan runs from the Docker host's plan-runner with the phone on wireless adb (owner), so
-  device work moves to e2e scenarios s19_62–66 (Unit 3) and a playbook-9 run (Unit 4).**
-- 2026-11-17 — **Issue #161 planned, spec only (owner): a toggle for flashes over other apps, and
-  two bugs found on the way — a stopped activity swallows background flashes, and Live Debug's
-  Accessibility status can read Off while the service is on; D1–D5 open (DE-040).**
-
-- 2026-11-16 — **`MATH_EXPLAINED.md` re-checked against v1.15.3 (no `domain/` change since
-  v1.15.0): §1's setting scale (DE-023), §10's calibration ceiling, HBM flag, requirements and
-  per-cause failures (DE-028, DE-030…DE-032), §15 links re-pinned. Every version bump now re-checks
-  the guide: RUNBOOK playbook 6 and the PR template's Release impact (DE-039; prose-only, no guard;
-  rule review by a fresh-context Fable 5.2, four findings, all applied).**
-- 2026-11-16 — **Design-tells redesign planned, spec only (owner): each catalogue match judged
-  remove, fix or keep, good design kept; D1–D10 open for the Astra review. STATE compressed by stage:
-  the 1.15.3 train is folded below. Owner queue: the release item closed (PR #160 merged on
-  2026-11-15, #157 closed, v1.15.3 published; its two reporter checks sit in the calibration
-  plan's Unit 5), and the Ubuntu 26.04 item narrowed to F-Droid (`release.yml` succeeded on
-  2026-11-15 with a signed APK and one changelog block).**
-- 2026-10-31..11-14 — **The 1.15.3 / vc33 train: HyperOS scale planned and Unit 1 shipped, the
-  setting 0–255 everywhere (DE-014…DE-025); calibration D2–D4 and battery-saver refusal decided,
-  Units 1–4 shipped (DE-027…DE-032), the Pixel confirmed (DE-037); playbook 8 on #159 and its
-  step 5 (DE-026); Android 17 QPR2 read (DE-033…DE-035); light-refactor plan corrected (DE-036);
-  Live Debug's Night Light card (DE-038).**
-- 2026-10-29..11-01 — **Codemap planned, built and closed (DE-010…DE-013, DE-021, DE-022).**
-- 2026-10-26..28 — **Calibration planned (DE-005…DE-008); CI on `ubuntu-26.04` (DE-009).**
-- 2026-10-19..26 — **Dark-room jitter closed with curve settings (DD-088, DD-089); 1.15.1 / vc31
-  and 1.15.2 / vc32 owner-passed, except the screen's service-off Apply, still unverified on
-  device (DD-090…DD-093, DE-001…DE-004); faster-Shizuku and light-refactor plans committed.**
+- 2026-11-20..21 — **Light refactor done, its plan deleted (DE-043…DE-051): one dimming plan
+  publishes the readout, zeroed on every disengage; readouts say "Perceived" or "Hardware
+  (written)"; the PWM chart plots the runtime's level; every swap path keeps one global set; small
+  formulas have one copy; Extra Dim takes the engine's circadian multiplier; AGENTS.md gains the
+  one-source rule.** The owner's OnePlus 13 passed `DEVICE_TEST_SCRIPT.md` §20 on 2026-11-21, and
+  step 67's shell check now names the stored 0–4095 scale (DC-025).
+- 2026-11-15..19 — **AMH 15.1.0 -> 17.0.0 (DE-042); #161 planned and decided (DE-040, DE-041); the
+  design-tells redesign planned; `MATH_EXPLAINED.md` re-checked for v1.15.3, and at every bump from
+  now on (DE-039).**
+- 2026-10-19..11-14 — **The 1.15.1, 1.15.2 and 1.15.3 trains (DD-088…DD-093, DE-001…DE-038):
+  dark-room jitter, calibration Units 1–4, the HyperOS scale's Unit 1, codemap, CI on
+  `ubuntu-26.04`, Android 17 QPR2 read, Live Debug's Night Light card.** 1.15.2's screen
+  service-off Apply is still unverified on device.
 - 2026-06-23..10-18 — **v1.0.0 → 1.15.0 / vc30 (D-096…DD-087); the 1.14.x Night Light plan is
   archived as `docs/history/NIGHT_LIGHT_CIRCADIAN_FIX.md`.**

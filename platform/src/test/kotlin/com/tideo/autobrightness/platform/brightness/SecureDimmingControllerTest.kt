@@ -62,6 +62,22 @@ class SecureDimmingControllerTest {
     }
 
     @Test
+    fun refusedSecureWrites_reportFailure_whenElevated() {
+        val app = ApplicationProvider.getApplicationContext<android.app.Application>()
+        Shadows.shadowOf(app).grantPermissions(Manifest.permission.WRITE_SECURE_SETTINGS)
+        privilegeManager.refresh()
+        val attempted = mutableListOf<Pair<String, Int>>()
+        val refusing = AndroidSecureDimmingController(context, privilegeManager, secureWrite = { key, value ->
+            attempted += key to value
+            false
+        })
+
+        assertTrue(refusing.setLevel(500).isFailure, "a putInt that returns false must not read as written")
+        assertTrue(refusing.setActivated(true).isFailure, "a putInt that returns false must not read as written")
+        assertEquals(listOf("reduce_bright_colors_level" to 500, "reduce_bright_colors_activated" to 1), attempted)
+    }
+
+    @Test
     fun setLevel_clampsToValidRange_whenElevated() {
         val app = ApplicationProvider.getApplicationContext<android.app.Application>()
         Shadows.shadowOf(app).grantPermissions(Manifest.permission.WRITE_SECURE_SETTINGS)

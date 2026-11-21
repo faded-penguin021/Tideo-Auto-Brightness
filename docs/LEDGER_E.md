@@ -574,3 +574,10 @@
   Q cleared the readout at once and loading P restored it. Step 67's shell read 642, not the 40 the
   script expected: the script's error, since this OnePlus stores 0–4095 below the Settings API
   (DC-025) and 40 × 4095 / 255 ≈ 642, so the step now names both scales. No other anomaly.
+- DE-052: **`AndroidSecureDimmingController` fails a `reduce_bright_colors` write whose
+  `Settings.Secure.putInt` returns false (light-refactor follow-up, owner, 2026-11-21).** The
+  Boolean was discarded, so a refused level or activation write read as success: the coordinator
+  latched `engaged`, published the plan's readout and skipped DB-001's fail-safe clear. Now it
+  takes the path a thrown write already took: readout 0, a clear only while `engaged` reads true
+  (an UNKNOWN latch waits for the next `disengage`), and a retry on the next pipeline event.
+  `SecureDisplayController`'s writes discard the same Boolean and are not changed here.

@@ -16,15 +16,19 @@ interface SecureDimmingController {
 class AndroidSecureDimmingController(
     private val context: Context,
     private val privilegeManager: PrivilegeManager,
+    private val secureWrite: ((key: String, value: Int) -> Boolean)? = null,
 ) : SecureDimmingController {
     private val resolver: ContentResolver get() = context.contentResolver
+
+    private fun putSecure(key: String, value: Int) =
+        check(secureWrite?.invoke(key, value) ?: Settings.Secure.putInt(resolver, key, value)) { "$key not written" }
 
     override fun setLevel(level: Int): Result<Unit> {
         if (privilegeManager.currentTier() < Tier.ELEVATED) {
             return Result.failure(SecurityException("WRITE_SECURE_SETTINGS not granted"))
         }
         return runCatching {
-            Settings.Secure.putInt(resolver, "reduce_bright_colors_level", level.coerceIn(0, 1000))
+            putSecure("reduce_bright_colors_level", level.coerceIn(0, 1000))
         }
     }
 
@@ -33,7 +37,7 @@ class AndroidSecureDimmingController(
             return Result.failure(SecurityException("WRITE_SECURE_SETTINGS not granted"))
         }
         return runCatching {
-            Settings.Secure.putInt(resolver, "reduce_bright_colors_activated", if (on) 1 else 0)
+            putSecure("reduce_bright_colors_activated", if (on) 1 else 0)
         }
     }
 }
