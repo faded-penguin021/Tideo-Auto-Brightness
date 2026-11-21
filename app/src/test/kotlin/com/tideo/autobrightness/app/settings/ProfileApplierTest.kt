@@ -82,6 +82,24 @@ class ProfileApplierTest {
     }
 
     @Test
+    fun applyProfile_untouchedBuiltInSavedWithOtherGlobalsKeepsTrustAndQuickSettings_DD031() = runBlocking {
+        // A legacy import's title persists (DE-047), so a built-in saved back from the live settings carries it.
+        val profiles = UserProfileStore(app.userProfilesDataStore)
+        profiles.save("Outdoors", DefaultProfiles.Outdoors.copy(setupTitle = "My AAB", debugLevel = 5))
+        seed(AabSettings(serviceEnabled = false, setupTitle = "My AAB", trustUnreliableSensor = true, quickSettingsEnabled = true))
+
+        try {
+            applier.applyProfile("Outdoors")
+
+            val r = committed()
+            assertTrue(r.trustUnreliableSensor, "globals a load keeps do not make a built-in edited")
+            assertTrue(r.quickSettingsEnabled, "globals a load keeps do not make a built-in edited")
+        } finally {
+            profiles.restoreFactory()
+        }
+    }
+
+    @Test
     fun applyProfile_unknownName_isNoOp() = runBlocking {
         val before = AabSettings(serviceEnabled = false, minBrightness = 42, contextOverride = false)
         seed(before)

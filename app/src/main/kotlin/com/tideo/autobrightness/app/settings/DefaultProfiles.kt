@@ -70,7 +70,8 @@ object DefaultProfiles {
     )
 
     // DD-031: task592 writes no trust_unreliable or qs_use, so loading an untouched built-in keeps the user's.
+    // DE-053: the globals a load keeps anyway never make a built-in "edited".
     fun keepUserChoices(name: String, profile: AabSettings, current: AabSettings): AabSettings =
-        if (all[name]?.copy(schemaVersion = 0) != profile.copy(schemaVersion = 0)) profile
+        if (all[name]?.let { profile.keepGlobalsFrom(it) == it } != true) profile
         else profile.copy(trustUnreliableSensor = current.trustUnreliableSensor, quickSettingsEnabled = current.quickSettingsEnabled)
 }

@@ -543,6 +543,7 @@
   fields. The draft's rebase and `apply` stay separate, because the draft edits `detectOverrides`.
   A non-factory title, which only a legacy Tasker import wrote, now persists and stops DD-031's
   built-in match; it has no readout, so this is noted, not fixed.
+  → The built-in match is fixed: DE-053.
 - DE-048 [cited]: **Extra Dim takes task90's `%AAB_DimDynamic` from `BrightnessEngine.evaluate`, which
   is null with `%AAB_ScalingUse` off (light refactor Unit 6, D5; revisits D-072(2)).** The pipeline
   rebuilt it from the 3-decimal scale divided by `ScaleSpread`, scaling the rounding error by up to
@@ -560,6 +561,7 @@
   where Live Debug shows the stored value to up to three decimals. D4's "labelled as the base curve" is
   not landed: the legend still says "Curve". The entry is their record, so the code gains no
   citation; no guard backs the rule, since a duplication detector would be noisy or gamed (DA-004).
+  → The owner dropped D4's base-curve label as a nit (2026-11-21); the legend keeps "Curve".
 - DE-050: **Two light-refactor findings are deferred scope, not declines: the settings schema
   rewrite, as not light, and the settings contract's default strings, audited and all equal to the
   code (light refactor, 2026-10-21).** A later plan may take either up without reopening anything.
@@ -581,3 +583,9 @@
   takes the path a thrown write already took: readout 0, a clear only while `engaged` reads true
   (an UNKNOWN latch waits for the next `disengage`), and a retry on the next pipeline event.
   `SecureDisplayController`'s writes discard the same Boolean and are not changed here.
+- DE-053 [cited]: **DD-031's built-in match ignores the global set a load keeps anyway
+  (`keepGlobalsFrom`), so an untouched built-in saved back with a legacy `setupTitle` or another
+  global still keeps the user's Trust and Quick Settings choices (light-refactor follow-up, owner,
+  2026-11-21).** The match compared every field but `schemaVersion`, so after DE-047 let a legacy
+  title persist, saving an unedited built-in from the live settings made every later load of it
+  read as edited. A difference in any profile field still counts as an edit.

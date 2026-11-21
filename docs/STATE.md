@@ -26,12 +26,6 @@ investigation stays closed (DB-051…DB-060), and Scorecard.dev is a run-once lo
 
 ## Active work
 
-- **Light-refactor follow-ups (owner, 2026-11-21)** — Tideo defects the refactor's units noted
-  and left, one unit each, before the flash plan's Unit 1, with no plan file. Out of scope: the
-  runner machine's QEMU test flakes and missing pytest, and D4's base-curve label, which the owner
-  dropped as a nit (DE-049 keeps it unlanded).
-  [x] 1 dimming chart crash below the minimum · [x] 2 secure dimming write result (DE-052) ·
-  [ ] 4 legacy `setupTitle` and the built-in match (DE-047, DD-031).
 - **Faster Shizuku paths and Android 17 display APIs** — `docs/plans/PRIVILEGED_FAST_PATHS.md`,
   spec only (owner, 2026-10-19). Unit 1 is the owner's Astra review; Units 2–13 wait until the
   owner's OnePlus 13 runs ColorOS 17, each on the owner's go-ahead. Unit 5 also lets an
@@ -56,7 +50,7 @@ investigation stays closed (DB-051…DB-060), and Scorecard.dev is a run-once lo
 - **Flash visibility: On, Off (outside Tideo), Off (everywhere), and two bugs (#161)** —
   `docs/plans/FLASH_VISIBILITY_TOGGLE.md`, spec only; D1–D5 decided (DE-040, DE-041); each unit
   runs on the owner's go-ahead, from the Docker host's plan-runner with device work only via
-  `e2e/run.sh`. It runs after the follow-ups, its Unit 1 makes the train's one bump (DE-043), and
+  `e2e/run.sh`. It is next in this train, its Unit 1 makes the train's one bump (DE-043), and
   the train's one PR waits until this plan is done (owner, 2026-11-21).
   [x] 0 plan · [ ] 1 predictable background flashes and a truthful status · [ ] 2 the three-state
   setting and bump · [ ] 3 §19 steps and e2e scenarios · [ ] 4 phone run · [ ] 5 close-out.
@@ -109,11 +103,10 @@ proposing work; changing it is legislation under PROTOCOLS' rule-review protocol
 
 Newest first; ledger rows are the durable detail.
 
-- 2026-11-21 — **Follow-up 2: a refused Extra Dim write now reads as failed (DE-052).** The
-  coordinator's existing failure path (DB-001) then clears Extra Dim and retries next cycle.
-- 2026-11-21 — **Follow-up 1: the Super Dimming chart no longer crashes when the draft threshold
-  sits below the minimum brightness while Extra Dim is engaged.** The "Now" marker's clamp got an
-  empty range there (minimum 25, threshold 4: range 25..15).
+- 2026-11-21 — **Light-refactor follow-ups done (owner): the Super Dimming chart no longer
+  crashes with the draft threshold below the minimum; a refused Extra Dim write reads as failed
+  (DE-052); kept globals such as a legacy title no longer stop DD-031's built-in match (DE-053).**
+  The owner dropped D4's base-curve label as a nit; the runner's QEMU flakes stay out of scope.
 - 2026-11-20..21 — **Light refactor done, its plan deleted (DE-043…DE-051): one dimming plan
   publishes the readout, zeroed on every disengage; readouts say "Perceived" or "Hardware
   (written)"; the PWM chart plots the runtime's level; every swap path keeps one global set; small
