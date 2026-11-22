@@ -88,12 +88,7 @@ investigation stays closed (DB-051…DB-060), and Scorecard.dev is a run-once lo
    upstream checks this in its own repository. Settles it: `grep -c redact-tool-output
    scripts/guards/*.sh` prints a nonzero count, or a Changelog line records (b).
 
-3. **[2026-10-28] Check that F-Droid's rebuild of 1.15.3 matches ours.** It is the first release
-   built on `ubuntu-26.04` (DE-009) and with #159's new pins in `release.yml`, which succeeded on
-   2026-11-15 with a signed APK and one changelog block. Settles it: 1.15.3 appears on F-Droid
-   marked reproducible.
-
-4. **[2026-11-22] Run the light-refactor follow-up checks on the phone.** Build the debug APK
+3. **[2026-11-22] Run the light-refactor follow-up checks on the phone.** Build the debug APK
    from this train (`./gradlew :app:assembleDebug`), install it over adb (`e2e/run.sh --install`),
    and walk `docs/rebuild/DEVICE_TEST_SCRIPT.md` §21, steps 71–74, on the OnePlus 13. It worked if
    each step's **Expected** holds: the dimming chart stays open with a threshold below the
@@ -114,9 +109,12 @@ proposing work; changing it is legislation under PROTOCOLS' rule-review protocol
 
 Newest first; ledger rows are the durable detail.
 
+- 2026-11-22 — **F-Droid's rebuild of 1.15.3 matched ours (Owner-queue item closed).** Seen
+  2026-11-22: `https://f-droid.org/api/v1/packages/com.tideo.autobrightness` lists 1.15.3 / vc33 as
+  suggested, and in reproducible-build mode F-Droid publishes only on a match (`FDROID_VALIDATION.md`).
 - 2026-11-22 — **No guard for the test-first rule: no local incident, and the measured signals
-  were stale or noisy, so the owner dropped it (DE-057); device checks stay on the phone E2E suite,
-  no KVM CI (owner).**
+  were stale or noisy, so the owner dropped it (DE-057). No KVM CI either: the owner asked for one
+  only if the phone E2E suite proved insufficient, and this session judged it sufficient.**
 - 2026-11-22 — **`AGENTS.md` is 30 numbered binding rules, each naming its enforcing artifact,
   plus the details only a section can hold: 33.4 KB → 29.1 KB; session branches are
   `claude/<topic>` even when a harness assigns another name (owner, DE-056).**
