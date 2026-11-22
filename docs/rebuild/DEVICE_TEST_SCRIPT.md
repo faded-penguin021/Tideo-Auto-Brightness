@@ -899,6 +899,54 @@ Dimming, since its chart plots the draft.
     light changes. Load P again: step 68's readout returns within a few seconds. Tap **Resume
     context automation** afterwards, since a manual load pauses it (step 25).
 
+## 21. Light-refactor follow-ups (DE-052…DE-055)
+
+E2E auto: none; every row, with its reason, is in `e2e/scenarios.toml`.
+
+What a phone cannot show: the fixed path of DE-052 and DE-054 is a secure-settings write that
+returns false, which cannot be staged on a stock phone without the settings surgery step 19c
+also rules out, so steps 72 and 73 only check that working writes still read as working. The
+refused path is covered by `SecureDimmingControllerTest` and `SecureDisplayControllerTest`.
+DE-055 needs a profile file from before 1.14.0, which added DD-030's factory revision, upgraded
+in place; it has no step here, and `UserProfileStoreTest` is its evidence.
+
+Setup for 71–73 **[ELEVATED]**: service running, no context rule matching, a dark room, the
+phone lying still. On **Misc**, set **Min brightness** to 25 and Apply. On **Super Dimming**,
+switch Super dimming on and **Use software dimming (PWM-sensitive)** off, set **Dimming
+threshold** to 40, and Apply. Wait until the Dashboard shows "Super dimming N%".
+
+71. **The dimming chart survives a threshold below the minimum (light-refactor follow-up 1).**
+    Super Dimming → Dimming curve shows the red **Now** line. Type 4 into **Dimming threshold**
+    and do not Apply. **Expected:** the banner "Dimming threshold is below minimum brightness."
+    appears and the screen stays open. Only the absence of a crash is checked here; the curve
+    for this draft may look empty. Switch **Use software dimming (PWM-sensitive)** on, still
+    without applying, so the chart redraws in its PWM mode. **Expected:** still no crash.
+    **Fail:** the app closes, as 1.15.3 does at the first edit. Tap **Discard**.
+72. **Extra Dim writes still read as landed (DE-052).** Leave the setup applied and the room
+    dark. **Expected:** `adb shell settings get secure reduce_bright_colors_activated` reads 1,
+    `adb shell settings get secure reduce_bright_colors_level` matches the Live super dimming
+    card's level, rounded, and the Dashboard shows the same "Super dimming N%". Light the
+    sensor above the threshold (a lamp or a torch). **Expected:** within a few seconds
+    `reduce_bright_colors_activated` reads 0 and the Dashboard line is gone. **Fail:** a
+    dimming level is on screen while `reduce_bright_colors_activated` reads 0, or dimming never
+    engages although the card shows a level (a working write read as refused).
+73. **Privileged Display writes still read as landed (DE-054).** Re-run step 32 with the service
+    off, and step 38. If Shizuku is running for Tideo, also re-run step 38a, which takes the
+    Night Light service route (DC-057). **Expected:** as written there, and no Apply reports a
+    failure for a change that system Settings shows as made. **Fail:** a toggle the device shows
+    as changed is reported as failed, which is the one new risk this fix brings to a phone.
+74. **An untouched built-in keeps the Trust choice after a kept global changes (DE-053)
+    [BASIC].** Service running, no context rule matching. On **Reactivity**, switch **Trust
+    low-accuracy sensor** off and Apply. On **Profiles**, load **Outdoors**. On **Live Debug
+    Info**, set **Log Level** to 5. On **Profiles**, **Save current settings as…** "Outdoors" and
+    confirm **Overwrite**. The saved copy now differs from the built-in only in globals: the log
+    level and the context lock that the load set. On **Reactivity**, switch **Trust low-accuracy
+    sensor** on and Apply, then load **Outdoors** again. **Expected:** Reactivity still shows
+    **Trust low-accuracy sensor** on. **Fail:** it is off again, which is 1.15.3's behaviour.
+    The Quick Settings choice that DD-031 also keeps is set only by a Tasker import and is on
+    no screen, so it is not checked here. Afterwards, set Log Level and Trust back as they were
+    and tap **Resume context automation** (step 25).
+
 ---
 
 **On completion:** flip the affected `PARITY_CHECKLIST.md` rows to `device-verified`; record any failures

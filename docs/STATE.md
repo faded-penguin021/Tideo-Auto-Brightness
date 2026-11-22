@@ -93,6 +93,17 @@ investigation stays closed (DB-051…DB-060), and Scorecard.dev is a run-once lo
    2026-11-15 with a signed APK and one changelog block. Settles it: 1.15.3 appears on F-Droid
    marked reproducible.
 
+4. **[2026-11-22] Run the light-refactor follow-up checks on the phone.** Build the debug APK
+   from this train (`./gradlew :app:assembleDebug`), install it over adb (`e2e/run.sh --install`),
+   and walk `docs/rebuild/DEVICE_TEST_SCRIPT.md` §21, steps 71–74, on the OnePlus 13. It worked if
+   each step's **Expected** holds: the dimming chart stays open with a threshold below the
+   minimum, Extra Dim and the Privileged Display toggles still report working writes as working,
+   and reloading an untouched Outdoors keeps "Trust low-accuracy sensor". A phone cannot stage a
+   refused secure write (DE-052, DE-054) or a pre-1.14.0 profile file (DE-055); their unit tests
+   are the only evidence, and §21's preamble says so. It does not block the train's PR, which
+   waits for the flash plan anyway. Settles it: the owner reports 71–74 passed, or names the step
+   that failed; record either as a Changelog line.
+
 ## Decided non-items
 
 Binding owner declines live in `docs/rebuild/DECIDED_NON_ITEMS.md` (moved there by the owner's
@@ -102,6 +113,9 @@ proposing work; changing it is legislation under PROTOCOLS' rule-review protocol
 ## Changelog
 
 Newest first; ledger rows are the durable detail.
+
+- 2026-11-22 — **`DEVICE_TEST_SCRIPT.md` §21 (steps 71–74) checks the light-refactor follow-ups
+  on a phone; queued for the owner (item 4).**
 
 - 2026-11-21 — **Refused Privileged Display writes read as failed (owner, DE-054); kept globals
   no longer block DD-030's one-time factory upgrade (owner, DE-055).**

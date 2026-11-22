@@ -546,3 +546,24 @@ reason = "the override pause needs the system slider and the reapply needs the l
 id = "s20_70"
 status = "manual"
 reason = "needs two saved profiles and a manual load, which pauses context automation, with the light held unchanged"
+
+# §21 Light-refactor follow-ups
+[[scenario]]
+id = "s21_71"
+status = "manual"
+reason = "needs ELEVATED, Extra Dim engaged in a steady dark room, and an unapplied draft below the minimum; the pass is the absence of a crash, judged by eye"
+
+[[scenario]]
+id = "s21_72"
+status = "manual"
+reason = "needs ELEVATED, a steady dark room and then light above the threshold; added for the owner's one-off phone check, not yet scripted"
+
+[[scenario]]
+id = "s21_73"
+status = "manual"
+reason = "re-runs steps 32, 38 and 38a, whose own rows say what is automated; the added check compares Apply's failure report with system Settings by eye"
+
+[[scenario]]
+id = "s21_74"
+status = "manual"
+reason = "overwrites the saved Outdoors profile and loads it by hand, both on the UI boundary's denylist"
