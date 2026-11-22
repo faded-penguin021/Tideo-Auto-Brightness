@@ -622,3 +622,13 @@
   owner also ruled that session branches are `claude/<topic>`, a short kebab-case name as the Claude
   Code CLI uses, binding over a harness-assigned name without the prefix (the cloud harness began
   assigning `ccr-<id>` names).
+- DE-057: **No guard for the test-first rule (PROTOCOLS Session discipline 12): proposed, measured,
+  and dropped by the owner (2026-11-22).** The ledger, the STATE changelog and `docs/history/` record
+  no test written after its fix and no test loosened to make way for one; the rule came in with AMH
+  17.0.0 (DE-042), not from an incident here. Measured over all 299 commits of the full history: 9 of
+  79 commits whose message matches `\b(fix(es|ed)?|bug|crash(es|ed)?|regression|defect)\b` and touch
+  `(app|domain|platform)/src/main/*.kt` changed no `*/src/test/*` file, all dated 2026-06-11..06-28
+  and mostly UI work no JVM test reaches, and 56 commits delete lines from an existing test file
+  (`git diff --numstat --diff-filter=MD <c>^ <c> -- '*/src/test/**'`), nearly every train's squash
+  among them. D-162 would have limited either check to a warning, and one firing on a fifth of all
+  commits is warn fatigue, so both halves stay prose until a real incident shows what to check.

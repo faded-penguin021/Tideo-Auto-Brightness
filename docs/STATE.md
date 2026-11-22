@@ -114,6 +114,9 @@ proposing work; changing it is legislation under PROTOCOLS' rule-review protocol
 
 Newest first; ledger rows are the durable detail.
 
+- 2026-11-22 — **No guard for the test-first rule: no local incident, and the measured signals
+  were stale or noisy, so the owner dropped it (DE-057); device checks stay on the phone E2E suite,
+  no KVM CI (owner).**
 - 2026-11-22 — **`AGENTS.md` is 30 numbered binding rules, each naming its enforcing artifact,
   plus the details only a section can hold: 33.4 KB → 29.1 KB; session branches are
   `claude/<topic>` even when a harness assigns another name (owner, DE-056).**
