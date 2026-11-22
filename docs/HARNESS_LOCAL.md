@@ -238,7 +238,7 @@ which you chose and why.
 | Key | Ours | Why |
 |---|---|---|
 | `AMH_PROSE_VERSION` | `17.0.0` (no stock key) | **Ours entirely.** The version whose binding prose the tree follows, against `AMH_VERSION` for the shipped scripts. The two are **equal today** — the 17.0.0 upgrade landed scripts and seed prose in one commit (DE-042), as 15.1.0 did (DD-066) and DC-036 had closed the earlier 9.2.0…14.0.0 split — so `doc-facts.sh` is silent on the pair. The key stays because the **Upgrading** section below reads the changelog forward from it, which is the reason it exists; while the two differ the guard warns every run and fails if `AGENTS.md` drops its disclosure sentence first. Set them equal only in the commit that lands the prose (DC-031, DC-036). |
-| `BRANCH_PREFIX` | `claude` | Session branches are `claude/<codename>`, named in each session's directive. |
+| `BRANCH_PREFIX` | `claude` | Session branches are `claude/<topic>`, a short kebab-case name for the work; `AGENTS.md` **Git** overrules a harness-assigned name without the prefix (owner, DE-056). No rail reads the namespace. |
 | `MERGE_MODE` | `branch-train` | DA-002: branches are cut from the newest session branch, superseded ones deleted unmerged, only the final superset squash-merged. |
 | `REMOTE_FLAG` | `AAB_REMOTE` | Pre-existing neutral flag (D-176). See the adapter note below. |
 | `LEDGER_LINE_CAP` | `1000` (stock 800) | The base volume closed at D-176 and `_A.md` at exactly 1000 lines (D-153, DA-001). Since AMH 5.1.0 the volume headers and the RUNBOOK name the key instead of restating the number, so **this cell is the last prose copy** — it is the one that must move with `amh.conf`. |
@@ -267,6 +267,15 @@ Docker container, so a second sandbox inside it adds a layer without a new bound
 `.claude/settings.json` has no `sandbox` key and `bwrap socat` are not in `REQUIRED_TOOLS`. The two repo-local hooks
 (`python-edit.sh`, `comment-budget.sh`) keep their own spelling and no `onFailure`, because the
 16.0.0 note reaches only the four AMH hooks.
+
+**The two AMH `PreToolUse` guards refuse the call when they fail (AMH 16.0.0).** The Claude
+adapter anchors its AMH hooks at the project root and gives both pre-execution hooks — the command
+guard on `Bash|PowerShell` and its `--pre-task` mode — `"onFailure": "block"`, so a crashed,
+timed-out or missing guard is a stop instead of a silent pass. That holds on Claude Code 2.1.295 or
+later; an older build ignores the key and lets the call run. Under this adapter on Windows, Git for
+Windows is a hard requirement: without Git Bash every shell call is refused, and AMH is not usable.
+`AGENTS.md` **Harness** holds the rule this wiring serves (report such a refusal, never work around
+it); this paragraph moved here from there (DE-056).
 
 > **Adoption hazard, learned the hard way.** Our pre-AMH `command-guard.sh` took a
 > `--claude-hook` flag; the shipped one reads the hook payload on stdin with no flag. The moment
@@ -372,7 +381,7 @@ that exist today:
 | Adapter | Bootstrap | Command rail | Deny rails | Output redaction | Comment rail | Inline-Python rail |
 |---|---|---|---|---|---|---|
 | `.claude/settings.json` | yes (SessionStart hook, with the remote-flag translation; a second hook runs the repo-local `scripts/session-facts.sh`) | yes (PreToolUse on `Bash\|PowerShell`, stdin payload) | yes | configured, **not observed here** (PostToolUse on every tool → `redact-tool-output.sh`, AMH 15.0.0; fail-open, successful calls only, `redact.sh`'s shapes only, needs `python3`; no local guard checks the wiring is still present) | yes (PostToolUse on `Edit\|Write\|MultiEdit` → `comment-budget.sh --hook`, block cap only) | yes (second PreToolUse hook → `python-edit.sh --hook`, first match only) |
-| `.codex/config.toml` + `.codex/rules/amh.rules` | declared; **not observed to fire** on codex 0.152.1 or 0.153.2 — see below | declared; **not observed to fire** on either version, which would leave `command-guard.sh` an uncalled script for Codex | yes — the `.rules` prefix policy is loaded (`--ignore-rules` exists to skip it); its path vocabulary is narrower than a hook's | declared (`[[hooks.PostToolUse]]` → `redact-tool-output.sh`, which blocks and substitutes rather than rewriting); **not observed to fire**, like its other hooks | **no** — neither a shell hook nor a prefix rule can judge a file an edit tool wrote; `AGENTS.md` Conventions is the immediate layer | **no** — `AGENTS.md` Conventions is the only layer standing |
+| `.codex/config.toml` + `.codex/rules/amh.rules` | declared; **not observed to fire** on codex 0.152.1 or 0.153.2 — see below | declared; **not observed to fire** on either version, which would leave `command-guard.sh` an uncalled script for Codex | yes — the `.rules` prefix policy is loaded (`--ignore-rules` exists to skip it); its path vocabulary is narrower than a hook's | declared (`[[hooks.PostToolUse]]` → `redact-tool-output.sh`, which blocks and substitutes rather than rewriting); **not observed to fire**, like its other hooks | **no** — neither a shell hook nor a prefix rule can judge a file an edit tool wrote; `AGENTS.md` rule 12 is the immediate layer | **no** — `AGENTS.md` rule 17 is the only layer standing |
 
 **On the comment rail specifically.** The ladder guard is the coverage; the hook is only
 *salience*. A rule that lands solely in a ladder run arrives after the narrative is written and

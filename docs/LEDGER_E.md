@@ -610,3 +610,15 @@
   for good, since the revision is recorded whatever the outcome. The upgraded profile takes the
   factory's profile fields and `schemaVersion` and keeps the globals it held, which no load reads
   (DE-047). A difference in any profile field still keeps the profile as the user left it.
+- DE-056: **`AGENTS.md` is rebuilt around 30 numbered binding rules, each tagged with the artifact
+  that holds it, and section prose restating a rule or its enforcement is deleted (owner,
+  2026-11-22, approving the move).** Measured with `wc -c AGENTS.md`: 33,362 bytes before, 29,137
+  after; a first attempt that added the index beside the old prose measured 39,303 and the owner
+  rejected the growth. Removed history and adapter notes stay held elsewhere: the 15.1.0 -> 17.0.0
+  narrative in DE-042 and `docs/HARNESS_LOCAL.md`'s `AMH_PROSE_VERSION` row, the Destructive work
+  arrival note in DD-066, the push rail's namespace history in DC-036 and, with the PowerShell reader's
+  gaps and each rail's refusal list, the `scripts/command-guard.sh` header, the Codex measurements and python-edit marker mechanics in `docs/HARNESS_LOCAL.md`, whose
+  "Adapter and CI notes" also gains the `onFailure` version floor and Windows Git Bash requirement. The
+  owner also ruled that session branches are `claude/<topic>`, a short kebab-case name as the Claude
+  Code CLI uses, binding over a harness-assigned name without the prefix (the cloud harness began
+  assigning `ccr-<id>` names).

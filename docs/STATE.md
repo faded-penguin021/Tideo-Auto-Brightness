@@ -114,6 +114,9 @@ proposing work; changing it is legislation under PROTOCOLS' rule-review protocol
 
 Newest first; ledger rows are the durable detail.
 
+- 2026-11-22 — **`AGENTS.md` is 30 numbered binding rules, each naming its enforcing artifact,
+  plus the details only a section can hold: 33.4 KB → 29.1 KB; session branches are
+  `claude/<topic>` even when a harness assigns another name (owner, DE-056).**
 - 2026-11-22 — **`DEVICE_TEST_SCRIPT.md` §21 (steps 71–74) checks the light-refactor follow-ups
   on a phone; queued for the owner (item 4).**
 
