@@ -27,6 +27,38 @@ in place: a correction is a new row plus one appended pointer on the old one.
 - **`:app`** — Compose M3 UI (~9 screens), DataStore settings (`AabSettings`), foreground
   service runtime, QS tile, boot receiver, notification.
 
+## Invariants (BINDING — `AGENTS.md` rule 18)
+
+Binding under `AGENTS.md` rule 18, which moved them here from the constitution (DE-058). The
+complete catalogue is in `docs/LEDGER*.md`; search it as needed. These are the ones most often
+violated during maintenance:
+
+- The concurrency model is binding. There is one pipeline coroutine, and each event runs to
+  completion, including its animation. Light readings are never queued: while a cycle or its
+  cooldown holds Tasker's `%AAB_MainLoop` re-entry mutex, the newest reading that passes the
+  accuracy gate waits in a single pending slot, replacing any older one, and is reconsidered
+  against the gates then current, dead band included, once the cycle and cooldown end. A pending
+  reading never runs ahead of a control event queued before it arrived, and screen-off, pause and
+  stop discard it. Tasker drops such a reading; this departure is DC-069, amending D-027(d).
+  While smoothed lux lies outside the stored band (stretched to hold the reading it is centred
+  on), the dead band does not refuse an unchanged reading, and after an event that leaves the slot
+  empty while the pipeline runs awake and unpaused, the latest reading that sensor session
+  admitted is put back in it as a marked continuation, so settling finishes on a sensor gone
+  silent. A real reading replaces the
+  continuation, it is never counted as a callback, and nothing refills it once smoothed lux is
+  inside the band. A settling step that stalls, or the twentieth, places smoothed lux on the
+  nearest edge. Tasker has no settling path; this departure is DC-070 (DC-071).
+- Profile gates are hardcoded Kotlin booleans with provenance and a truth-table test. There is no
+  generic `ConditionList` evaluator. For `ConditionList`, And binds more tightly than Or, then And2
+  and Or2 join from left to right. XML children are alphabetical, so sort them numerically before
+  reading their order.
+- Curve mathematics comes from the Variable Set expressions in `task661`, not from Java. The Java
+  three-zone formula in `task663` exists only as a plotting copy for cross-validation. If the two
+  disagree, record the difference in `docs/rebuild/parity_gaps.md` instead of guessing.
+- `%AAB_Proximity` multiplies `LuxAlpha` by 0.1; it never pauses the pipeline. `%AAB_Test` contains
+  user-facing curve-wizard diagnostics intended for the clipboard and must be surfaced.
+  `%AAB_Debug` consists of ten named categories rather than a verbosity level.
+
 ## Reference-doc index (live; bare names are in `docs/rebuild/`, paths are repo-relative)
 
 | Question | Doc |
@@ -508,7 +540,7 @@ If this runbook lacks what you need for the task in front of you:
    actually made now.
 
 Boundary (DA-006): self-adaptation covers *operational* content — playbooks, the doc index,
-module maps, commands, stale paths. *Binding* rules (everything in `docs/PROTOCOLS.md`, guard
-semantics, git/permission policy) are never self-adaptation: they go through the rule-review
-protocol (DA-005), and process-reshaping changes through the Owner queue (`docs/PROTOCOLS.md` →
-**Session discipline** 7(d)).
+module maps, commands, stale paths. *Binding* rules (everything in `docs/PROTOCOLS.md`, this
+file's Invariants (`AGENTS.md` rule 18), guard semantics, git/permission policy) are never
+self-adaptation: they go through the rule-review protocol (DA-005), and process-reshaping changes
+through the Owner queue (`docs/PROTOCOLS.md` → **Session discipline** 7(d)).

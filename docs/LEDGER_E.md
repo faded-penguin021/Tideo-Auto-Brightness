@@ -632,3 +632,9 @@
   (`git diff --numstat --diff-filter=MD <c>^ <c> -- '*/src/test/**'`), nearly every train's squash
   among them. D-162 would have limited either check to a warning, and one firing on a fifth of all
   commits is warn fatigue, so both halves stay prose until a real incident shows what to check.
+- DE-058: **`AGENTS.md` sheds its Invariants section to RUNBOOK "Invariants", moved verbatim and
+  still binding through rule 18, and folds Secrets into rules 19–21, Destructive work into one
+  paragraph and Architecture into one, whose Shizuku detail `privilege_tiers.md` already held
+  (owner, 2026-11-23).** Measured with `wc -c AGENTS.md`: 29,137 bytes before, 24,088 after. No
+  rule was repealed or weakened; each removed sentence is restated in a rule, in the kept
+  paragraph, or in the document the pointer names.

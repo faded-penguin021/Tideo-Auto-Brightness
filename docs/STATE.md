@@ -109,6 +109,9 @@ proposing work; changing it is legislation under PROTOCOLS' rule-review protocol
 
 Newest first; ledger rows are the durable detail.
 
+- 2026-11-23 — **`AGENTS.md` 29,137 → 24,088 bytes: Invariants moved to RUNBOOK, still binding;
+  Secrets folded into rules 19–21; Destructive work and Architecture cut to a paragraph each
+  (owner, DE-058).**
 - 2026-11-22 — **F-Droid's rebuild of 1.15.3 matched ours (Owner-queue item closed).** Seen
   2026-11-22: `https://f-droid.org/api/v1/packages/com.tideo.autobrightness` lists 1.15.3 / vc33 as
   suggested, and in reproducible-build mode F-Droid publishes only on a match (`FDROID_VALIDATION.md`).

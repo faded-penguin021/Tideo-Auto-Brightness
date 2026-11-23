@@ -88,16 +88,23 @@ rail, advisory or hook updates its tag here in the same commit (prose).
 17. Prefer `Write` or `Edit` to an inline `python3 -c` or heredoc edit, which is opaque until read
     back (DB-062); a preference, not a ban. [hook: Claude `python-edit.sh`, first match per
     container]
-18. The invariants below bind as stated, and the app never reads Tasker's own `adbwp`
-    preferences. → Invariants [prose; tests cover parts]
-19. Never dump an environment or print any part of a credential; report only whether a named
-    credential is present. → Secrets [rail partial: Claude `settings.json` environment-dump and
-    credential-file denies; guard partial: secret-shape rung, `staged-secrets.sh`; hook: the
-    output-redaction filter, configured but not observed]
-20. The owner's personal identifiers are secrets; check `git config user.email` before the first
-    commit. → Secrets [guard partial: author-identity rung on committed identities; else prose]
-21. A leaked secret stops normal work: an Owner-queue item at once; the owner rotates, and any
-    history rewrite is the owner's. → Secrets [prose]
+18. The invariants in RUNBOOK "Invariants" bind as stated, and the app never reads Tasker's own
+    `adbwp` preferences. → `docs/RUNBOOK.md` Invariants [prose; tests cover parts]
+19. Never dump an environment or print any part of a credential — value, prefix, suffix, length,
+    hash, or an `echo` expanding it; report only whether a named credential is present. If
+    diagnosis seems to need a value, ask the owner in the Owner queue for a narrower evidence
+    contract. `scripts/command-guard.sh` and `scripts/redact.sh` state their boundaries in their
+    headers, never copied into this file, and a green check does not replace this rule. [rail partial: Claude `settings.json`
+    environment-dump and credential-file denies; guard partial: secret-shape rung,
+    `staged-secrets.sh`; hook: the output-redaction filter, configured but not observed]
+20. The owner's personal identifiers are secrets, in Git author metadata, bylines and changelog
+    credits too: use the owner's handle or a forge no-reply alias, never a personal address, even
+    one the harness supplied; check `git config user.email` before the first commit. [guard
+    partial: author-identity rung on committed identities, which cannot judge an identity not yet
+    committed nor tell a work address from a personal one; else prose]
+21. A leaked secret stops normal work: name it by key only, add an Owner-queue item at once and
+    follow PROTOCOLS "Incident: leaked credential" (DA-006); the owner rotates, and no agent
+    rewrites history. [prose]
 22. Run destructive code against fixtures only; never remove a safety check to watch what it
     prevents; a refused deletion is a stop. → Destructive work [rail partial: `command-guard.sh`
     target list, Claude only; else prose]
@@ -189,26 +196,14 @@ that an approach was never tried or what a session did. Use the ledger, the STAT
 
 ## Architecture
 
-The `:domain` module is pure JVM code. It contains the mathematics and decisions, has no Android
-imports, and is golden-tested against transcribed Tasker references. The `:platform` module holds
-Android adapters behind small interfaces. The `:app` module contains the Compose UI, DataStore,
-and the foreground-service runtime. `docs/RUNBOOK.md` describes the same structure in more detail.
-
-The app has two privilege tiers:
-
-- **BASIC** uses the user-grantable `WRITE_SETTINGS` permission and runs the core pipeline.
-- **ELEVATED** uses `WRITE_SECURE_SETTINGS`, granted once through `pm grant` over adb, Shizuku, or
-  root. It adds super dimming and the Privileged Display toggles. After the grant, secure writes go
-  directly through `Settings.Secure` or `Settings.Global`; they do not use a binder.
-
-Shizuku is also an optional runtime dependency in exactly four places: the Wi-Fi SSID strategy that
-does not require Location, the force-dark toggle, the Night Light temperature write through
-the display service (DC-057) — the one secure-settings write that can also go through a binder: on
-a build observed ignoring the Kelvin key, while a profile's extended range of 686–7308 K is on, and
-after an out-of-range write until one lands through it (DD-048, DD-051) — and the `dumpsys display`
-brightness read during a bright-light hand-off and a display calibration, first tried after the DUMP
-grant and root, then reused while it answers (DD-077). It is not only a grant mechanism. The count
-is anchored in `scripts/guards/doc-facts.sh`; if it changes, update both the claim and the constant.
+`:domain` is pure JVM mathematics and decisions, golden-tested against transcribed Tasker
+references; `:platform` holds Android adapters behind small interfaces; `:app` holds the Compose
+UI, DataStore and the foreground-service runtime (RUNBOOK "Where logic lives"). **BASIC** runs the
+core pipeline on `WRITE_SETTINGS`; **ELEVATED** adds super dimming and the Privileged Display
+toggles on `WRITE_SECURE_SETTINGS`, granted once over adb, Shizuku or root. Beyond granting,
+Shizuku is an optional runtime dependency in exactly four places, each described in
+`docs/rebuild/architecture/privilege_tiers.md`; the count is anchored in
+`scripts/guards/doc-facts.sh`, so a change updates the claim, its restatements and the constant.
 
 ## Conventions
 
@@ -251,88 +246,22 @@ is a decision of its own: that unit owes a fresh-context pass with no self-revie
 the old test against the specification and never against the fix (AMH 17.0.0, P21). Where rule 14
 forbids the change outright, it is forbidden.
 
-## Invariants
-
-The complete catalogue is in `docs/LEDGER*.md`; search it as needed. These are the invariants most
-often violated during maintenance:
-
-- The concurrency model is binding. There is one pipeline coroutine, and each event runs to
-  completion, including its animation. Light readings are never queued: while a cycle or its
-  cooldown holds Tasker's `%AAB_MainLoop` re-entry mutex, the newest reading that passes the
-  accuracy gate waits in a single pending slot, replacing any older one, and is reconsidered
-  against the gates then current, dead band included, once the cycle and cooldown end. A pending
-  reading never runs ahead of a control event queued before it arrived, and screen-off, pause and
-  stop discard it. Tasker drops such a reading; this departure is DC-069, amending D-027(d).
-  While smoothed lux lies outside the stored band (stretched to hold the reading it is centred
-  on), the dead band does not refuse an unchanged reading, and after an event that leaves the slot
-  empty while the pipeline runs awake and unpaused, the latest reading that sensor session
-  admitted is put back in it as a marked continuation, so settling finishes on a sensor gone
-  silent. A real reading replaces the
-  continuation, it is never counted as a callback, and nothing refills it once smoothed lux is
-  inside the band. A settling step that stalls, or the twentieth, places smoothed lux on the
-  nearest edge. Tasker has no settling path; this departure is DC-070 (DC-071).
-- Profile gates are hardcoded Kotlin booleans with provenance and a truth-table test. There is no
-  generic `ConditionList` evaluator. For `ConditionList`, And binds more tightly than Or, then And2
-  and Or2 join from left to right. XML children are alphabetical, so sort them numerically before
-  reading their order.
-- Curve mathematics comes from the Variable Set expressions in `task661`, not from Java. The Java
-  three-zone formula in `task663` exists only as a plotting copy for cross-validation. If the two
-  disagree, record the difference in `docs/rebuild/parity_gaps.md` instead of guessing.
-- `%AAB_Proximity` multiplies `LuxAlpha` by 0.1; it never pauses the pipeline. `%AAB_Test` contains
-  user-facing curve-wizard diagnostics intended for the clipboard and must be surfaced.
-  `%AAB_Debug` consists of ten named categories rather than a verbosity level.
-
-## Secrets
-
-The app contains no secrets, but the session environment carries credentials. "Any part" includes
-a credential's value, prefix, suffix, length and hash, and expanding it into `echo`. If diagnosis
-appears to need a value, add an Owner-queue question asking for a narrower evidence contract.
-
-Owner identifiers leak through Git author metadata, document bylines and changelog credits, where
-credential protections may not apply: use the owner's handle or a forge no-reply alias, never a
-personal address, even one the harness supplied. The identity rung cannot judge an identity not
-yet committed, nor tell a work address from a personal one.
-
-`scripts/command-guard.sh` and `scripts/redact.sh` state their exact boundaries in their headers;
-do not copy them here, where they would drift. A green check does not replace these rules.
-
-On a leak, refer to the secret only by key name and follow `docs/PROTOCOLS.md` "Incident: leaked
-credential" (DA-006). No agent rewrites history.
-
 ## Destructive work
 
-- **Exercise an unguarded destructive path against a fixture, never against a live one.** Code
-  that deletes, truncates or resets is run against a tree made for the run — a `mktemp -d`, a
-  fixture directory, a scratch DataStore — never against the working tree, a home directory, a
-  connected device's data, or anything whose loss would matter. This covers the demonstration a
-  guard is expected to ship with (`docs/PROTOCOLS.md` "Incident: leaked credential" step 5, and
-  every guard added under `scripts/guards/` with its fixture in `scripts/tests/local-guards.sh`):
-  proving a fixture fails without its guard is done by removing the **behaviour** and re-running
-  the **suite**, never by performing the unguarded operation for real.
-- **Never remove a safety check from the source to observe what it prevents.** Writing a guard
-  and then deleting it to see what happens is not a test; it is the incident. When a guard's
-  necessity is in question, the answer is a fixture that FAILS without it — not an execution that
-  succeeds without it.
-- **A refused deletion is a stop, not a spelling problem.** When a guard denies a deletion
-  permanently, or the host refuses it, never retry it through another shell, a `cmd /c` or
-  `powershell -Command` wrapper, an interpreter or a script file to get it past the refusal. Read
-  what the refusal objected to; if the deletion is still needed, use a spelling the refusal itself
-  names or ask the owner. A one-time advisory clears when the SAME command is rerun after the
-  check it asks for; a respelling made only to dodge it is the sidestep its text names. On
-  Windows, never wrap a path in `\"` nested quotes for `cmd /c`: neither `cmd.exe` nor Windows
-  PowerShell 5.1 reads `\"` as an escape, and in reported incidents `rmdir /s /q` received a bare
-  `\` — the root of the drive. A leftover git worktree is removed with
-  `git worktree remove --force <path>`, which needs no nested quoting.
-- **What the rail does not hold binds you.** `scripts/command-guard.sh` permanently blocks only a
-  short TARGET list — four recursive-deletion commands aimed at a filesystem root, a drive root or a
-  home directory, and one Windows quoting spelling at any path — and gives most other destructive
-  verbs (the git ones only on an unknown target) and inline interpreter deletions one advisory that
-  a rerun clears. It reaches only an agent whose
-  pre-execution hook runs it; for Codex this section is prose only (`docs/HARNESS_LOCAL.md`).
-  Everything else is prose: a path built from a variable it cannot expand, a deletion behind
-  `bash -c` (always, under a harness that wraps every command in `bash -lc`), a deletion in a
-  script file, a Gradle task or test suite that deletes when it runs, and any spelling off the
-  list. Its header block **what this guard does NOT catch** is the authority on the rest.
+Rule 22's details. Destructive code is anything that deletes, truncates or resets, a Gradle task
+or test suite included. A fixture is a tree made for the run — a `mktemp -d`, a fixture directory, a
+scratch DataStore — never the working tree, a home directory, a device's data or anything whose
+loss would matter. A guard is shown necessary by a fixture that fails when its **behaviour** is
+removed and the **suite** rerun (PROTOCOLS "Incident: leaked credential" step 5,
+`scripts/tests/local-guards.sh`), never by running the unguarded operation. After a refused deletion, never retry through another shell, a
+`cmd /c` or `powershell -Command` wrapper, an interpreter or a script file: use a spelling the
+refusal names, or ask the owner. A one-time advisory clears when the SAME command is rerun after
+its check; a respelling to dodge it is the sidestep it names. On Windows never nest `\"` quotes
+for `cmd /c` — neither `cmd.exe` nor PowerShell 5.1 reads it as an escape, and `rmdir /s /q` has
+received a bare `\`, the drive root; remove a leftover worktree with
+`git worktree remove --force <path>`. `scripts/command-guard.sh` blocks only a short target list,
+only for an agent whose pre-execution hook runs it (for Codex none, `docs/HARNESS_LOCAL.md`); its
+header block **what this guard does NOT catch** names the rest, which binds as prose.
 
 ## External content
 

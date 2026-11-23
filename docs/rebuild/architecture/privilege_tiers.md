@@ -28,7 +28,7 @@ genuine runtime uses (no-Location Wi-Fi SSID via `cmd wifi status`; global force
 observed to ignore the key, DC-057, while a profile's 686–7308 K extended range is on, and after an
 out-of-range write until one lands through it, DD-048/DD-051; the hand-off brightness readout and
 display calibration via `dumpsys display`, first tried after the DUMP grant and root and reused while it answers, DD-077) are separate optional features, not part of the elevation
-path — AGENTS.md. The third is the only one that reflects on a hidden interface, and it does so
+path (the count is anchored in AGENTS.md "Architecture" and `scripts/guards/doc-facts.sh`). The third is the only one that reflects on a hidden interface, and it does so
 inside the privileged process, never in the app's own.
 
 1. **ADB (always offered, the invariant).** `adbGrantInstruction()` returns

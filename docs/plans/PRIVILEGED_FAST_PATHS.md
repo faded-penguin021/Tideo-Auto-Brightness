@@ -207,10 +207,10 @@ becomes a new DD row in the unit that acts on it:
     Night Light temperature through the display service, and the display brightness readout;
   - one item for the one-time grants.
 - Keep the plain language and the same facts. Leave README's pointer unchanged. The text must
-  agree with AGENTS.md "Architecture" and with `privilege_tiers.md`.
+  agree with `privilege_tiers.md` and with AGENTS.md "Architecture"'s count.
 - From here on, each unit that changes a use edits its own item.
 - Acceptance: `--guards-only` green, and the commit body states that the four items match
-  AGENTS.md.
+  `privilege_tiers.md` and AGENTS.md's count.
 
 **4. Open the code train and measure the helper (no behaviour change).**
 - Do the version bump.
